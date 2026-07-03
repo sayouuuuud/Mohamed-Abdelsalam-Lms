@@ -19,20 +19,33 @@ import {
   ChevronRight,
   X,
 } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { useLogout } from '@/lib/use-logout'
+import { NavBadge } from '@/components/nav-badge'
+import {
+  getStudentSidebarBadges,
+  type StudentSidebarBadges,
+} from '@/app/student/badges-actions'
 
-const navItems = [
+type BadgeKey = keyof StudentSidebarBadges
+
+const navItems: {
+  label: string
+  icon: typeof LayoutDashboard
+  href: string
+  badge?: BadgeKey
+}[] = [
   { label: 'الرئيسية', icon: LayoutDashboard, href: '/student' },
   { label: 'تصفّح المحاضرات', icon: Compass, href: '/student/browse' },
   { label: 'كورساتي', icon: BookOpen, href: '/student/courses' },
   { label: 'الاختبارات', icon: ClipboardList, href: '/student/exams' },
   { label: 'الواجبات', icon: FileText, href: '/student/assignments' },
   { label: 'جدولي', icon: CalendarDays, href: '/student/schedule' },
-  { label: 'الرسائل', icon: MessageSquare, href: '/student/messages' },
-  { label: 'الإشعارات', icon: Bell, href: '/student/notifications' },
-  { label: 'الفواتير', icon: Receipt, href: '/student/billing' },
+  { label: 'الرسائل', icon: MessageSquare, href: '/student/messages', badge: 'messages' },
+  { label: 'الإشعارات', icon: Bell, href: '/student/notifications', badge: 'notifications' },
+  { label: 'الفواتير', icon: Receipt, href: '/student/billing', badge: 'billing' },
   { label: 'الإعدادات', icon: Settings, href: '/student/settings' },
 ]
 
@@ -49,6 +62,28 @@ export function StudentSidebar({
 }) {
   const pathname = usePathname()
   const logout = useLogout()
+  const [badges, setBadges] = useState<StudentSidebarBadges>({
+    messages: 0,
+    notifications: 0,
+    billing: 0,
+  })
+
+  // Fetch live counts on mount, poll every 60s, and refresh on navigation
+  // so a badge clears right after the student visits the relevant page.
+  useEffect(() => {
+    let active = true
+    async function load() {
+      const data = await getStudentSidebarBadges()
+      if (active) setBadges(data)
+    }
+    load()
+    const interval = setInterval(load, 60_000)
+    return () => {
+      active = false
+      clearInterval(interval)
+    }
+  }, [pathname])
+
   return (
     <>
       {open && (
@@ -130,10 +165,17 @@ export function StudentSidebar({
                     )}
                   >
                     <item.icon className="size-5 shrink-0" />
+                    {collapsed && item.badge && (
+                      <NavBadge count={badges[item.badge]} collapsed />
+                    )}
                     {!collapsed && (
                       <>
                         <span className="flex-1">{item.label}</span>
-                        {active && <ChevronLeft className="size-4 opacity-70" />}
+                        {item.badge && badges[item.badge] > 0 ? (
+                          <NavBadge count={badges[item.badge]} />
+                        ) : (
+                          active && <ChevronLeft className="size-4 opacity-70" />
+                        )}
                       </>
                     )}
                   </Link>
