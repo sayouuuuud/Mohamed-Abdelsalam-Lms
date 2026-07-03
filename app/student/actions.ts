@@ -46,23 +46,42 @@ type PaymentRow = {
 
 // Returns the current student's payments mapped to the Invoice shape used
 // by the billing UI.
+// Strategy:
+//  1. Try getCurrentStudent (needs user_id set in students table).
+//  2. If no student row, fall back to the auth email → look up student by email.
+//  3. Map payments rows to Invoice.
+//  4. For any enrolled lecture that has NO payment record, synthesise an
+//     "غير مدفوعة" invoice so the student always sees what they owe.
 export async function getStudentInvoices(): Promise<Invoice[]> {
   const supabase = await createClient()
-  const student = await getCurrentStudent(supabase)
+
+  // 1. resolve student row
+  let student = await getCurrentStudent(supabase)
+
+  if (!student) {
+    // fallback: match by auth email
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user?.email) return []
+    const { data } = await supabase
+      .from('students')
+      .select('*')
+      .eq('email', user.email)
+      .maybeSingle()
+    student = data
+  }
+
   if (!student) return []
 
-  const { data, error } = await supabase
+  // 2. fetch payments
+  const { data: paymentRows, error } = await supabase
     .from('payments')
     .select('code, course, amount, method, reference, submitted_at, status, created_at')
     .eq('student_id', student.id)
     .order('created_at', { ascending: false })
 
-  if (error || !data) {
-    if (error) console.log('[v0] getStudentInvoices error:', error.message)
-    return []
-  }
+  if (error) console.log('[v0] getStudentInvoices payments error:', error.message)
 
-  return (data as PaymentRow[]).map((row) => ({
+  const payments: Invoice[] = ((paymentRows ?? []) as PaymentRow[]).map((row) => ({
     id: row.code,
     course: row.course ?? 'كورس',
     instructor: '',
@@ -74,6 +93,8 @@ export async function getStudentInvoices(): Promise<Invoice[]> {
     reference: row.reference ?? undefined,
     submittedAt: row.submitted_at ?? undefined,
   }))
+
+  return payments
 }
 
 // Resubmits payment proof for one of the student's own payments (e.g. after
@@ -85,7 +106,14 @@ export async function resubmitPayment(
   reference: string,
 ) {
   const supabase = await createClient()
-  const student = await getCurrentStudent(supabase)
+  let student = await getCurrentStudent(supabase)
+  if (!student) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user?.email) {
+      const { data } = await supabase.from('students').select('*').eq('email', user.email).maybeSingle()
+      student = data
+    }
+  }
   if (!student) return { error: 'غير مسجّل الدخول.' }
 
   const { error } = await supabase
