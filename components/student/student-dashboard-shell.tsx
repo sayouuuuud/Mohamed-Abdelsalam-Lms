@@ -11,7 +11,7 @@ import { LearningActivityChart } from './learning-activity-chart'
 import type { ActivityDay, CourseProgress, ScheduleItem, GradeItem, Announcement } from '@/lib/student-types'
 import { Announcements } from './announcements'
 import { UpcomingExams } from './upcoming-exams'
-import { WeeklyGoals } from './weekly-goals'
+import { PendingAssignments } from './pending-assignments'
 import { MonthlyProgress } from './monthly-progress'
 
 export function StudentDashboardShell({
@@ -52,10 +52,10 @@ export function StudentDashboardShell({
         </div>
       </div>
 
-      {/* Row 3: أحدث الدرجات + الأهداف الأسبوعية + إنجازات الشهر */}
+      {/* Row 3: أحدث الدرجات + الواجبات المطلوبة + إنجازات الشهر */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <RecentGrades grades={grades} />
-        <WeeklyGoals />
+        <PendingAssignments />
         <MonthlyProgress />
       </div>
 
