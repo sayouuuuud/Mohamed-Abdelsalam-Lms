@@ -21,20 +21,33 @@ import {
   ChevronRight,
   X,
 } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { useLogout } from '@/lib/use-logout'
+import { NavBadge } from '@/components/nav-badge'
+import {
+  getAdminSidebarBadges,
+  type AdminSidebarBadges,
+} from '@/app/admin/badges-actions'
 
-const navItems = [
+type BadgeKey = keyof AdminSidebarBadges
+
+const navItems: {
+  label: string
+  icon: typeof LayoutDashboard
+  href: string
+  badge?: BadgeKey
+}[] = [
   { label: 'الصفحة الرئيسية', icon: LayoutDashboard, href: '/admin/dashboard' },
   { label: 'الطلاب', icon: Users, href: '/admin/students' },
   { label: 'التصنيفات', icon: Layers, href: '/admin/categories' },
   { label: 'المحاضرات', icon: BookOpen, href: '/admin/courses' },
   { label: 'الاختبارات', icon: ClipboardList, href: '/admin/exams' },
   { label: 'التقويم', icon: CalendarDays, href: '/admin/calendar' },
-  { label: 'الطلبات', icon: ShoppingCart, href: '/admin/payments' },
-  { label: 'رسائل', icon: MessageSquare, href: '/admin/messages' },
-  { label: 'الإشعارات', icon: Bell, href: '/admin/notifications' },
+  { label: 'الطلبات', icon: ShoppingCart, href: '/admin/payments', badge: 'orders' },
+  { label: 'رسائل', icon: MessageSquare, href: '/admin/messages', badge: 'messages' },
+  { label: 'الإشعارات', icon: Bell, href: '/admin/notifications', badge: 'notifications' },
   { label: 'خصومات و الكوبونات', icon: Tag, href: '/admin/coupons' },
   { label: 'التقارير', icon: BarChart3, href: '/admin/reports' },
   { label: 'الإعدادات', icon: Settings, href: '/admin/settings' },
@@ -53,6 +66,28 @@ export function Sidebar({
 }) {
   const pathname = usePathname()
   const logout = useLogout()
+  const [badges, setBadges] = useState<AdminSidebarBadges>({
+    orders: 0,
+    messages: 0,
+    notifications: 0,
+  })
+
+  // Fetch live counts on mount, poll every 60s, and refresh on navigation
+  // so a badge clears right after the admin visits the relevant page.
+  useEffect(() => {
+    let active = true
+    async function load() {
+      const data = await getAdminSidebarBadges()
+      if (active) setBadges(data)
+    }
+    load()
+    const interval = setInterval(load, 60_000)
+    return () => {
+      active = false
+      clearInterval(interval)
+    }
+  }, [pathname])
+
   return (
     <>
       {open && (
@@ -134,10 +169,17 @@ export function Sidebar({
                   )}
                 >
                   <item.icon className="size-5 shrink-0" />
+                  {collapsed && item.badge && (
+                    <NavBadge count={badges[item.badge]} collapsed />
+                  )}
                   {!collapsed && (
                     <>
                       <span className="flex-1">{item.label}</span>
-                      {active && <ChevronLeft className="size-4 opacity-70" />}
+                      {item.badge && badges[item.badge] > 0 ? (
+                        <NavBadge count={badges[item.badge]} />
+                      ) : (
+                        active && <ChevronLeft className="size-4 opacity-70" />
+                      )}
                     </>
                   )}
                 </Link>
