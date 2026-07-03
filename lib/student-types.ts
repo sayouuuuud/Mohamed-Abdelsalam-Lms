@@ -171,9 +171,7 @@ export type ScheduleEvent = {
   time: string
   type: ScheduleEventType
   course: string
-  instructor?: string
-  duration?: number
-  location?: string
+  description?: string
 }
 
 /** مختصر للداشبورد */

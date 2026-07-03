@@ -11,8 +11,6 @@ import {
   FileText,
   BookOpenCheck,
   Video,
-  MapPin,
-  User,
 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -396,23 +394,15 @@ function EventRow({ event }: { event: ScheduleEvent }) {
           <p className="mt-0.5 text-xs text-muted-foreground">{event.course}</p>
         </div>
       </div>
+      {event.description && (
+        <p className="mt-2 text-right text-xs leading-relaxed text-muted-foreground">
+          {event.description}
+        </p>
+      )}
       <div className="mt-2 flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-xs text-muted-foreground">
-        {event.instructor && (
-          <span className="flex items-center gap-1">
-            <User className="size-3" />
-            {event.instructor}
-          </span>
-        )}
-        {event.location && (
-          <span className="flex items-center gap-1">
-            <MapPin className="size-3" />
-            {event.location}
-          </span>
-        )}
         <span className="flex items-center gap-1">
           <Clock className="size-3" />
           {event.time}
-          {event.duration ? ` · ${event.duration} د` : ''}
         </span>
       </div>
     </div>
