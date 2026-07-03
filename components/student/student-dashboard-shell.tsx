@@ -27,9 +27,41 @@ export function StudentDashboardShell({
   announcements: Announcement[]
   activity: ActivityDay[]
 }) {
+  // ── Real values for the welcome banner (computed from live data) ──
+  const totalCompleted = enrolledCourses.reduce((s, c) => s + c.completedLessons, 0)
+  const totalLessons = enrolledCourses.reduce((s, c) => s + c.totalLessons, 0)
+  const completionPercent =
+    totalLessons > 0 ? Math.round((totalCompleted / totalLessons) * 100) : 0
+
+  const avgGrade =
+    grades.length > 0
+      ? Math.round(
+          grades.reduce((s, g) => s + (g.total > 0 ? (g.score / g.total) * 100 : 0), 0) /
+            grades.length,
+        )
+      : null
+
+  // Consecutive days with learning activity, counting back from the most recent day.
+  let streak = 0
+  for (let i = activity.length - 1; i >= 0; i--) {
+    if (activity[i].hours > 0) streak++
+    else break
+  }
+
+  const lessonsThisWeek = schedule.filter(
+    (s) => s.type === 'محاضرة' || s.type === 'مراجعة',
+  ).length
+  const examsThisWeek = schedule.filter((s) => s.type === 'اختبار').length
+
   return (
     <div className="flex flex-col gap-4">
-      <StudentWelcome />
+      <StudentWelcome
+        completionPercent={completionPercent}
+        avgGrade={avgGrade}
+        streak={streak}
+        lessonsThisWeek={lessonsThisWeek}
+        examsThisWeek={examsThisWeek}
+      />
       <StudentStats courses={enrolledCourses} grades={grades} activity={activity} />
 
       {/* Row 1: أكمل من حيث توقفت (wide) + الاختبارات القادمة */}
