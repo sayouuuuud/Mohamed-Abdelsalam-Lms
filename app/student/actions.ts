@@ -249,9 +249,7 @@ export async function getStudentFullSchedule() {
       time: e.event_time,
       type: e.type,
       course: e.course || 'عام',
-      instructor: 'منصة تعليمية',
-      location: e.custom ? 'أونلاين' : '',
-      duration: 60
+      description: e.description || '',
     }
   })
 }
