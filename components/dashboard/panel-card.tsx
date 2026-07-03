@@ -15,6 +15,7 @@ export function PanelCard({
   onFilterChange,
   action,
   actionHref,
+  actionSlot,
   children,
 }: {
   title: string
@@ -27,6 +28,8 @@ export function PanelCard({
   action?: string
   /** If provided, the action button becomes a link. */
   actionHref?: string
+  /** Custom header control (takes priority over `action`). */
+  actionSlot?: ReactNode
   children: ReactNode
 }) {
   return (
@@ -44,17 +47,19 @@ export function PanelCard({
             {filter}
           </span>
         ) : null}
-        {action && (
-          actionHref ? (
-            <Link href={actionHref} className="text-xs font-semibold text-primary hover:underline">
-              {action}
-            </Link>
-          ) : (
-            <button type="button" className="text-xs font-semibold text-primary hover:underline">
-              {action}
-            </button>
-          )
-        )}
+        {actionSlot
+          ? actionSlot
+          : action && (
+              actionHref ? (
+                <Link href={actionHref} className="text-xs font-semibold text-primary hover:underline">
+                  {action}
+                </Link>
+              ) : (
+                <button type="button" className="text-xs font-semibold text-primary hover:underline">
+                  {action}
+                </button>
+              )
+            )}
       </div>
       <div className="flex min-h-0 flex-1 flex-col">{children}</div>
     </Card>

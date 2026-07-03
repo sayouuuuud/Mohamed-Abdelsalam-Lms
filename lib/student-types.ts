@@ -36,6 +36,28 @@ export type ActivityDay = {
 }
 
 // ---------------------------------------------------------------------------
+// Weekly Goals (أهداف أسبوعية — الأهداف قابلة للتعديل والتقدّم محسوب تلقائياً)
+// ---------------------------------------------------------------------------
+
+export type WeeklyGoalKey = 'lessons' | 'hours' | 'assignments' | 'exams'
+
+export type WeeklyGoal = {
+  key: WeeklyGoalKey
+  label: string
+  /** التقدّم الفعلي هذا الأسبوع — محسوب من البيانات الحقيقية */
+  current: number
+  /** الهدف الذي حدّده الطالب */
+  target: number
+}
+
+export type WeeklyGoalTargets = {
+  lessons: number
+  hours: number
+  assignments: number
+  exams: number
+}
+
+// ---------------------------------------------------------------------------
 // Courses & Lessons
 // ---------------------------------------------------------------------------
 
