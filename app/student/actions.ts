@@ -904,3 +904,134 @@ export async function trackStudentDevice() {
   }, { onConflict: 'student_id' });
 }
 
+// ── Monthly Progress ────────────────────────────────────────────────────────
+
+export type MonthlyStat = {
+  label: string
+  value: string | number
+  change: string
+  positive: boolean | null
+}
+
+// Returns four real stats for the current calendar month:
+// completed lessons, learning hours, current daily streak, average grade.
+export async function getStudentMonthlyProgress(): Promise<MonthlyStat[]> {
+  const supabase = await createClient()
+  const student = await getCurrentStudent(supabase)
+
+  const empty: MonthlyStat[] = [
+    { label: 'درس مكتمل', value: 0, change: 'ابدأ التعلّم الآن', positive: null },
+    { label: 'ساعة تعلّم', value: 0, change: 'ابدأ التعلّم الآن', positive: null },
+    { label: 'يوم نشاط متتالي', value: 0, change: 'لا يوجد نشاط بعد', positive: null },
+    { label: 'متوسط الدرجات', value: '—', change: 'لا توجد درجات بعد', positive: null },
+  ]
+  if (!student) return empty
+
+  const now = new Date()
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  const monthStartISO = monthStart.toISOString()
+  const monthStartDate = monthStartISO.split('T')[0]
+
+  // 1) Completed lessons this month (content progress uses user_id).
+  const { count: lessonsCount } = await supabase
+    .from('student_content_progress')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', student.user_id)
+    .eq('item_type', 'lesson')
+    .eq('status', 'completed')
+    .gte('updated_at', monthStartISO)
+
+  // 2) Learning hours this month.
+  const { data: monthActivity } = await supabase
+    .from('learning_activity')
+    .select('activity_date, minutes')
+    .eq('student_id', student.id)
+    .gte('activity_date', monthStartDate)
+  const totalMinutes = (monthActivity ?? []).reduce(
+    (sum, r: any) => sum + (r.minutes ?? 0),
+    0,
+  )
+  const hours = Math.round(totalMinutes / 60)
+
+  // 3) Current consecutive-day streak (based on all activity days).
+  const { data: allActivity } = await supabase
+    .from('learning_activity')
+    .select('activity_date')
+    .eq('student_id', student.id)
+    .gt('minutes', 0)
+    .order('activity_date', { ascending: false })
+  const activeDays = new Set(
+    (allActivity ?? []).map((r: any) => r.activity_date as string),
+  )
+  let streak = 0
+  const cursor = new Date()
+  cursor.setHours(0, 0, 0, 0)
+  // If there's no activity today, start counting from yesterday so an
+  // in-progress day doesn't reset the streak.
+  if (!activeDays.has(cursor.toISOString().split('T')[0])) {
+    cursor.setDate(cursor.getDate() - 1)
+  }
+  while (activeDays.has(cursor.toISOString().split('T')[0])) {
+    streak++
+    cursor.setDate(cursor.getDate() - 1)
+  }
+
+  // 4) Average grade this month (assignments + exams, normalised to %).
+  const { data: asgSubs } = await supabase
+    .from('assignment_submissions')
+    .select('score, submitted_at, assignments(points)')
+    .eq('student_id', student.id)
+    .eq('status', 'مصحّح')
+    .gte('submitted_at', monthStartISO)
+  const { data: examSubs } = await supabase
+    .from('exam_submissions')
+    .select('score, total, submitted_at')
+    .eq('student_id', student.id)
+    .eq('grading_status', 'graded')
+    .gte('submitted_at', monthStartISO)
+
+  const percentages: number[] = []
+  for (const s of asgSubs ?? []) {
+    const points = (s.assignments as any)?.points ?? 0
+    if (points > 0 && s.score != null) percentages.push((s.score / points) * 100)
+  }
+  for (const s of examSubs ?? []) {
+    const total = (s as any).total ?? 0
+    if (total > 0 && s.score != null) percentages.push((s.score / total) * 100)
+  }
+  const avgGrade =
+    percentages.length > 0
+      ? Math.round(percentages.reduce((a, b) => a + b, 0) / percentages.length)
+      : null
+
+  return [
+    {
+      label: 'درس مكتمل',
+      value: lessonsCount ?? 0,
+      change: 'خلال هذا الشهر',
+      positive: (lessonsCount ?? 0) > 0 ? true : null,
+    },
+    {
+      label: 'ساعة تعلّم',
+      value: hours,
+      change: 'خلال هذا الشهر',
+      positive: hours > 0 ? true : null,
+    },
+    {
+      label: 'يوم نشاط متتالي',
+      value: streak,
+      change: streak > 0 ? 'استمر في التعلّم!' : 'لا يوجد نشاط بعد',
+      positive: streak > 0 ? true : null,
+    },
+    {
+      label: 'متوسط الدرجات',
+      value: avgGrade != null ? `${avgGrade}%` : '—',
+      change:
+        avgGrade != null
+          ? `عن ${percentages.length} تقييم هذا الشهر`
+          : 'لا توجد درجات بعد',
+      positive: avgGrade != null ? avgGrade >= 60 : null,
+    },
+  ]
+}
+
