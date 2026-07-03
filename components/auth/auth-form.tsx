@@ -25,8 +25,8 @@ export function AuthForm({ initialTab = 'login' }: { initialTab?: Tab }) {
   const [error, setError] = useState('')
 
   // login state
-  const [loginEmail, setLoginEmail] = useState('admin@test.com')
-  const [loginPassword, setLoginPassword] = useState('111111')
+  const [loginEmail, setLoginEmail] = useState('')
+  const [loginPassword, setLoginPassword] = useState('')
 
   // register state
   const [name, setName] = useState('')
@@ -353,7 +353,7 @@ export function AuthForm({ initialTab = 'login' }: { initialTab?: Tab }) {
 
         <Field
           id="email"
-          label="البريد الإلكتروني"
+          label="ال��ريد الإلكتروني"
           icon={<Mail className="size-4" />}
           type="email"
           placeholder="you@example.com"
