@@ -44,14 +44,17 @@ export function StudentWelcome({
           {summary}
         </p>
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <Button asChild className="bg-white text-sidebar hover:bg-white/90">
+          <Button
+            asChild
+            className="shrink-0 whitespace-nowrap bg-white text-sidebar hover:bg-white/90"
+          >
             <Link href="/student/courses">
               <Play className="size-4" />
               متابعة التعلّم
             </Link>
           </Button>
           {streak > 0 && (
-            <div className="flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2 text-sm font-medium">
+            <div className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl bg-white/10 px-3 py-2 text-sm font-medium">
               <Flame className="size-4 text-amber-400" />
               <span>
                 {streak} {streak === 1 ? 'يوم متتالي' : 'أيام متتالية'}
