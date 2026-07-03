@@ -10,6 +10,7 @@ import {
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import {
+  computeCouponStatus,
   type CouponRecord,
   type CouponStatus,
   type CouponType,
@@ -90,7 +91,15 @@ export function CouponsProvider({
         if (editing) {
           const original = [...coupons]
           setCoupons((prev) =>
-            prev.map((c) => (c.id === editing.id ? { ...c, ...values } : c)),
+            prev.map((c) =>
+              c.id === editing.id
+                ? {
+                    ...c,
+                    ...values,
+                    status: computeCouponStatus(values.status, values.endDate),
+                  }
+                : c,
+            ),
           )
           setFormOpen(false)
           setEditing(null)

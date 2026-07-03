@@ -3,7 +3,12 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
-import type { CouponRecord, CouponStatus, CouponType } from '@/lib/coupons-data'
+import {
+  computeCouponStatus,
+  type CouponRecord,
+  type CouponStatus,
+  type CouponType,
+} from '@/lib/coupons-data'
 
 export async function getCoupons(): Promise<CouponRecord[]> {
   const supabase = await createClient()
@@ -24,7 +29,7 @@ export async function getCoupons(): Promise<CouponRecord[]> {
     limit: row.limit,
     startDate: row.start_date,
     endDate: row.end_date,
-    status: row.status as CouponStatus,
+    status: computeCouponStatus(row.status as CouponStatus, row.end_date),
     scope: (row.scope ?? 'all') as 'all' | 'lectures',
   }))
 }
