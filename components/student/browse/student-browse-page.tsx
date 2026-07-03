@@ -161,13 +161,13 @@ export function StudentBrowsePage({
                 className="flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition-shadow hover:shadow-md"
               >
                 {/* lecture artwork */}
-                <div className="relative aspect-[16/10] w-full overflow-hidden bg-gradient-to-br from-secondary to-muted">
+                <div className="relative aspect-[16/10] w-full shrink-0 overflow-hidden bg-gradient-to-br from-secondary to-muted">
                   <Image
                     src={lec.image || `/lessons/${lec.slug}.png`}
                     alt={lec.title}
                     fill
                     sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
-                    className="object-contain p-4"
+                    className="object-cover"
                   />
                   <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-3">
                     <span className="rounded-lg bg-card/90 px-2 py-1 text-[11px] font-semibold text-muted-foreground backdrop-blur">
@@ -283,7 +283,7 @@ function LectureDetailsModal({
             alt={lecture.title}
             fill
             sizes="512px"
-            className="object-contain p-6"
+            className="object-cover"
           />
           <button
             type="button"
