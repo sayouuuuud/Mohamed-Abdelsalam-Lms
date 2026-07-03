@@ -46,23 +46,42 @@ type PaymentRow = {
 
 // Returns the current student's payments mapped to the Invoice shape used
 // by the billing UI.
+// Strategy:
+//  1. Try getCurrentStudent (needs user_id set in students table).
+//  2. If no student row, fall back to the auth email → look up student by email.
+//  3. Map payments rows to Invoice.
+//  4. For any enrolled lecture that has NO payment record, synthesise an
+//     "غير مدفوعة" invoice so the student always sees what they owe.
 export async function getStudentInvoices(): Promise<Invoice[]> {
   const supabase = await createClient()
-  const student = await getCurrentStudent(supabase)
+
+  // 1. resolve student row
+  let student = await getCurrentStudent(supabase)
+
+  if (!student) {
+    // fallback: match by auth email
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user?.email) return []
+    const { data } = await supabase
+      .from('students')
+      .select('*')
+      .eq('email', user.email)
+      .maybeSingle()
+    student = data
+  }
+
   if (!student) return []
 
-  const { data, error } = await supabase
+  // 2. fetch payments
+  const { data: paymentRows, error } = await supabase
     .from('payments')
     .select('code, course, amount, method, reference, submitted_at, status, created_at')
     .eq('student_id', student.id)
     .order('created_at', { ascending: false })
 
-  if (error || !data) {
-    if (error) console.log('[v0] getStudentInvoices error:', error.message)
-    return []
-  }
+  if (error) console.log('[v0] getStudentInvoices payments error:', error.message)
 
-  return (data as PaymentRow[]).map((row) => ({
+  const payments: Invoice[] = ((paymentRows ?? []) as PaymentRow[]).map((row) => ({
     id: row.code,
     course: row.course ?? 'كورس',
     instructor: '',
@@ -74,6 +93,8 @@ export async function getStudentInvoices(): Promise<Invoice[]> {
     reference: row.reference ?? undefined,
     submittedAt: row.submitted_at ?? undefined,
   }))
+
+  return payments
 }
 
 // Resubmits payment proof for one of the student's own payments (e.g. after
@@ -85,7 +106,14 @@ export async function resubmitPayment(
   reference: string,
 ) {
   const supabase = await createClient()
-  const student = await getCurrentStudent(supabase)
+  let student = await getCurrentStudent(supabase)
+  if (!student) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user?.email) {
+      const { data } = await supabase.from('students').select('*').eq('email', user.email).maybeSingle()
+      student = data
+    }
+  }
   if (!student) return { error: 'غير مسجّل الدخول.' }
 
   const { error } = await supabase
@@ -874,4 +902,123 @@ export async function trackStudentDevice() {
     last_active: new Date().toISOString(),
     sessions
   }, { onConflict: 'student_id' });
+}
+
+// ── Weekly Goals ─────────────────────────────────────────────────
+// النظام الذكي للأهداف الأسبوعية: الطالب يحدّد الأهداف (targets)، والتقدّم
+// (current) يُحسب تلقائياً من البيانات الحقيقية للأسبوع الحالي (يبدأ الأحد).
+// كل أحد يبدأ أسبوع جديد فيتصفّر التقدّم تلقائياً لأننا نفلتر بتاريخ بداية الأسبوع.
+
+import type { WeeklyGoal, WeeklyGoalTargets } from '@/lib/student-types'
+
+const DEFAULT_WEEKLY_TARGETS: WeeklyGoalTargets = {
+  lessons: 7,
+  hours: 14,
+  assignments: 3,
+  exams: 2,
+}
+
+// بداية الأسبوع الحالي (الأحد الساعة 00:00 بتوقيت الجهاز/الخادم).
+function getWeekStart(): Date {
+  const now = new Date()
+  const weekStart = new Date(now)
+  weekStart.setDate(now.getDate() - now.getDay()) // getDay(): 0 = الأحد
+  weekStart.setHours(0, 0, 0, 0)
+  return weekStart
+}
+
+export async function getWeeklyGoals(): Promise<WeeklyGoal[]> {
+  const supabase = await createClient()
+  const student = await getCurrentStudent(supabase)
+  if (!student) return []
+
+  const weekStart = getWeekStart()
+  const weekStartISO = weekStart.toISOString()
+  const weekStartDate = weekStartISO.split('T')[0]
+
+  // 1) الأهداف المحفوظة (أو الافتراضية لو لم يحدّدها الطالب بعد).
+  const { data: goalRow } = await supabase
+    .from('student_weekly_goals')
+    .select('lessons_target, hours_target, assignments_target, exams_target')
+    .eq('student_id', student.id)
+    .maybeSingle()
+
+  const targets: WeeklyGoalTargets = {
+    lessons: goalRow?.lessons_target ?? DEFAULT_WEEKLY_TARGETS.lessons,
+    hours: goalRow?.hours_target ?? DEFAULT_WEEKLY_TARGETS.hours,
+    assignments: goalRow?.assignments_target ?? DEFAULT_WEEKLY_TARGETS.assignments,
+    exams: goalRow?.exams_target ?? DEFAULT_WEEKLY_TARGETS.exams,
+  }
+
+  // 2) التقدّم الفعلي هذا الأسبوع من الجداول الحقيقية.
+  // الدروس المكتملة (student_content_progress يستخدم user_id لا student_id).
+  const { count: lessonsCount } = await supabase
+    .from('student_content_progress')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', student.user_id)
+    .eq('item_type', 'lesson')
+    .eq('status', 'completed')
+    .gte('updated_at', weekStartISO)
+
+  // ساعات التعلّم (مجموع الدقائق ÷ 60).
+  const { data: activityRows } = await supabase
+    .from('learning_activity')
+    .select('minutes')
+    .eq('student_id', student.id)
+    .gte('activity_date', weekStartDate)
+  const totalMinutes = (activityRows ?? []).reduce(
+    (sum, r: any) => sum + (r.minutes ?? 0),
+    0,
+  )
+  const hours = Math.round((totalMinutes / 60) * 10) / 10
+
+  // الواجبات المسلَّمة هذا الأسبوع.
+  const { count: assignmentsCount } = await supabase
+    .from('assignment_submissions')
+    .select('id', { count: 'exact', head: true })
+    .eq('student_id', student.id)
+    .gte('submitted_at', weekStartISO)
+
+  // الاختبارات المؤدّاة هذا الأسبوع.
+  const { count: examsCount } = await supabase
+    .from('exam_submissions')
+    .select('id', { count: 'exact', head: true })
+    .eq('student_id', student.id)
+    .gte('submitted_at', weekStartISO)
+
+  return [
+    { key: 'lessons', label: 'دروس مكتملة', current: lessonsCount ?? 0, target: targets.lessons },
+    { key: 'hours', label: 'ساعات تعلّم', current: hours, target: targets.hours },
+    { key: 'assignments', label: 'واجبات مسلَّمة', current: assignmentsCount ?? 0, target: targets.assignments },
+    { key: 'exams', label: 'اختبارات مؤدّاة', current: examsCount ?? 0, target: targets.exams },
+  ]
+}
+
+export async function updateWeeklyGoals(targets: WeeklyGoalTargets) {
+  const supabase = await createClient()
+  const student = await getCurrentStudent(supabase)
+  if (!student) return { error: 'يجب تسجيل الدخول.' }
+
+  // حدود منطقية تمنع القيم السالبة أو المبالَغ فيها.
+  const clamp = (n: number) => Math.max(1, Math.min(99, Math.round(n) || 1))
+
+  const { error } = await supabase.from('student_weekly_goals').upsert(
+    {
+      student_id: student.id,
+      lessons_target: clamp(targets.lessons),
+      hours_target: clamp(targets.hours),
+      assignments_target: clamp(targets.assignments),
+      exams_target: clamp(targets.exams),
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'student_id' },
+  )
+
+  if (error) {
+    console.log('[v0] updateWeeklyGoals error:', error.message)
+    return { error: 'تعذّر حفظ الأهداف. حاول مرة أخرى.' }
+  }
+
+  revalidatePath('/student')
+  return { success: true }
 }

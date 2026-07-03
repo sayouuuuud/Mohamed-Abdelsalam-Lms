@@ -23,6 +23,13 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { useLogout } from '@/lib/use-logout'
 import { getAdminProfile } from '@/app/admin/settings/actions'
+import { toast } from 'sonner'
+import {
+  getNotifications,
+  markAsRead,
+  markAllAsRead,
+} from '@/app/admin/notifications/actions'
+import type { NotificationRecord } from '@/lib/notifications-data'
 
 /* ─── mock data ─── */
 const mockMessages = [
@@ -31,17 +38,6 @@ const mockMessages = [
   { id: 3, name: 'عمر خالد', text: 'هل يوجد تمارين إضافية؟', time: 'منذ ساعة', read: false },
   { id: 4, name: 'منى حسن', text: 'الفيديو مش بيشتغل عندي', time: 'منذ 3 س', read: true },
   { id: 5, name: 'يوسف إبراهيم', text: 'تم الاشتراك في الكورس الجديد', time: 'أمس', read: true },
-]
-
-const mockNotifications = [
-  { id: 1, text: 'طالب جديد سجّل في كورس React', time: 'منذ 2 د', read: false, type: 'student' },
-  { id: 2, text: 'تم استلام دفعة بقيمة 350 ج.م', time: 'منذ 15 د', read: false, type: 'payment' },
-  { id: 3, text: 'تعليق جديد على درس CSS', time: 'منذ 45 د', read: false, type: 'comment' },
-  { id: 4, text: 'انتهت صلاحية كوبون SUMMER30', time: 'منذ 2 س', read: true, type: 'coupon' },
-  { id: 5, text: '8 طلاب أكملوا الاختبار النهائي', time: 'منذ 4 س', read: true, type: 'exam' },
-  { id: 6, text: 'تحديث جديد متاح للمنصة', time: 'أمس', read: true, type: 'system' },
-  { id: 7, text: 'تقرير الإيرادات الأسبوعي جاهز', time: 'أمس', read: true, type: 'report' },
-  { id: 8, text: 'طالب طلب استرداد المبلغ', time: 'أمس', read: false, type: 'payment' },
 ]
 
 /* ─── hook: close on outside click ─── */
@@ -157,12 +153,44 @@ function MessagesDropdown() {
 /* ─── Notifications dropdown ─── */
 function NotificationsDropdown() {
   const [open, setOpen] = useState(false)
-  const [notifications, setNotifications] = useState(mockNotifications)
+  const [notifications, setNotifications] = useState<NotificationRecord[]>([])
   const ref = useRef<HTMLDivElement>(null)
+  const knownIds = useRef<Set<string>>(new Set())
+  const firstLoad = useRef(true)
   useOutsideClick(ref, () => setOpen(false))
 
+  // Fetch real notifications on mount and poll periodically. Toast when a new
+  // unread notification arrives (but not on the very first load).
+  useEffect(() => {
+    let active = true
+    async function load() {
+      const data = await getNotifications()
+      if (!active) return
+      if (!firstLoad.current) {
+        const fresh = data.filter(
+          (n) => !n.read && !knownIds.current.has(n.id),
+        )
+        for (const n of fresh.slice(0, 3)) {
+          toast(n.title, { description: n.description || undefined })
+        }
+      }
+      knownIds.current = new Set(data.map((n) => n.id))
+      firstLoad.current = false
+      setNotifications(data)
+    }
+    load()
+    const interval = setInterval(load, 60_000)
+    return () => {
+      active = false
+      clearInterval(interval)
+    }
+  }, [])
+
   const unread = notifications.filter((n) => !n.read).length
-  const markAllRead = () => setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+  const markAllRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+    markAllAsRead()
+  }
 
   return (
     <div ref={ref} className="relative">
@@ -207,32 +235,44 @@ function NotificationsDropdown() {
 
           {/* list */}
           <ul className="max-h-72 overflow-y-auto scrollbar-hide divide-y divide-border">
-            {notifications.map((n) => (
-              <li key={n.id}>
-                <button
-                  onClick={() =>
-                    setNotifications((prev) =>
-                      prev.map((item) => (item.id === n.id ? { ...item, read: true } : item)),
-                    )
-                  }
-                  className={cn(
-                    'flex w-full items-start gap-3 px-4 py-3 text-right transition-colors hover:bg-secondary/60',
-                    !n.read && 'bg-primary/5',
-                  )}
-                >
-                  <div
-                    className={cn(
-                      'mt-0.5 size-2 shrink-0 rounded-full',
-                      !n.read ? 'bg-primary' : 'bg-transparent',
-                    )}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm text-foreground leading-snug">{n.text}</p>
-                    <span className="mt-0.5 text-[11px] text-muted-foreground">{n.time}</span>
-                  </div>
-                </button>
+            {notifications.length === 0 ? (
+              <li className="px-4 py-8 text-center text-sm text-muted-foreground">
+                لا توجد إشعارات.
               </li>
-            ))}
+            ) : (
+              notifications.map((n) => (
+                <li key={n.id}>
+                  <button
+                    onClick={() => {
+                      setNotifications((prev) =>
+                        prev.map((item) => (item.id === n.id ? { ...item, read: true } : item)),
+                      )
+                      if (!n.read) markAsRead(n.id)
+                    }}
+                    className={cn(
+                      'flex w-full items-start gap-3 px-4 py-3 text-right transition-colors hover:bg-secondary/60',
+                      !n.read && 'bg-primary/5',
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        'mt-0.5 size-2 shrink-0 rounded-full',
+                        !n.read ? 'bg-primary' : 'bg-transparent',
+                      )}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold leading-snug text-foreground">{n.title}</p>
+                      {n.description && (
+                        <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
+                          {n.description}
+                        </p>
+                      )}
+                      <span className="mt-0.5 block text-[11px] text-muted-foreground">{n.time}</span>
+                    </div>
+                  </button>
+                </li>
+              ))
+            )}
           </ul>
 
           {/* footer */}

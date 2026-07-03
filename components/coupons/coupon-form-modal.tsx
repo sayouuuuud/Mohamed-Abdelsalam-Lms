@@ -11,7 +11,8 @@ import { getCouponLectureIds } from '@/app/admin/coupons/actions'
 import type { CouponStatus, CouponType, CouponScope } from '@/lib/coupons-data'
 
 const types: CouponType[] = ['نسبة مئوية', 'مبلغ ثابت']
-const statuses: CouponStatus[] = ['نشط', 'منتهي', 'متوقف']
+// "منتهي" حالة محسوبة من تاريخ الانتهاء تلقائياً، فالأدمن يختار نشط/متوقف فقط.
+const statuses: CouponStatus[] = ['نشط', 'متوقف']
 
 export function CouponFormModal() {
   const {
@@ -46,7 +47,8 @@ export function CouponFormModal() {
       setLimit(editing ? String(editing.limit) : '')
       setStartDate(editing?.startDate ?? '')
       setEndDate(editing?.endDate ?? '')
-      setStatus(editing?.status ?? 'نشط')
+      // "منتهي" محسوبة، فنرجّعها لنيّة الأدمن الأصلية (نشط) عند التعديل.
+      setStatus(editing?.status === 'متوقف' ? 'متوقف' : 'نشط')
       setScope(editing?.scope ?? 'all')
       setLectureQuery('')
       // Load the coupon's covered lectures when editing a lectures-scoped one.
