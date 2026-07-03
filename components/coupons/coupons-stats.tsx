@@ -1,17 +1,23 @@
+'use client'
+
 import { Ticket, CheckCircle2, TrendingUp, Percent } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import { couponRecords } from '@/lib/coupons-data'
+import { useCoupons } from '@/components/coupons/coupons-context'
 
 export function CouponsStats() {
-  const totalCoupons = couponRecords.length
-  const activeCoupons = couponRecords.filter((c) => c.status === 'نشط').length
-  const totalRedemptions = couponRecords.reduce((sum, c) => sum + c.used, 0)
-  const avgDiscount = Math.round(
-    couponRecords
-      .filter((c) => c.type === 'نسبة مئوية')
-      .reduce((sum, c, _, arr) => sum + c.value / arr.length, 0),
-  )
+  const { coupons } = useCoupons()
+
+  const totalCoupons = coupons.length
+  const activeCoupons = coupons.filter((c) => c.status === 'نشط').length
+  const totalRedemptions = coupons.reduce((sum, c) => sum + c.used, 0)
+  const percentageCoupons = coupons.filter((c) => c.type === 'نسبة مئوية')
+  const avgDiscount = percentageCoupons.length
+    ? Math.round(
+        percentageCoupons.reduce((sum, c) => sum + c.value, 0) /
+          percentageCoupons.length,
+      )
+    : 0
 
   const stats = [
     {
