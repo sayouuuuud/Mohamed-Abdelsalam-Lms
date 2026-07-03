@@ -287,17 +287,6 @@ export function StudentHeader({
         <ProfileDropdown />
 
         <div className="flex items-center gap-1">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="hidden sm:flex"
-            onClick={() => {
-              toast.success('تم الحفظ بنجاح', { description: 'تم تحديث البيانات الخاصة بك بنجاح وتم حفظ التعديلات.' })
-              toast.error('حدث خطأ', { description: 'لم نتمكن من حفظ التغييرات، يرجى المحاولة مرة أخرى.' })
-            }}
-          >
-            تجربة الإشعارات
-          </Button>
           <CartButton className="text-muted-foreground hover:text-foreground" />
           <NotificationsDropdown />
           <Button
