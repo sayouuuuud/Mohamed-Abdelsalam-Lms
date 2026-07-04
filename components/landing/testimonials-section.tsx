@@ -40,18 +40,25 @@ function TestimonialCard({
   student,
   active = true,
   chartHeightClass = 'h-56 sm:h-64',
+  compact = false,
 }: {
   student: Testimonial
   active?: boolean
   chartHeightClass?: string
+  compact?: boolean
 }) {
   const jump = student.after - student.before
 
   return (
     <div className="grid h-full grid-cols-1 gap-px overflow-hidden rounded-[2rem] border border-navy/15 bg-navy/15 shadow-2xl shadow-navy/10 lg:grid-cols-5 dark:border-white/10 dark:bg-white/5 dark:shadow-black/40">
       {/* chart card (navy) */}
-      <div className="relative bg-navy p-5 sm:p-6 lg:p-7 lg:col-span-3 dark:bg-ink-raised">
-        <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+      <div
+        className={cn(
+          'relative bg-navy lg:col-span-3 dark:bg-ink-raised',
+          compact ? 'p-4' : 'p-5 sm:p-6 lg:p-7',
+        )}
+      >
+        <div className={cn('flex flex-wrap items-end justify-between gap-4', compact ? 'mb-3' : 'mb-5')}>
           <div>
             <p className="text-xs font-semibold tracking-wider text-gold dark:text-teal-glow">
               منحنى التقدّم
@@ -132,7 +139,12 @@ function TestimonialCard({
         </div>
 
         {/* before -> after result, written like a math statement */}
-        <div className="mt-6 flex items-center justify-center gap-4 font-thmanyah">
+        <div
+          className={cn(
+            'flex items-center justify-center gap-4 font-thmanyah',
+            compact ? 'mt-4' : 'mt-6',
+          )}
+        >
           <div className="text-center">
             <span className="block text-xs text-cream/50 dark:text-ink-dim">قبل</span>
             <span className="text-2xl font-bold text-red-400 dark:text-red-400/90">
@@ -150,15 +162,37 @@ function TestimonialCard({
       </div>
 
       {/* story card (cream) */}
-      <div className="flex flex-col bg-cream p-5 sm:p-6 lg:p-7 lg:col-span-2 dark:bg-ink-base">
-        <Quote className="size-9 text-gold dark:text-teal-glow/40" />
-        <blockquote className="mt-4 flex-1 text-pretty text-lg font-medium leading-relaxed text-navy sm:text-xl dark:text-ink-fg">
+      <div
+        className={cn(
+          'flex flex-col bg-cream lg:col-span-2 dark:bg-ink-base',
+          compact ? 'p-4' : 'p-5 sm:p-6 lg:p-7',
+        )}
+      >
+        <Quote className={cn('text-gold dark:text-teal-glow/40', compact ? 'size-7' : 'size-9')} />
+        <blockquote
+          className={cn(
+            'flex-1 text-pretty font-medium leading-relaxed text-navy dark:text-ink-fg',
+            compact
+              ? 'mt-3 line-clamp-4 text-base'
+              : 'mt-4 text-lg sm:text-xl',
+          )}
+        >
           {student.quote}
         </blockquote>
 
-        <div className="mt-6 border-t border-navy/10 pt-5 dark:border-white/10">
+        <div
+          className={cn(
+            'border-t border-navy/10 dark:border-white/10',
+            compact ? 'mt-4 pt-4' : 'mt-6 pt-5',
+          )}
+        >
           <div className="flex items-center gap-3">
-            <span className="grid size-12 place-items-center rounded-full bg-navy font-bold text-cream dark:bg-teal-glow dark:text-ink-base">
+            <span
+              className={cn(
+                'grid place-items-center rounded-full bg-navy font-bold text-cream dark:bg-teal-glow dark:text-ink-base',
+                compact ? 'size-10' : 'size-12',
+              )}
+            >
               {student.name.charAt(0)}
             </span>
             <div>
@@ -201,7 +235,7 @@ function MobileCarousel() {
       >
         {testimonials.map((s, i) => (
           <div key={i} className="w-full shrink-0 snap-center">
-            <TestimonialCard student={s} chartHeightClass="h-48" />
+            <TestimonialCard student={s} chartHeightClass="h-40" compact />
           </div>
         ))}
       </div>
