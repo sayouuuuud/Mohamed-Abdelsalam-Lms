@@ -1,6 +1,6 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { motion, type Variants } from 'framer-motion'
 import { LandingNavbar } from './landing-navbar'
 import { HeroSection } from './hero-section'
 import { FeaturesSection } from './features-section'
@@ -11,18 +11,22 @@ import { CtaSection } from './cta-section'
 import { SiteFooter } from './site-footer'
 import { ScrollRefresh } from './scroll-refresh'
 import type { Stage } from '@/lib/landing-data'
+import type { SiteContent } from '@/lib/site-content-defaults'
+import { DEFAULT_SITE_CONTENT } from '@/lib/site-content-defaults'
 
-const fadeInUp = {
+const fadeInUp: Variants = {
   hidden: { opacity: 0, y: 40 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeOut' } }
+  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeOut' } },
 }
 
 export function LandingPage({
   stages = [],
   isLoggedIn = false,
+  siteContent = DEFAULT_SITE_CONTENT,
 }: {
   stages?: Stage[]
   isLoggedIn?: boolean
+  siteContent?: SiteContent
 }) {
   return (
     <div className="relative min-h-screen bg-cream dark:bg-ink-base">
@@ -42,31 +46,31 @@ export function LandingPage({
         }}
       />
       <div className="relative z-10">
-        <LandingNavbar isLoggedIn={isLoggedIn} />
+        <LandingNavbar isLoggedIn={isLoggedIn} content={siteContent.navbar} />
         <main>
-          <HeroSection />
-          
+          <HeroSection content={siteContent.hero} />
+
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeInUp}>
-            <FeaturesSection />
+            <FeaturesSection content={siteContent.features} />
           </motion.div>
-          
+
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeInUp}>
             <StagesSection stages={stages} />
           </motion.div>
-          
+
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeInUp}>
-            <StatsSection />
+            <StatsSection content={siteContent.stats} />
           </motion.div>
-          
+
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeInUp}>
-            <TestimonialsSection />
+            <TestimonialsSection content={siteContent.testimonials} />
           </motion.div>
-          
+
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={fadeInUp}>
-            <CtaSection />
+            <CtaSection content={siteContent.cta} />
           </motion.div>
         </main>
-        <SiteFooter />
+        <SiteFooter content={siteContent.footer} />
       </div>
     </div>
   )

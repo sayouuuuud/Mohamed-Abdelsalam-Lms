@@ -15,6 +15,7 @@ import {
   Camera,
   Check,
   Loader2,
+  LayoutTemplate,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -22,6 +23,10 @@ import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { ToggleSwitch } from '@/components/settings/toggle-switch'
+import { SiteContentTab } from '@/components/settings/site-content-tab'
+import type { SiteContent } from '@/lib/site-content-defaults'
+import { DEFAULT_SITE_CONTENT } from '@/lib/site-content-defaults'
+import { neonPresets, applyNeonPreset, type NeonPresetId } from '@/lib/neon-presets'
 
 // ── Color presets ──────────────────────────────────────────────
 const colorPresets = [
@@ -97,6 +102,7 @@ const tabs = [
   { id: 'notifications', label: 'الإشعارات', icon: Bell },
   { id: 'security', label: 'الأمان', icon: Shield },
   { id: 'preferences', label: 'التفضيلات', icon: SlidersHorizontal },
+  { id: 'content', label: 'محتوى الموقع', icon: LayoutTemplate },
 ] as const
 
 type TabId = (typeof tabs)[number]['id']
@@ -112,6 +118,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 export function SettingsPanel({
   initialSettings,
   adminProfile,
+  initialSiteContent,
 }: {
   initialSettings?: any
   adminProfile?: {
@@ -122,6 +129,7 @@ export function SettingsPanel({
     role: string
     initials: string
   } | null
+  initialSiteContent?: SiteContent
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -131,7 +139,7 @@ export function SettingsPanel({
     profile: { firstName: 'محمد', lastName: 'أحمد', email: 'mohamed@platform.com', phone: '+20 100 123 4567', bio: 'مدير منصة تعليمية متخصصة في الدورات التقنية.' },
     notifications: { emailNotif: true, pushNotif: true, smsNotif: false, marketingNotif: false, weeklyReport: true },
     security: { requireEmailVerification: true, allowRegistrations: true },
-    preferences: { darkMode: false, autoPublish: false, activeColor: 'navy' as PresetId }
+    preferences: { darkMode: false, autoPublish: false, activeColor: 'navy' as PresetId, neonPreset: 'teal-violet' as NeonPresetId }
   }
 
   // Real admin profile is the source of truth for name/email/phone/avatar.
@@ -196,6 +204,9 @@ export function SettingsPanel({
   const setDarkMode = (_v: boolean) => toggleTheme()
   const [autoPublish, setAutoPublish] = useState(settings.preferences.autoPublish)
   const [activeColor, setActiveColor] = useState<PresetId>(settings.preferences.activeColor as PresetId)
+  const [neonPreset, setNeonPreset] = useState<NeonPresetId>(
+    (settings.preferences.neonPreset ?? 'teal-violet') as NeonPresetId,
+  )
 
   // Email verification on signup (defaults to ON when not previously saved).
   const [requireEmailVerification, setRequireEmailVerification] = useState(
@@ -241,8 +252,8 @@ export function SettingsPanel({
         profile: { firstName, lastName, email, phone, bio },
         notifications: { emailNotif, pushNotif, smsNotif, marketingNotif, weeklyReport },
         security: { requireEmailVerification, allowRegistrations },
-        preferences: { darkMode, autoPublish, activeColor }
-      }
+      preferences: { darkMode, autoPublish, activeColor, neonPreset }
+    }
       
       const res = await updateSettings(newSettings)
       if (res.error) {
@@ -257,6 +268,11 @@ export function SettingsPanel({
   function handleColorChange(id: PresetId) {
     setActiveColor(id)
     applyColorPreset(id)
+  }
+
+  function handleNeonChange(id: NeonPresetId) {
+    setNeonPreset(id)
+    applyNeonPreset(id)
   }
 
   return (
@@ -559,10 +575,55 @@ export function SettingsPanel({
               </p>
             </div>
 
+            {/* Dark-mode neon accents picker */}
+            <div className="mt-4 rounded-xl border border-border bg-muted/30 p-4">
+              <p className="mb-3 text-right text-sm font-medium text-foreground">
+                ألوان الوضع الليلي (النيون)
+              </p>
+              <p className="mb-4 text-right text-xs text-muted-foreground">
+                تتحكم في الألوان المتوهجة اللي بتظهر في الوضع الليلي: الأرقام، الرموز
+                الرياضية، والتوهّج حول عناصر الصفحة الرئيسية.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                {neonPresets.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => handleNeonChange(preset.id)}
+                    title={preset.label}
+                    aria-label={preset.label}
+                    className={cn(
+                      'group relative flex size-10 items-center justify-center overflow-hidden rounded-full transition-transform hover:scale-110',
+                      neonPreset === preset.id && 'ring-2 ring-offset-2 ring-offset-card ring-foreground/30',
+                    )}
+                    style={{
+                      background: `linear-gradient(135deg, ${preset.swatch1} 0 50%, ${preset.swatch2} 50% 100%)`,
+                    }}
+                  >
+                    {neonPreset === preset.id && (
+                      <Check className="size-4 text-white drop-shadow" strokeWidth={3} />
+                    )}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-3 text-right text-xs text-muted-foreground">
+                التدرّج الحالي:{' '}
+                <span className="font-semibold text-foreground">
+                  {neonPresets.find((p) => p.id === neonPreset)?.label}
+                </span>
+              </p>
+            </div>
+
             <div className="flex justify-start pt-4">
               <Button onClick={handleSave} disabled={isPending}>حفظ التفضيلات</Button>
             </div>
           </div>
+        )}
+
+        {activeTab === 'content' && (
+          <SiteContentTab
+            initialContent={initialSiteContent ?? DEFAULT_SITE_CONTENT}
+          />
         )}
       </div>
     </div>

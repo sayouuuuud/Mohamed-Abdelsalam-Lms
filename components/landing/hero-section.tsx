@@ -7,6 +7,8 @@ import { useGSAP } from '@gsap/react'
 import { ArrowLeft, Sparkles } from 'lucide-react'
 import { AnimatedNumber } from './animated-number'
 import { cn } from '@/lib/utils'
+import type { HeroContent } from '@/lib/site-content-defaults'
+import { DEFAULT_SITE_CONTENT } from '@/lib/site-content-defaults'
 
 // Floating math objects scattered across the hero for an energetic, on-theme
 // backdrop. Each carries a light-mode color and a dark-mode (neon) color.
@@ -23,7 +25,7 @@ const floatSymbols = [
   { char: 'x²', top: '8%', left: '52%', size: 'text-4xl', color: 'text-gold/45', dark: 'dark:text-violet-glow/55' },
 ]
 
-export function HeroSection() {
+export function HeroSection({ content = DEFAULT_SITE_CONTENT.hero }: { content?: HeroContent }) {
   const root = useRef<HTMLElement>(null)
 
   useGSAP(() => {
@@ -59,6 +61,9 @@ export function HeroSection() {
     })
   }, { scope: root })
 
+  // Parse the title: replace {highlight} token with the highlighted word
+  const titleLine2 = content.titleLine2.replace('{highlight}', content.titleHighlight)
+
   return (
     <section ref={root} id="hero" className="relative overflow-hidden pt-28 md:pt-36">
       {floatSymbols.map((s, i) => (
@@ -81,57 +86,45 @@ export function HeroSection() {
         <div className="order-2 pb-16 md:order-1 md:col-span-5 md:pb-24 lg:col-span-6">
           <span className="hero-stagger inline-flex items-center gap-2 rounded-full border border-navy/15 bg-cream/80 px-4 py-1.5 text-sm font-semibold text-navy-soft backdrop-blur dark:border-white/10 dark:bg-ink-raised/70 dark:text-teal-glow">
             <Sparkles className="size-4 text-gold-deep dark:text-teal-glow" />
-            منصة الرياضيات الأولى للثانوية العامة
+            {content.badge}
           </span>
 
           <h1 className="hero-stagger mt-7 font-hero text-4xl font-normal leading-[1.7] text-navy sm:text-5xl md:text-3xl md:leading-[1.6] lg:text-[2.5rem] lg:leading-[1.6] xl:text-[3.5rem] xl:leading-[1.65] dark:text-ink-fg">
-            <span className="block">الرياضيات مش صعبة،</span>
+            <span className="block">{content.titleLine1}</span>
             <span className="block">
-              هي بس محتاجة{' '}
-              <span className="text-emerald-deep dark:text-teal-glow">مُعلّم</span>{' '}
-              <span className="relative whitespace-nowrap text-emerald-deep dark:text-teal-glow">
-                صح
-                <span
-                  className="absolute -bottom-1 right-0 h-[0.3em] w-full rounded-full bg-gold/70 dark:bg-teal-glow/70"
-                  aria-hidden="true"
-                />
-              </span>
+              {content.titleLine2.split('{highlight}')[0]}
+              <span className="text-emerald-deep dark:text-teal-glow">{content.titleHighlight}</span>
+              {content.titleLine2.split('{highlight}')[1]}
             </span>
           </h1>
 
           <p className="hero-stagger mt-6 max-w-xl text-pretty text-lg leading-relaxed text-ink-muted md:text-sm lg:text-base xl:text-lg dark:text-ink-dim">
-            مع الأستاذ <span className="font-bold text-navy dark:text-ink-fg">عبد السلام</span> هتفهم كل
-            فكرة من جذورها، وتتدرّب لحد ما المسألة تبقى أسهل حاجة. اختار مرحلتك وابدأ
-            رحلتك للتفوق.
+            {content.description}
           </p>
 
           <div className="hero-stagger mt-9 flex flex-col gap-3 sm:flex-row md:gap-2.5 lg:gap-3">
             <a
-              href="#stages"
+              href={content.cta1Href}
               className="group inline-flex items-center justify-center gap-2 rounded-full bg-gold px-8 py-4 text-base font-bold text-navy-deep shadow-lg shadow-gold/30 transition-transform duration-200 hover:-translate-y-0.5 md:px-5 md:py-3 md:text-sm lg:px-8 lg:py-4 lg:text-base dark:bg-violet-glow dark:text-white dark:shadow-[0_0_30px_oklch(0.66_0.2_292_/_0.45)]"
             >
-              اختار مرحلتك الدراسية
+              {content.cta1Text}
               <ArrowLeft className="size-5 transition-transform duration-200 group-hover:-translate-x-1 md:size-4 lg:size-5" />
             </a>
             <a
-              href="#features"
+              href={content.cta2Href}
               className="inline-flex items-center justify-center rounded-full border border-navy/20 bg-cream/60 px-8 py-4 text-base font-bold text-navy backdrop-blur transition-colors hover:bg-navy/5 md:px-5 md:py-3 md:text-sm lg:px-8 lg:py-4 lg:text-base dark:border-white/15 dark:bg-white/5 dark:text-ink-fg dark:hover:bg-white/10"
             >
-              اعرف أكتر عن المنصة
+              {content.cta2Text}
             </a>
           </div>
 
           <dl className="hero-stagger mt-12 flex flex-wrap items-start justify-between gap-6 sm:gap-8 border-t border-navy/10 pt-8 dark:border-white/10 max-w-lg">
-            {[
-              { val: 25, pre: '+', suf: '', l: 'سنة خبرة' },
-              { val: 48, pre: '+', suf: ' ألف', l: 'طالب' },
-              { val: 98, pre: '٪', suf: '', l: 'نسبة رضا' },
-            ].map((s) => (
-              <div key={s.l} className="flex flex-col items-center md:items-start">
+            {content.miniStats.map((s) => (
+              <div key={s.label} className="flex flex-col items-center md:items-start">
                 <dt className="font-thmanyah text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-navy dark:text-teal-glow whitespace-nowrap">
-                  <AnimatedNumber value={s.val} prefix={s.pre} suffix={s.suf} duration={2.5} />
+                  <AnimatedNumber value={s.value} prefix={s.prefix} suffix={s.suffix} duration={2.5} />
                 </dt>
-                <dd className="mt-2 text-base sm:text-lg font-medium text-ink-muted dark:text-ink-dim">{s.l}</dd>
+                <dd className="mt-2 text-base sm:text-lg font-medium text-ink-muted dark:text-ink-dim">{s.label}</dd>
               </div>
             ))}
           </dl>
@@ -153,54 +146,55 @@ export function HeroSection() {
                 'radial-gradient(closest-side, oklch(0.84 0.13 184 / 0.18), transparent 70%)',
             }}
           />
-          {/* negative margin-top raises the image above the section baseline while
-              staying clipped by overflow-hidden on the section — never bleeds into navbar */}
           <div className="hero-photo relative z-10 w-full max-w-[440px] -left-4 -top-3 md:-left-8 md:-mt-20 md:-top-4 md:max-w-[580px] lg:-mt-28 lg:max-w-[560px] xl:-mt-24 xl:max-w-[580px]">
             {/* light-mode portrait */}
             <Image
-              src="/teacher-abdelsalam.webp"
-              alt="الأستاذ عبد السلام، مدرس الرياضيات"
+              src={content.teacherImageLight}
+              alt={content.teacherImageAlt}
               width={1083}
               height={1452}
               priority
               className="h-auto w-full object-contain dark:hidden"
             />
-            {/* dark-mode portrait (neon calligraphy artwork) */}
+            {/* dark-mode portrait */}
             <Image
-              src="/teacher-abdelsalam-dark.webp"
-              alt="الأستاذ عبد السلام، مدرس الرياضيات"
+              src={content.teacherImageDark}
+              alt={content.teacherImageAlt}
               width={772}
               height={1024}
               priority
               className="mx-auto hidden h-auto w-[96%] object-contain dark:block translate-y-6"
             />
 
-            {/* Geometric Number Line stuck to the teacher's feet */}
-            <div 
-              className="absolute -bottom-7 left-1/2 w-[85%] h-12 -translate-x-1/2 pointer-events-none"
-              style={{ 
+            {/* Geometric Number Line stuck to the teacher's feet.
+                The ruler is h-12 with its line at top-1/2, so a bottom offset of
+                -24px (h/2) puts the line exactly on the wrapper's bottom edge =
+                the light image's bottom. The dark image is shifted down by
+                translate-y-6 (24px); instead of pushing the ruler further down
+                (which clips against the section's overflow-hidden), we keep the
+                same -bottom-6 offset and translate the whole ruler down to match
+                the dark portrait so nothing overflows the section. */}
+            <div
+              className="absolute -bottom-6 left-1/2 w-[85%] h-12 -translate-x-1/2 dark:translate-y-6 pointer-events-none"
+              style={{
                 WebkitMaskImage: 'linear-gradient(to right, transparent, black 5%, black 95%, transparent)',
-                maskImage: 'linear-gradient(to right, transparent, black 5%, black 95%, transparent)' 
+                maskImage: 'linear-gradient(to right, transparent, black 5%, black 95%, transparent)',
               }}
             >
               <div className="hero-axis relative w-full h-full flex items-center">
-                {/* Main Axis Line */}
                 <div className="absolute inset-x-0 top-1/2 h-[2px] -translate-y-1/2 bg-gold dark:bg-teal-glow opacity-80" />
-                
-                {/* Ticks */}
                 <div className="absolute inset-x-0 top-1/2 flex -translate-y-1/2 justify-between px-2">
                   {Array.from({ length: 41 }).map((_, i) => {
-                    const isCenter = i === 20;
-                    const isMajor = i % 10 === 0;
-                    const isMedium = i % 5 === 0;
-                    
+                    const isCenter = i === 20
+                    const isMajor = i % 10 === 0
+                    const isMedium = i % 5 === 0
                     return (
                       <div key={i} className="flex flex-col items-center relative">
-                        <div 
+                        <div
                           className={cn(
-                            "w-[2px] bg-gold dark:bg-teal-glow", 
-                            isCenter ? "h-6 opacity-100" : isMajor ? "h-4 opacity-100" : isMedium ? "h-2.5 opacity-80" : "h-1.5 opacity-50"
-                          )} 
+                            'w-[2px] bg-gold dark:bg-teal-glow',
+                            isCenter ? 'h-6 opacity-100' : isMajor ? 'h-4 opacity-100' : isMedium ? 'h-2.5 opacity-80' : 'h-1.5 opacity-50',
+                          )}
                         />
                         {isCenter && (
                           <span className="absolute top-5 text-sm font-mono font-bold text-gold dark:text-teal-glow">0</span>
@@ -214,21 +208,13 @@ export function HeroSection() {
           </div>
         </div>
       </div>
-
     </section>
   )
 }
 
 function WireCube({ className = '' }: { className?: string }) {
   return (
-    <svg
-      width="92"
-      height="92"
-      viewBox="0 0 100 100"
-      fill="none"
-      className={`pointer-events-none absolute ${className}`}
-      aria-hidden="true"
-    >
+    <svg width="92" height="92" viewBox="0 0 100 100" fill="none" className={`pointer-events-none absolute ${className}`} aria-hidden="true">
       <g stroke="currentColor" strokeWidth="1.5" opacity="0.9">
         <path d="M20 30 L60 18 L80 34 L40 46 Z" />
         <path d="M20 30 L20 66 L40 82 L40 46" />
@@ -242,14 +228,7 @@ function WireCube({ className = '' }: { className?: string }) {
 
 function WireTriangle({ className = '' }: { className?: string }) {
   return (
-    <svg
-      width="84"
-      height="84"
-      viewBox="0 0 100 100"
-      fill="none"
-      className={`pointer-events-none absolute ${className}`}
-      aria-hidden="true"
-    >
+    <svg width="84" height="84" viewBox="0 0 100 100" fill="none" className={`pointer-events-none absolute ${className}`} aria-hidden="true">
       <g stroke="currentColor" strokeWidth="1.5" opacity="0.9">
         <path d="M50 16 L86 80 L14 80 Z" />
         <path d="M50 16 L50 80" opacity="0.4" />

@@ -8,7 +8,9 @@ import { MathLoader } from '@/components/landing/math-loader'
 import { CartProvider } from '@/components/cart/cart-provider'
 import { CartModal } from '@/components/cart/cart-modal'
 import { colorPresets } from '@/lib/color-presets'
-import { getSiteColor } from '@/app/admin/settings/actions'
+import { neonPresets } from '@/lib/neon-presets'
+import { getSiteColor, getSiteNeon } from '@/app/admin/settings/actions'
+import { getSiteContent } from '@/lib/site-content'
 import './globals.css'
 
 
@@ -32,11 +34,13 @@ const lemonBrush = localFont({
   display: 'swap',
 })
 
-export const metadata: Metadata = {
-  title: 'منصة الأستاذ عبد السلام | تعلّم الرياضيات بسهولة',
-  description:
-    'منصة الأستاذ عبد السلام التعليمية للرياضيات لجميع المراحل الدراسية — شرح مبسّط، بنك أسئلة، وامتحانات تفاعلية. اختر مرحلتك وابدأ رحلة التفوق.',
-  generator: 'v0.app',
+export async function generateMetadata(): Promise<Metadata> {
+  const { seo } = await getSiteContent()
+  return {
+    title: seo.title,
+    description: seo.description,
+    generator: 'v0.app',
+  }
 }
 
 export const viewport: Viewport = {
@@ -55,10 +59,11 @@ export default async function RootLayout({
   // اللون المحفوظ على مستوى الموقع — يُقرأ من جدول عام (site_theme) يقدر أي زائر
   // أو حساب يقراه، فيفضل ثابت عبر كل الأجهزة وحتى قبل تسجيل الدخول.
   let savedColor = 'navy'
+  let savedNeon = 'teal-violet'
   try {
-    savedColor = await getSiteColor()
+    ;[savedColor, savedNeon] = await Promise.all([getSiteColor(), getSiteNeon()])
   } catch {
-    // لو فشل الجلب نكمّل باللون الافتراضي
+    // لو فشل الجلب نكمّل بالقيم الافتراضية
   }
 
   return (
@@ -91,6 +96,20 @@ export default async function RootLayout({
                 root.style.setProperty('--sidebar-primary', vals.sidebar);
                 root.style.setProperty('--sidebar-accent', vals.sidebar);
                 root.style.setProperty('--sidebar-ring', vals.ring);
+              }
+
+              // ألوان النيون للدارك مود — تُطبّق دائماً (لا تؤثر إلا تحت dark:)
+              var neons=${JSON.stringify(neonPresets)};
+              var serverNeon=${JSON.stringify(savedNeon)};
+              var n=serverNeon||localStorage.getItem('neon-preset')||'teal-violet';
+              try{localStorage.setItem('neon-preset',n)}catch(e){}
+              var neon=neons.find(function(p){return p.id===n});
+              if(neon){
+                var r2=document.documentElement;
+                r2.style.setProperty('--color-teal-glow', neon.tealGlow);
+                r2.style.setProperty('--color-teal-deep', neon.tealDeep);
+                r2.style.setProperty('--color-violet-glow', neon.violetGlow);
+                r2.style.setProperty('--color-violet-deep', neon.violetDeep);
               }
             }catch(e){}})();`,
           }}

@@ -12,24 +12,26 @@ import {
   YAxis,
 } from 'recharts'
 import { ArrowRight, Quote, TrendingUp } from 'lucide-react'
-import { testimonials } from '@/lib/landing-data'
-import type { Testimonial } from '@/lib/landing-data'
+import type { TestimonialsContent, TestimonialItem } from '@/lib/site-content-defaults'
+import { DEFAULT_SITE_CONTENT } from '@/lib/site-content-defaults'
+
+type Testimonial = TestimonialItem
 import { useReveal } from '@/lib/use-reveal'
 import { cn } from '@/lib/utils'
 
 /* Shared section heading. */
-function Heading() {
+function Heading({ content }: { content: Pick<TestimonialsContent, 'badge' | 'title' | 'description'> }) {
   return (
     <div className="reveal-item mx-auto mb-6 max-w-4xl text-center md:mb-10">
       <span className="text-sm font-semibold text-emerald-deep dark:text-teal-glow">
         <span className="font-mono">{'// '}</span>
-        قصص نجاح حقيقية
+        {content.badge}
       </span>
       <h2 className="font-thmanyah font-bold mt-3 text-3xl leading-tight text-navy sm:text-4xl lg:text-5xl dark:text-ink-fg">
-        كل طالب رحلة... وكل رحلة منحنى صاعد
+        {content.title}
       </h2>
       <p className="mt-4 text-pretty text-lg leading-relaxed text-ink-muted dark:text-ink-dim">
-        مش مجرد كلام. دي درجات طلاب حقيقيين اتحسّنت شهر ورا شهر لحد الامتحان النهائي.
+        {content.description}
       </p>
     </div>
   )
@@ -207,7 +209,7 @@ function TestimonialCard({
 }
 
 /* Mobile: a real swipeable carousel (one card at a time) using CSS scroll-snap. */
-function MobileCarousel() {
+function MobileCarousel({ items }: { items: Testimonial[] }) {
   const trackRef = useRef<HTMLDivElement>(null)
   const [index, setIndex] = useState(0)
 
@@ -216,7 +218,7 @@ function MobileCarousel() {
     if (!el) return
     // abs handles both LTR and RTL scroll directions across browsers
     const i = Math.round(Math.abs(el.scrollLeft) / el.clientWidth)
-    setIndex(Math.min(testimonials.length - 1, Math.max(0, i)))
+    setIndex(Math.min(items.length - 1, Math.max(0, i)))
   }
 
   const goTo = (i: number) => {
@@ -233,7 +235,7 @@ function MobileCarousel() {
         onScroll={onScroll}
         className="flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
       >
-        {testimonials.map((s, i) => (
+        {items.map((s, i) => (
           <div key={i} className="w-full shrink-0 snap-center">
             <TestimonialCard student={s} chartHeightClass="h-32" compact />
           </div>
@@ -242,7 +244,7 @@ function MobileCarousel() {
 
       {/* dots */}
       <div className="mt-5 flex items-center justify-center gap-2">
-        {testimonials.map((_, i) => (
+        {items.map((_, i) => (
           <button
             key={i}
             type="button"
@@ -263,7 +265,13 @@ function MobileCarousel() {
 }
 
 /* Desktop: keep the scroll-driven sticky panel that swaps testimonials. */
-function DesktopScrollShowcase() {
+function DesktopScrollShowcase({
+  items,
+  content,
+}: {
+  items: Testimonial[]
+  content: Pick<TestimonialsContent, 'badge' | 'title' | 'description'>
+}) {
   const [active, setActive] = useState(0)
 
   useEffect(() => {
@@ -278,15 +286,15 @@ function DesktopScrollShowcase() {
       if (scrolled >= 0 && scrolled <= scrollableDistance) {
         const progress = scrolled / scrollableDistance
         const newIndex = Math.min(
-          testimonials.length - 1,
-          Math.max(0, Math.floor(progress * testimonials.length)),
+          items.length - 1,
+          Math.max(0, Math.floor(progress * items.length)),
         )
         setActive((prev) => (newIndex !== prev ? newIndex : prev))
       } else if (scrolled < 0) {
         setActive((prev) => (prev !== 0 ? 0 : prev))
       } else if (scrolled > scrollableDistance) {
         setActive((prev) =>
-          prev !== testimonials.length - 1 ? testimonials.length - 1 : prev,
+          prev !== items.length - 1 ? items.length - 1 : prev,
         )
       }
     }
@@ -294,15 +302,15 @@ function DesktopScrollShowcase() {
     window.addEventListener('scroll', handleScroll, { passive: true })
     handleScroll()
     return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
+  }, [items.length])
 
   return (
     <div id="testimonials-desktop" className="relative h-[300vh]">
       <div className="sticky top-20 flex min-h-[calc(100vh-5rem)] w-full flex-col justify-center pb-12 pt-4">
         <div className="mx-auto w-full max-w-7xl px-8">
-          <Heading />
+          <Heading content={content} />
           <div className="reveal-item">
-            <TestimonialCard student={testimonials[active]} active />
+            <TestimonialCard student={items[active]} active />
           </div>
         </div>
       </div>
@@ -310,20 +318,20 @@ function DesktopScrollShowcase() {
   )
 }
 
-export function TestimonialsSection() {
+export function TestimonialsSection({ content = DEFAULT_SITE_CONTENT.testimonials }: { content?: TestimonialsContent }) {
   const root = useReveal<HTMLElement>('.reveal-item')
 
   return (
     <section ref={root} id="testimonials" className="relative">
       {/* Mobile: swipeable carousel, natural height (no scroll-hijack). */}
       <div className="mx-auto w-full max-w-2xl px-5 py-12 md:hidden">
-        <Heading />
-        <MobileCarousel />
+        <Heading content={content} />
+        <MobileCarousel items={content.items} />
       </div>
 
       {/* Desktop / tablet: original scroll-driven showcase. */}
       <div className="hidden md:block">
-        <DesktopScrollShowcase />
+        <DesktopScrollShowcase items={content.items} content={content} />
       </div>
     </section>
   )
