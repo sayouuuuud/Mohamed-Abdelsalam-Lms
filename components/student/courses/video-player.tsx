@@ -92,6 +92,10 @@ export function VideoPlayer({
         poster={poster}
         className="absolute inset-0 size-full object-contain"
         preload="metadata"
+        controlsList="nodownload noremoteplayback nofullscreen"
+        disablePictureInPicture
+        disableRemotePlayback
+        onContextMenu={(e) => e.preventDefault()}
         onClick={togglePlay}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
