@@ -39,8 +39,9 @@ export function GravityPills() {
     const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     const w = scene.clientWidth
     // Three tiers: very narrow phones (≤380px), wider phones (≤520px), desktop
-    const scale = w <= 380 ? 0.42 : w <= 520 ? 0.52 : 1
+    const scale = w <= 380 ? 0.44 : w <= 520 ? 0.54 : 1
 
+    // shrink pills on narrow screens so the pile stays below the CTA content
     pillRefs.current.forEach((el, i) => {
       if (!el) return
       const p = PILLS[i]
@@ -244,13 +245,9 @@ export function GravityPills() {
           } ${p.className}`}
           style={{
             opacity: 0,
-            // clamp keeps pills visually small on narrow screens even before
-            // the physics useEffect fires and overrides these values with JS.
-            height: `clamp(${p.shape === 'circle' ? (p.big ? 54 : 40) : p.big ? 44 : 35}px, ${p.shape === 'circle' ? (p.big ? '13vw' : '10vw') : p.big ? '11vw' : '9vw'}, ${p.shape === 'circle' ? (p.big ? 128 : 96) : p.big ? 104 : 84}px)`,
-            width: p.shape === 'circle'
-              ? `clamp(${p.big ? 54 : 40}px, ${p.big ? '13vw' : '10vw'}, ${p.big ? 128 : 96}px)`
-              : undefined,
-            fontSize: `clamp(${p.big ? 17 : 13}px, ${p.big ? '4.2vw' : '3.2vw'}, ${p.big ? 40 : 30}px)`,
+            height: p.shape === 'circle' ? (p.big ? 128 : 96) : p.big ? 104 : 84,
+            width: p.shape === 'circle' ? (p.big ? 128 : 96) : undefined,
+            fontSize: p.big ? 40 : 30,
           }}
         >
           {p.label}

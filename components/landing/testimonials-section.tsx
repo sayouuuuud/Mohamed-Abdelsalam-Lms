@@ -50,10 +50,7 @@ function TestimonialCard({
   const jump = student.after - student.before
 
   return (
-    <div className={cn(
-      'grid gap-px overflow-hidden rounded-[2rem] border border-navy/15 bg-navy/15 shadow-2xl shadow-navy/10 lg:grid-cols-5 dark:border-white/10 dark:bg-white/5 dark:shadow-black/40',
-      compact ? 'grid-cols-1' : 'h-full grid-cols-1',
-    )}>
+    <div className="grid h-full grid-cols-1 gap-px overflow-hidden rounded-[2rem] border border-navy/15 bg-navy/15 shadow-2xl shadow-navy/10 lg:grid-cols-5 dark:border-white/10 dark:bg-white/5 dark:shadow-black/40">
       {/* chart card (navy) */}
       <div
         className={cn(
@@ -66,18 +63,7 @@ function TestimonialCard({
             <p className="text-xs font-semibold tracking-wider text-gold dark:text-teal-glow">
               منحنى التقدّم
             </p>
-            <div className="mt-1 flex items-center gap-2">
-              <p className={cn('font-bold text-cream dark:text-ink-fg', compact ? 'text-base' : 'text-lg')}>
-                {student.subject}
-              </p>
-              {compact && (
-                <span className="text-sm font-semibold text-cream/70">
-                  <span className="text-red-400">{student.before}٪</span>
-                  {' → '}
-                  <span className="text-emerald-300">{student.after}٪</span>
-                </span>
-              )}
-            </div>
+            <p className="mt-1 text-lg font-bold text-cream dark:text-ink-fg">{student.subject}</p>
           </div>
           <div className="inline-flex items-center gap-2 rounded-full bg-emerald-brand/15 px-3 py-1.5 text-emerald-300 dark:bg-teal-glow/15 dark:text-teal-glow">
             <TrendingUp className="size-4" />
@@ -152,24 +138,27 @@ function TestimonialCard({
           </ResponsiveContainer>
         </div>
 
-        {/* before -> after — hidden in compact to save vertical space */}
-        {!compact && (
-          <div className="mt-6 flex items-center justify-center gap-4 font-thmanyah">
-            <div className="text-center">
-              <span className="block text-xs text-cream/50 dark:text-ink-dim">قبل</span>
-              <span className="text-2xl font-bold text-red-400 dark:text-red-400/90">
-                {student.before.toLocaleString('ar-EG')}٪
-              </span>
-            </div>
-            <ArrowRight className="size-5 text-cream/30 dark:text-ink-dim" />
-            <div className="text-center">
-              <span className="block text-xs text-cream/50 dark:text-ink-dim">بعد</span>
-              <span className="text-3xl font-extrabold text-emerald-300 dark:text-teal-glow">
-                {student.after.toLocaleString('ar-EG')}٪
-              </span>
-            </div>
+        {/* before -> after result, written like a math statement */}
+        <div
+          className={cn(
+            'flex items-center justify-center gap-4 font-thmanyah',
+            compact ? 'mt-4' : 'mt-6',
+          )}
+        >
+          <div className="text-center">
+            <span className="block text-xs text-cream/50 dark:text-ink-dim">قبل</span>
+            <span className={cn('font-bold text-red-400 dark:text-red-400/90', compact ? 'text-xl' : 'text-2xl')}>
+              {student.before.toLocaleString('ar-EG')}٪
+            </span>
           </div>
-        )}
+          <ArrowRight className="size-4 text-cream/30 dark:text-ink-dim" />
+          <div className="text-center">
+            <span className="block text-xs text-cream/50 dark:text-ink-dim">بعد</span>
+            <span className={cn('font-extrabold text-emerald-300 dark:text-teal-glow', compact ? 'text-2xl' : 'text-3xl')}>
+              {student.after.toLocaleString('ar-EG')}٪
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* story card (cream) */}
