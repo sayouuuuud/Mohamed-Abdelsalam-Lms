@@ -147,79 +147,61 @@ export function HeroSection({ content = DEFAULT_SITE_CONTENT.hero }: { content?:
             }}
           />
           <div className="hero-photo relative z-10 w-full max-w-[440px] -left-4 -top-3 md:-left-8 md:-mt-20 md:-top-4 md:max-w-[580px] lg:-mt-28 lg:max-w-[560px] xl:-mt-24 xl:max-w-[580px]">
-            {/* light-mode portrait — full width, number line matches it */}
-            <div className="relative dark:hidden">
-              <Image
-                src={content.teacherImageLight}
-                alt={content.teacherImageAlt}
-                width={1083}
-                height={1452}
-                priority
-                className="h-auto w-full object-contain"
-              />
-              <NumberLine />
-            </div>
+            {/* light-mode portrait */}
+            <Image
+              src={content.teacherImageLight}
+              alt={content.teacherImageAlt}
+              width={1083}
+              height={1452}
+              priority
+              className="h-auto w-full object-contain dark:hidden"
+            />
+            {/* dark-mode portrait */}
+            <Image
+              src={content.teacherImageDark}
+              alt={content.teacherImageAlt}
+              width={772}
+              height={1024}
+              priority
+              className="mx-auto hidden h-auto w-[96%] object-contain dark:block translate-y-6"
+            />
 
-            {/* dark-mode portrait — 96% width centered, number line matches it */}
-            <div className="relative mx-auto hidden w-[96%] dark:block">
-              <Image
-                src={content.teacherImageDark}
-                alt={content.teacherImageAlt}
-                width={772}
-                height={1024}
-                priority
-                className="h-auto w-full object-contain translate-y-6"
-              />
-              <NumberLine />
+            {/* Geometric Number Line stuck to the teacher's feet */}
+            <div
+              className="absolute -bottom-7 left-1/2 w-[85%] h-12 -translate-x-1/2 pointer-events-none"
+              style={{
+                WebkitMaskImage: 'linear-gradient(to right, transparent, black 5%, black 95%, transparent)',
+                maskImage: 'linear-gradient(to right, transparent, black 5%, black 95%, transparent)',
+              }}
+            >
+              <div className="hero-axis relative w-full h-full flex items-center">
+                <div className="absolute inset-x-0 top-1/2 h-[2px] -translate-y-1/2 bg-gold dark:bg-teal-glow opacity-80" />
+                <div className="absolute inset-x-0 top-1/2 flex -translate-y-1/2 justify-between px-2">
+                  {Array.from({ length: 41 }).map((_, i) => {
+                    const isCenter = i === 20
+                    const isMajor = i % 10 === 0
+                    const isMedium = i % 5 === 0
+                    return (
+                      <div key={i} className="flex flex-col items-center relative">
+                        <div
+                          className={cn(
+                            'w-[2px] bg-gold dark:bg-teal-glow',
+                            isCenter ? 'h-6 opacity-100' : isMajor ? 'h-4 opacity-100' : isMedium ? 'h-2.5 opacity-80' : 'h-1.5 opacity-50',
+                          )}
+                        />
+                        {isCenter && (
+                          <span className="absolute top-5 text-sm font-mono font-bold text-gold dark:text-teal-glow">0</span>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </section>
-  )
-}
-
-function NumberLine() {
-  return (
-    <div
-      className="hero-axis absolute -bottom-5 inset-x-0 h-12 pointer-events-none"
-      style={{
-        WebkitMaskImage: 'linear-gradient(to right, transparent, black 4%, black 96%, transparent)',
-        maskImage: 'linear-gradient(to right, transparent, black 4%, black 96%, transparent)',
-      }}
-    >
-      <div className="relative w-full h-full flex items-center">
-        <div className="absolute inset-x-0 top-1/2 h-[2px] -translate-y-1/2 bg-gold dark:bg-teal-glow opacity-80" />
-        <div className="absolute inset-x-0 top-1/2 flex -translate-y-1/2 justify-between px-1">
-          {Array.from({ length: 41 }).map((_, i) => {
-            const isCenter = i === 20
-            const isMajor = i % 10 === 0
-            const isMedium = i % 5 === 0
-            return (
-              <div key={i} className="flex flex-col items-center relative">
-                <div
-                  className={cn(
-                    'w-[2px] bg-gold dark:bg-teal-glow',
-                    isCenter
-                      ? 'h-6 opacity-100'
-                      : isMajor
-                      ? 'h-4 opacity-100'
-                      : isMedium
-                      ? 'h-2.5 opacity-80'
-                      : 'h-1.5 opacity-50',
-                  )}
-                />
-                {isCenter && (
-                  <span className="absolute top-5 text-sm font-mono font-bold text-gold dark:text-teal-glow">
-                    0
-                  </span>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    </div>
   )
 }
 
