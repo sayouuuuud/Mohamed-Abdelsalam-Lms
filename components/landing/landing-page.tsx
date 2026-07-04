@@ -1,6 +1,6 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { motion, type Variants } from 'framer-motion'
 import { LandingNavbar } from './landing-navbar'
 import { HeroSection } from './hero-section'
 import { FeaturesSection } from './features-section'
@@ -14,9 +14,9 @@ import type { Stage } from '@/lib/landing-data'
 import type { SiteContent } from '@/lib/site-content-defaults'
 import { DEFAULT_SITE_CONTENT } from '@/lib/site-content-defaults'
 
-const fadeInUp = {
+const fadeInUp: Variants = {
   hidden: { opacity: 0, y: 40 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeOut' } }
+  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeOut' } },
 }
 
 export function LandingPage({

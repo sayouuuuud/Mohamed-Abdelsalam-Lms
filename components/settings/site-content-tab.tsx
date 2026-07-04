@@ -12,6 +12,7 @@ import {
   RotateCcw,
   Camera,
   GripVertical,
+  Palette,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -688,6 +689,16 @@ export function SiteContentTab({ initialContent }: { initialContent: SiteContent
           تحكّم في كل نص، عنوان، صورة، ورقم يظهر في الصفحات العامة. التغييرات تظهر فورًا للزوار.
         </p>
       </div>
+
+      {/* Color control lives in Preferences tab — surface a shortcut here */}
+      <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3 text-right">
+        <Palette className="size-4 shrink-0 text-muted-foreground" />
+        <p className="flex-1 text-sm text-muted-foreground">
+          للتحكم في ألوان الواجهة الرئيسية، اذهب لتبويب{' '}
+          <strong className="text-foreground">التفضيلات</strong> في نفس هذه الصفحة.
+        </p>
+      </div>
+
       <Separator className="my-4" />
       <div className="space-y-2">
         {sections.map((s) => (
