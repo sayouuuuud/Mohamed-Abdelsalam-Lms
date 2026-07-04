@@ -1,17 +1,21 @@
 'use client'
 
-import { Lightbulb, ClipboardCheck, Video, LineChart } from 'lucide-react'
-import { features } from '@/lib/landing-data'
+import { Lightbulb, ClipboardCheck, Video, LineChart, BookOpen } from 'lucide-react'
 import { useReveal } from '@/lib/use-reveal'
+import type { FeaturesContent } from '@/lib/site-content'
+import { DEFAULT_SITE_CONTENT } from '@/lib/site-content'
 
-const iconMap = {
+const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   lightbulb: Lightbulb,
   clipboard: ClipboardCheck,
   video: Video,
   chart: LineChart,
+  book: BookOpen,
 }
 
-export function FeaturesSection() {
+const FallbackIcon = BookOpen
+
+export function FeaturesSection({ content = DEFAULT_SITE_CONTENT.features }: { content?: FeaturesContent }) {
   const headRef = useReveal<HTMLDivElement>(undefined, { y: 30 })
   const listRef = useReveal<HTMLDivElement>('.feature-row', { y: 40, duration: 0.6 })
 
@@ -21,20 +25,19 @@ export function FeaturesSection() {
         <div ref={headRef} className="max-w-2xl">
           <span className="text-sm font-semibold text-emerald-deep dark:text-teal-glow">
             <span className="font-mono">{'// '}</span>
-            إزاي بنذاكر مع بعض
+            {content.badge}
           </span>
           <h2 className="font-thmanyah font-bold mt-3 text-balance text-3xl leading-tight text-navy sm:text-4xl lg:text-5xl dark:text-ink-fg">
-            نظام تعليمي متكامل، مبني على خطوات واضحة.
+            {content.title}
           </h2>
           <p className="mt-5 text-pretty text-lg leading-relaxed text-ink-muted dark:text-ink-dim">
-            مش مجرد فيديوهات؛ ده مسار متدرّج يمسكك من أول فكرة لحد ما تدخل الامتحان واثق
-            من نفسك.
+            {content.description}
           </p>
         </div>
 
         <div ref={listRef} className="mt-14 border-t border-navy/10 dark:border-white/10">
-          {features.map((f) => {
-            const Icon = iconMap[f.icon as keyof typeof iconMap]
+          {content.items.map((f) => {
+            const Icon = iconMap[f.icon] ?? FallbackIcon
             return (
               <div
                 key={f.step}

@@ -9,6 +9,7 @@ import { CartProvider } from '@/components/cart/cart-provider'
 import { CartModal } from '@/components/cart/cart-modal'
 import { colorPresets } from '@/lib/color-presets'
 import { getSiteColor } from '@/app/admin/settings/actions'
+import { getSiteContent } from '@/lib/site-content'
 import './globals.css'
 
 
@@ -32,11 +33,13 @@ const lemonBrush = localFont({
   display: 'swap',
 })
 
-export const metadata: Metadata = {
-  title: 'منصة الأستاذ عبد السلام | تعلّم الرياضيات بسهولة',
-  description:
-    'منصة الأستاذ عبد السلام التعليمية للرياضيات لجميع المراحل الدراسية — شرح مبسّط، بنك أسئلة، وامتحانات تفاعلية. اختر مرحلتك وابدأ رحلة التفوق.',
-  generator: 'v0.app',
+export async function generateMetadata(): Promise<Metadata> {
+  const { seo } = await getSiteContent()
+  return {
+    title: seo.title,
+    description: seo.description,
+    generator: 'v0.app',
+  }
 }
 
 export const viewport: Viewport = {
