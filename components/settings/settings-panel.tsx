@@ -15,6 +15,7 @@ import {
   Camera,
   Check,
   Loader2,
+  LayoutTemplate,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -22,6 +23,9 @@ import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { ToggleSwitch } from '@/components/settings/toggle-switch'
+import { SiteContentTab } from '@/components/settings/site-content-tab'
+import type { SiteContent } from '@/lib/site-content-defaults'
+import { DEFAULT_SITE_CONTENT } from '@/lib/site-content-defaults'
 
 // ── Color presets ──────────────────────────────────────────────
 const colorPresets = [
@@ -97,6 +101,7 @@ const tabs = [
   { id: 'notifications', label: 'الإشعارات', icon: Bell },
   { id: 'security', label: 'الأمان', icon: Shield },
   { id: 'preferences', label: 'التفضيلات', icon: SlidersHorizontal },
+  { id: 'content', label: 'محتوى الموقع', icon: LayoutTemplate },
 ] as const
 
 type TabId = (typeof tabs)[number]['id']
@@ -112,6 +117,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 export function SettingsPanel({
   initialSettings,
   adminProfile,
+  initialSiteContent,
 }: {
   initialSettings?: any
   adminProfile?: {
@@ -122,6 +128,7 @@ export function SettingsPanel({
     role: string
     initials: string
   } | null
+  initialSiteContent?: SiteContent
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -563,6 +570,12 @@ export function SettingsPanel({
               <Button onClick={handleSave} disabled={isPending}>حفظ التفضيلات</Button>
             </div>
           </div>
+        )}
+
+        {activeTab === 'content' && (
+          <SiteContentTab
+            initialContent={initialSiteContent ?? DEFAULT_SITE_CONTENT}
+          />
         )}
       </div>
     </div>

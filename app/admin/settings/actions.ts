@@ -3,6 +3,64 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
+import { getSiteContent } from '@/lib/site-content'
+
+// ── Site Content (public CMS) ──────────────────────────────────────────────
+
+export async function getSiteContentForAdmin() {
+  return getSiteContent()
+}
+
+export async function updateSiteContentSection(
+  section: string,
+  value: unknown,
+): Promise<{ success?: true; error?: string }> {
+  const supabase = await createClient()
+  if (!(await requireAdmin(supabase))) {
+    return { error: 'غير مسموح. لازم تكون أدمن.' }
+  }
+
+  if (!section || typeof section !== 'string') {
+    return { error: 'القسم غير صالح.' }
+  }
+
+  const { error } = await supabase
+    .from('site_content')
+    .upsert(
+      { section, value, updated_at: new Date().toISOString() },
+      { onConflict: 'section' },
+    )
+
+  if (error) {
+    console.log('[v0] updateSiteContentSection error:', error.message)
+    return { error: 'تعذّر حفظ القسم. حاول تاني.' }
+  }
+
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
+export async function resetSiteContentSection(
+  section: string,
+): Promise<{ success?: true; error?: string }> {
+  const supabase = await createClient()
+  if (!(await requireAdmin(supabase))) {
+    return { error: 'غير مسموح. لازم تكون أدمن.' }
+  }
+
+  const { error } = await supabase
+    .from('site_content')
+    .delete()
+    .eq('section', section)
+
+  if (error) {
+    console.log('[v0] resetSiteContentSection error:', error.message)
+    return { error: 'تعذّر استعادة الافتراضي. حاول تاني.' }
+  }
+
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
 
 // Loads the currently signed-in admin's profile for the settings page/header.
 export async function getAdminProfile() {
