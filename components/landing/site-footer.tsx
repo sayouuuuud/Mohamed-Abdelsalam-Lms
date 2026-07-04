@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Sigma, Globe, Send, MessageCircle, Phone } from 'lucide-react'
-import type { FooterContent } from '@/lib/site-content'
-import { DEFAULT_SITE_CONTENT } from '@/lib/site-content'
+import type { FooterContent } from '@/lib/site-content-defaults'
+import { DEFAULT_SITE_CONTENT } from '@/lib/site-content-defaults'
 
 export function SiteFooter({ content = DEFAULT_SITE_CONTENT.footer }: { content?: FooterContent }) {
   const copyright = content.copyright.replace('{year}', String(new Date().getFullYear()))

@@ -7,8 +7,8 @@ import { cn } from '@/lib/utils'
 import { useTheme } from '@/components/theme-provider'
 import { CartButton } from '@/components/cart/cart-button'
 import { useCart } from '@/components/cart/cart-provider'
-import type { NavbarContent } from '@/lib/site-content'
-import { DEFAULT_SITE_CONTENT } from '@/lib/site-content'
+import type { NavbarContent } from '@/lib/site-content-defaults'
+import { DEFAULT_SITE_CONTENT } from '@/lib/site-content-defaults'
 
 function ThemeToggle({ className }: { className?: string }) {
   const { isDark, toggleTheme } = useTheme()

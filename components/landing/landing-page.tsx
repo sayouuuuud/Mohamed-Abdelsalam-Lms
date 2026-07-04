@@ -11,8 +11,8 @@ import { CtaSection } from './cta-section'
 import { SiteFooter } from './site-footer'
 import { ScrollRefresh } from './scroll-refresh'
 import type { Stage } from '@/lib/landing-data'
-import type { SiteContent } from '@/lib/site-content'
-import { DEFAULT_SITE_CONTENT } from '@/lib/site-content'
+import type { SiteContent } from '@/lib/site-content-defaults'
+import { DEFAULT_SITE_CONTENT } from '@/lib/site-content-defaults'
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 40 },

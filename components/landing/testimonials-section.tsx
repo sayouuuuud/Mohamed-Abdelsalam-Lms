@@ -12,8 +12,8 @@ import {
   YAxis,
 } from 'recharts'
 import { ArrowRight, Quote, TrendingUp } from 'lucide-react'
-import type { TestimonialsContent, TestimonialItem } from '@/lib/site-content'
-import { DEFAULT_SITE_CONTENT } from '@/lib/site-content'
+import type { TestimonialsContent, TestimonialItem } from '@/lib/site-content-defaults'
+import { DEFAULT_SITE_CONTENT } from '@/lib/site-content-defaults'
 
 type Testimonial = TestimonialItem
 import { useReveal } from '@/lib/use-reveal'

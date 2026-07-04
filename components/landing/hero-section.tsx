@@ -7,8 +7,8 @@ import { useGSAP } from '@gsap/react'
 import { ArrowLeft, Sparkles } from 'lucide-react'
 import { AnimatedNumber } from './animated-number'
 import { cn } from '@/lib/utils'
-import type { HeroContent } from '@/lib/site-content'
-import { DEFAULT_SITE_CONTENT } from '@/lib/site-content'
+import type { HeroContent } from '@/lib/site-content-defaults'
+import { DEFAULT_SITE_CONTENT } from '@/lib/site-content-defaults'
 
 // Floating math objects scattered across the hero for an energetic, on-theme
 // backdrop. Each carries a light-mode color and a dark-mode (neon) color.

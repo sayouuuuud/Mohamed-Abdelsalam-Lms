@@ -7,8 +7,8 @@ import { useGSAP } from '@gsap/react'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { ArrowLeft, CheckCircle2 } from 'lucide-react'
-import type { CtaContent } from '@/lib/site-content'
-import { DEFAULT_SITE_CONTENT } from '@/lib/site-content'
+import type { CtaContent } from '@/lib/site-content-defaults'
+import { DEFAULT_SITE_CONTENT } from '@/lib/site-content-defaults'
 
 // The matter-js physics canvas is heavy; load it client-side only so it never
 // blocks first paint of the landing page.

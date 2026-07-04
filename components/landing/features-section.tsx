@@ -2,8 +2,8 @@
 
 import { Lightbulb, ClipboardCheck, Video, LineChart, BookOpen } from 'lucide-react'
 import { useReveal } from '@/lib/use-reveal'
-import type { FeaturesContent } from '@/lib/site-content'
-import { DEFAULT_SITE_CONTENT } from '@/lib/site-content'
+import type { FeaturesContent } from '@/lib/site-content-defaults'
+import { DEFAULT_SITE_CONTENT } from '@/lib/site-content-defaults'
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   lightbulb: Lightbulb,

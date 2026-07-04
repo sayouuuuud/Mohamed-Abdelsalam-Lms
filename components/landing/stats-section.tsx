@@ -1,8 +1,8 @@
 'use client'
 
 import { AnimatedNumber } from './animated-number'
-import type { StatsContent } from '@/lib/site-content'
-import { DEFAULT_SITE_CONTENT } from '@/lib/site-content'
+import type { StatsContent } from '@/lib/site-content-defaults'
+import { DEFAULT_SITE_CONTENT } from '@/lib/site-content-defaults'
 
 export function StatsSection({ content = DEFAULT_SITE_CONTENT.stats }: { content?: StatsContent }) {
   return (
