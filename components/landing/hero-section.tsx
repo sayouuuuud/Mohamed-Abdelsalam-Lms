@@ -166,9 +166,13 @@ export function HeroSection({ content = DEFAULT_SITE_CONTENT.hero }: { content?:
               className="mx-auto hidden h-auto w-[96%] object-contain dark:block translate-y-6"
             />
 
-            {/* Geometric Number Line stuck to the teacher's feet */}
+            {/* Geometric Number Line stuck to the teacher's feet.
+                The ruler is h-12 with its line at top-1/2, so a bottom offset of
+                -24px (h/2) puts the line exactly on the wrapper's bottom edge =
+                the light image's bottom. The dark image is shifted down by
+                translate-y-6 (24px), so dark mode needs -48px to stay flush. */}
             <div
-              className="absolute -bottom-7 left-1/2 w-[85%] h-12 -translate-x-1/2 pointer-events-none"
+              className="absolute -bottom-6 dark:-bottom-12 left-1/2 w-[85%] h-12 -translate-x-1/2 pointer-events-none"
               style={{
                 WebkitMaskImage: 'linear-gradient(to right, transparent, black 5%, black 95%, transparent)',
                 maskImage: 'linear-gradient(to right, transparent, black 5%, black 95%, transparent)',
