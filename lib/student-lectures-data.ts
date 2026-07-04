@@ -1,5 +1,6 @@
 import 'server-only'
 import { createClient } from '@/lib/supabase/server'
+import { createPlaybackToken } from '@/lib/video-token'
 import type {
   Assignment,
   AssignmentStatus,
@@ -178,6 +179,12 @@ function toCourseDetail(row: LectureRow, progress: Progress = EMPTY_PROGRESS): C
   const lessons: Lesson[] = items
     .filter((it): it is Extract<CourseItem, { kind: 'lesson' }> => it.kind === 'lesson')
     .map((it) => it.lesson)
+
+  // Security: never send raw storage (UploadThing) URLs to the client. Every
+  // student-facing course shape flows through here, so stripping the URL once
+  // covers the course list, the outline page, and the player payload. The
+  // lesson player re-attaches a signed proxy URL for the single lesson opened.
+  for (const l of lessons) l.videoUrl = undefined
 
   const completedLessons = lessons.filter((l) => l.completed).length
 
@@ -410,10 +417,32 @@ export async function getPurchasedLesson(
 ): Promise<
   { course: CourseDetail; lesson: Lesson; index: number; all: Lesson[] } | undefined
 > {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return undefined
+
   const course = await getPurchasedCourseDetail(courseSlug)
   if (!course) return undefined
   const all = course.sections.flatMap((s) => s.lessons)
   const index = all.findIndex((l) => l.id === lessonSlug)
   if (index === -1) return undefined
-  return { course, lesson: all[index], index, all }
+
+  const lesson = all[index]
+
+  // Never leak the real UploadThing URLs to the browser. Strip them from every
+  // lesson in the payload, then hand back a signed proxy URL for ONLY the lesson
+  // being opened. Opening the lecture rotates the playback session, so any
+  // previously issued link (even one copied from DevTools) stops working.
+  for (const s of course.sections) {
+    for (const l of s.lessons) l.videoUrl = undefined
+  }
+
+  if (lesson.type === 'فيديو' && lesson.lessonId) {
+    const token = await createPlaybackToken(user.id, lesson.lessonId)
+    lesson.videoUrl = `/api/lectures/${lesson.lessonId}/stream?t=${encodeURIComponent(token)}`
+  }
+
+  return { course, lesson, index, all }
 }
