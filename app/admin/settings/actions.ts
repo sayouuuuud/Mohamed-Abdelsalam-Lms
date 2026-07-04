@@ -150,6 +150,20 @@ export async function getSiteColor(): Promise<string> {
   return data.active_color
 }
 
+// Reads the site-wide dark-mode neon accent preset from the PUBLIC theme table.
+// Works for any visitor / device (same public-read policy as `getSiteColor`).
+export async function getSiteNeon(): Promise<string> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('site_theme')
+    .select('neon_preset')
+    .eq('id', true)
+    .single()
+
+  if (error || !data?.neon_preset) return 'teal-violet'
+  return data.neon_preset
+}
+
 export async function updateSettings(newSettings: any) {
   const supabase = await createClient()
   if (!(await requireAdmin(supabase))) {
@@ -175,17 +189,22 @@ export async function updateSettings(newSettings: any) {
     return { error: 'تعذّر حفظ الإعدادات (لا يوجد صف).' }
   }
 
-  // Mirror the accent color into the publicly-readable theme table so it
-  // applies on every device for every visitor (the settings table is
-  // admin-only). Keep going even if this part fails.
+  // Mirror the accent color AND the dark-mode neon preset into the
+  // publicly-readable theme table so both apply on every device for every
+  // visitor (the settings table is admin-only). Keep going even if this fails.
   const activeColor = newSettings?.preferences?.activeColor
-  if (activeColor) {
+  const neonPreset = newSettings?.preferences?.neonPreset
+  if (activeColor || neonPreset) {
+    const themeRow: Record<string, unknown> = {
+      id: true,
+      updated_at: new Date().toISOString(),
+    }
+    if (activeColor) themeRow.active_color = activeColor
+    if (neonPreset) themeRow.neon_preset = neonPreset
+
     const { error: themeError } = await supabase
       .from('site_theme')
-      .upsert(
-        { id: true, active_color: activeColor, updated_at: new Date().toISOString() },
-        { onConflict: 'id' },
-      )
+      .upsert(themeRow, { onConflict: 'id' })
     if (themeError) {
       console.log('[v0] updateSettings site_theme error:', themeError.message)
     }
