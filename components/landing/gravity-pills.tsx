@@ -37,13 +37,14 @@ export function GravityPills() {
     if (!scene) return
 
     const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const isCompact = scene.clientWidth < 520
+    const w = scene.clientWidth
+    // Three tiers: very narrow phones (≤380px), wider phones (≤520px), desktop
+    const scale = w <= 380 ? 0.44 : w <= 520 ? 0.54 : 1
 
     // shrink pills on narrow screens so the pile stays below the CTA content
     pillRefs.current.forEach((el, i) => {
       if (!el) return
       const p = PILLS[i]
-      const scale = isCompact ? 0.66 : 1
       const base =
         p.shape === 'circle' ? (p.big ? 128 : 96) : p.big ? 104 : 84
       const h = Math.round(base * scale)

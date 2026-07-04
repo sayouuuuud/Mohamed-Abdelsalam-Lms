@@ -9,12 +9,12 @@ import { formatRelativeArabic } from '@/lib/notifications-data'
 
 // ── Billing ──────────────────────────────────────────────────────
 
-// Maps the admin-side payment status to the student-facing invoice status.
-function mapPaymentStatus(status: string): InvoiceStatus {
+// Maps an order's status to the student-facing invoice status.
+function mapOrderStatus(status: string): InvoiceStatus {
   switch (status) {
-    case 'مقبول':
+    case 'approved':
       return 'مدفوعة'
-    case 'مرفوض':
+    case 'rejected':
       return 'مرفوضة'
     default:
       return 'قيد المراجعة'
@@ -33,94 +33,91 @@ function formatPaymentDate(date: string): string {
   }
 }
 
-type PaymentRow = {
+type OrderRow = {
   code: string
-  course: string | null
-  amount: number
   method: string | null
   reference: string | null
-  submitted_at: string | null
+  note: string | null
+  total: number
   status: string
   created_at: string
+  order_items: { lecture_title: string | null }[] | null
 }
 
-// Returns the current student's payments mapped to the Invoice shape used
-// by the billing UI.
-// Strategy:
-//  1. Try getCurrentStudent (needs user_id set in students table).
-//  2. If no student row, fall back to the auth email → look up student by email.
-//  3. Map payments rows to Invoice.
-//  4. For any enrolled lecture that has NO payment record, synthesise an
-//     "غير مدفوعة" invoice so the student always sees what they owe.
+const asPaymentMethod = (m: string | null): PaymentMethod | undefined =>
+  m === 'انستاباي' || m === 'فودافون كاش' ? m : undefined
+
+// Returns the current student's real purchases (the `orders` created at
+// checkout) mapped to the Invoice shape used by the billing UI. This is the
+// same data the admin approves under /admin/payments, so an approved order
+// shows here as "مدفوعة". (The legacy `payments` table is seed-only and is no
+// longer the source of truth for what a student actually bought.)
 export async function getStudentInvoices(): Promise<Invoice[]> {
   const supabase = await createClient()
 
-  // 1. resolve student row
-  let student = await getCurrentStudent(supabase)
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return []
 
-  if (!student) {
-    // fallback: match by auth email
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user?.email) return []
-    const { data } = await supabase
-      .from('students')
-      .select('*')
-      .eq('email', user.email)
-      .maybeSingle()
-    student = data
-  }
-
-  if (!student) return []
-
-  // 2. fetch payments
-  const { data: paymentRows, error } = await supabase
-    .from('payments')
-    .select('code, course, amount, method, reference, submitted_at, status, created_at')
-    .eq('student_id', student.id)
+  const { data: orderRows, error } = await supabase
+    .from('orders')
+    .select(
+      'code, method, reference, note, total, status, created_at, order_items(lecture_title)',
+    )
+    .eq('student_id', user.id)
     .order('created_at', { ascending: false })
 
-  if (error) console.log('[v0] getStudentInvoices payments error:', error.message)
+  if (error) console.log('[v0] getStudentInvoices orders error:', error.message)
 
-  const payments: Invoice[] = ((paymentRows ?? []) as PaymentRow[]).map((row) => ({
-    id: row.code,
-    course: row.course ?? 'كورس',
-    instructor: '',
-    amount: Number(row.amount) || 0,
-    issuedAt: formatPaymentDate(row.created_at),
-    dueDate: formatPaymentDate(row.created_at),
-    status: mapPaymentStatus(row.status),
-    method: (row.method as PaymentMethod) ?? undefined,
-    reference: row.reference ?? undefined,
-    submittedAt: row.submitted_at ?? undefined,
-  }))
+  return ((orderRows ?? []) as OrderRow[]).map((row) => {
+    const titles = (row.order_items ?? [])
+      .map((i) => i.lecture_title)
+      .filter((t): t is string => !!t)
+    const course =
+      titles.length === 0
+        ? 'طلب شراء'
+        : titles.length === 1
+          ? titles[0]
+          : `${titles[0]} +${titles.length - 1} كورس`
 
-  return payments
+    return {
+      id: row.code,
+      course,
+      instructor: '',
+      amount: Number(row.total) || 0,
+      issuedAt: formatPaymentDate(row.created_at),
+      dueDate: formatPaymentDate(row.created_at),
+      status: mapOrderStatus(row.status),
+      method: asPaymentMethod(row.method),
+      reference: row.reference || undefined,
+      submittedAt:
+        row.status === 'pending' ? formatPaymentDate(row.created_at) : undefined,
+      rejectionReason:
+        row.status === 'rejected' ? row.note || undefined : undefined,
+    }
+  })
 }
 
-// Resubmits payment proof for one of the student's own payments (e.g. after
-// rejection). Scoped to the current student so a student can only touch their
-// own rows.
+// Resubmits payment proof for one of the student's own orders (e.g. after
+// rejection). Scoped to the current auth user so a student can only touch their
+// own orders. Sets the order back to pending for admin re-review.
 export async function resubmitPayment(
   code: string,
   method: PaymentMethod,
   reference: string,
 ) {
   const supabase = await createClient()
-  let student = await getCurrentStudent(supabase)
-  if (!student) {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user?.email) {
-      const { data } = await supabase.from('students').select('*').eq('email', user.email).maybeSingle()
-      student = data
-    }
-  }
-  if (!student) return { error: 'غير مسجّل الدخول.' }
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'غير مسجّل الدخول.' }
 
   const { error } = await supabase
-    .from('payments')
-    .update({ method, reference, status: 'قيد المراجعة', submitted_at: 'الآن' })
+    .from('orders')
+    .update({ method, reference, status: 'pending' })
     .eq('code', code)
-    .eq('student_id', student.id)
+    .eq('student_id', user.id)
 
   if (error) {
     console.log('[v0] resubmitPayment error:', error.message)
