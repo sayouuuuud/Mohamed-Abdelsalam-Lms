@@ -147,14 +147,14 @@ function TestimonialCard({
         >
           <div className="text-center">
             <span className="block text-xs text-cream/50 dark:text-ink-dim">قبل</span>
-            <span className="text-2xl font-bold text-red-400 dark:text-red-400/90">
+            <span className={cn('font-bold text-red-400 dark:text-red-400/90', compact ? 'text-xl' : 'text-2xl')}>
               {student.before.toLocaleString('ar-EG')}٪
             </span>
           </div>
-          <ArrowRight className="size-5 text-cream/30 dark:text-ink-dim" />
+          <ArrowRight className="size-4 text-cream/30 dark:text-ink-dim" />
           <div className="text-center">
             <span className="block text-xs text-cream/50 dark:text-ink-dim">بعد</span>
-            <span className="text-3xl font-extrabold text-emerald-300 dark:text-teal-glow">
+            <span className={cn('font-extrabold text-emerald-300 dark:text-teal-glow', compact ? 'text-2xl' : 'text-3xl')}>
               {student.after.toLocaleString('ar-EG')}٪
             </span>
           </div>
@@ -173,7 +173,7 @@ function TestimonialCard({
           className={cn(
             'flex-1 text-pretty font-medium leading-relaxed text-navy dark:text-ink-fg',
             compact
-              ? 'mt-3 line-clamp-4 text-base'
+              ? 'mt-2 line-clamp-3 text-sm leading-snug'
               : 'mt-4 text-lg sm:text-xl',
           )}
         >
@@ -235,7 +235,7 @@ function MobileCarousel() {
       >
         {testimonials.map((s, i) => (
           <div key={i} className="w-full shrink-0 snap-center">
-            <TestimonialCard student={s} chartHeightClass="h-40" compact />
+            <TestimonialCard student={s} chartHeightClass="h-32" compact />
           </div>
         ))}
       </div>
