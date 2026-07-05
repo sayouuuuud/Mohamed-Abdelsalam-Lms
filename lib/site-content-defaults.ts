@@ -85,6 +85,14 @@ export type CtaContent = {
 
 export type FooterLink = { label: string; href: string }
 
+export type SocialPlatform = 'website' | 'telegram' | 'whatsapp' | 'youtube' | 'facebook' | 'instagram' | 'tiktok' | 'twitter'
+
+export type SocialLink = {
+  platform: SocialPlatform
+  href: string
+  enabled: boolean
+}
+
 export type FooterContent = {
   siteName: string
   siteTagline: string
@@ -93,6 +101,7 @@ export type FooterContent = {
   address: string
   quickLinks: FooterLink[]
   copyright: string // supports {year} token
+  socialLinks: SocialLink[]
 }
 
 export type NavbarContent = {
@@ -290,6 +299,14 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
       { label: 'تسجيل الدخول', href: '/student' },
     ],
     copyright: '© {year} منصة الأستاذ عبد السلام للرياضيات — جميع الحقوق محفوظة.',
+  socialLinks: [
+    { platform: 'website' as SocialPlatform,   href: '#', enabled: true },
+    { platform: 'telegram' as SocialPlatform,  href: '#', enabled: true },
+    { platform: 'whatsapp' as SocialPlatform,  href: '#', enabled: true },
+    { platform: 'youtube' as SocialPlatform,   href: '#', enabled: false },
+    { platform: 'facebook' as SocialPlatform,  href: '#', enabled: false },
+    { platform: 'instagram' as SocialPlatform, href: '#', enabled: false },
+  ],
   },
 
   navbar: {
