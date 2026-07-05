@@ -36,6 +36,8 @@ import type {
   CtaContent,
   FooterContent,
   FooterLink,
+  SocialLink,
+  SocialPlatform,
   NavbarContent,
   SeoContent,
 } from '@/lib/site-content-defaults'
@@ -510,6 +512,82 @@ function LinksEditor({ label, links, onChange }: { label: string; links: FooterL
   )
 }
 
+const SOCIAL_META: { platform: SocialPlatform; label: string; placeholder: string }[] = [
+  { platform: 'website',   label: 'الموقع الرسمي',  placeholder: 'https://example.com' },
+  { platform: 'telegram',  label: 'تليجرام',         placeholder: 'https://t.me/username' },
+  { platform: 'whatsapp',  label: 'واتساب',          placeholder: 'https://wa.me/201000000000' },
+  { platform: 'youtube',   label: 'يوتيوب',          placeholder: 'https://youtube.com/@channel' },
+  { platform: 'facebook',  label: 'فيسبوك',          placeholder: 'https://facebook.com/page' },
+  { platform: 'instagram', label: 'انستجرام',        placeholder: 'https://instagram.com/username' },
+  { platform: 'tiktok',    label: 'تيك توك',         placeholder: 'https://tiktok.com/@username' },
+  { platform: 'twitter',   label: 'تويتر / X',       placeholder: 'https://x.com/username' },
+]
+
+function SocialLinksEditor({
+  value,
+  onChange,
+}: {
+  value: SocialLink[]
+  onChange: (v: SocialLink[]) => void
+}) {
+  // Ensure every platform is represented (merge saved values over the full list)
+  const merged: SocialLink[] = SOCIAL_META.map((meta) => {
+    const saved = value.find((s) => s.platform === meta.platform)
+    return saved ?? { platform: meta.platform, href: '', enabled: false }
+  })
+
+  function update(platform: SocialPlatform, patch: Partial<SocialLink>) {
+    onChange(merged.map((s) => (s.platform === platform ? { ...s, ...patch } : s)))
+  }
+
+  return (
+    <div>
+      <FieldLabel hint="فعّل المنصة وأضف الرابط — المنصات المعطّلة لا تظهر للزوار">
+        حسابات السوشيال ميديا
+      </FieldLabel>
+      <div className="mt-2 divide-y divide-border rounded-xl border border-border overflow-hidden">
+        {merged.map((social) => {
+          const meta = SOCIAL_META.find((m) => m.platform === social.platform)!
+          return (
+            <div key={social.platform} className="flex items-center gap-3 bg-background px-3 py-2.5">
+              {/* Toggle */}
+              <button
+                type="button"
+                role="switch"
+                aria-checked={social.enabled}
+                onClick={() => update(social.platform, { enabled: !social.enabled })}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                  social.enabled ? 'bg-primary' : 'bg-input'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg transition-transform ${
+                    social.enabled ? 'translate-x-4' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+              {/* Label */}
+              <span className="w-28 shrink-0 text-right text-sm font-medium text-foreground">
+                {meta.label}
+              </span>
+              {/* URL input */}
+              <input
+                type="url"
+                dir="ltr"
+                placeholder={meta.placeholder}
+                value={social.href}
+                onChange={(e) => update(social.platform, { href: e.target.value })}
+                disabled={!social.enabled}
+                className="flex-1 rounded-md border border-input bg-transparent px-3 py-1.5 text-left text-sm shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
+              />
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function FooterEditor({ value, onChange }: { value: FooterContent; onChange: (v: FooterContent) => void }) {
   const set = <K extends keyof FooterContent>(k: K, v: FooterContent[K]) => onChange({ ...value, [k]: v })
   return (
@@ -524,6 +602,10 @@ function FooterEditor({ value, onChange }: { value: FooterContent; onChange: (v:
         <Field label="العنوان"><Input value={value.address} onChange={(e) => set('address', e.target.value)} className="text-right" /></Field>
       </div>
       <LinksEditor label="الروابط السريعة" links={value.quickLinks} onChange={(v) => set('quickLinks', v)} />
+      <SocialLinksEditor
+        value={value.socialLinks ?? []}
+        onChange={(v) => set('socialLinks', v)}
+      />
       <Field label="نص حقوق الملكية" hint="استخدم {year} لوضع السنة تلقائيًا">
         <Input value={value.copyright} onChange={(e) => set('copyright', e.target.value)} className="text-right" />
       </Field>
