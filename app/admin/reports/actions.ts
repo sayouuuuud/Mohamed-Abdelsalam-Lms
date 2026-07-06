@@ -83,24 +83,9 @@ export async function getReportsData() {
 
   const { data: coursesData } = await supabase
     .from('courses')
-    .select(`id, title, students, price, category`)
-
-  // Top students by enrollment count
-  const { data: topStudentsRaw } = await supabase
-    .from('enrollments')
-    .select('student_id, students(name)')
-
-  // Page views for the last 30 days (for views widget)
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
-  const { data: viewsRaw } = await supabase
-    .from('page_views')
-    .select('visited_at, visitor_id, device')
-    .gte('visited_at', thirtyDaysAgo)
-
-  // Exam scores for performance analysis
-  const { data: examResultsRaw } = await supabase
-    .from('exam_results')
-    .select('score, passed, exam_id')
+    .select(`
+      id, title, students, price, category
+    `)
 
   const approvedPayments = payments?.filter((p) => p.status === 'مقبول') || []
   const totalRevenue = approvedPayments.reduce((sum, p) => sum + Number(p.amount), 0)
@@ -228,97 +213,6 @@ export async function getReportsData() {
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 10)
 
-  // ── Conversion funnel ─────────────────────────────────────────────────────
-  const totalVisitors = viewsRaw ? new Set(viewsRaw.map((v) => v.visitor_id)).size : 0
-  const conversionFunnel = [
-    { stage: 'الزوّار', value: totalVisitors || 0, fill: 'var(--chart-1)' },
-    { stage: 'المسجّلون', value: studentsCount || 0, fill: 'var(--chart-2)' },
-    { stage: 'المشتركون', value: (enrollmentsRaw || []).length, fill: 'var(--chart-3)' },
-    {
-      stage: 'المدفوعون',
-      value: new Set(approvedPayments.map((p: any) => p.student_id)).size || approvedPayments.length,
-      fill: 'var(--chart-4)',
-    },
-  ]
-
-  // ── Top students by enrollment count ────────────────────────────────────
-  const studentEnrollCount: Record<string, number> = {}
-  ;(topStudentsRaw || []).forEach((e: any) => {
-    if (!e.student_id) return
-    studentEnrollCount[e.student_id] = (studentEnrollCount[e.student_id] || 0) + 1
-  })
-  const topStudents = Object.entries(studentEnrollCount)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
-    .map(([student_id, courses]) => ({ student_id, courses }))
-
-  // ── Device breakdown from page_views ───────────────────────────────────
-  const deviceCount: Record<string, number> = {}
-  ;(viewsRaw || []).forEach((v: any) => {
-    const d = v.device || 'unknown'
-    deviceCount[d] = (deviceCount[d] || 0) + 1
-  })
-  const deviceBreakdown = Object.entries(deviceCount)
-    .sort((a, b) => b[1] - a[1])
-    .map(([device, count]) => ({
-      device,
-      count,
-      fill: device === 'mobile' ? 'var(--chart-1)' : device === 'desktop' ? 'var(--chart-2)' : 'var(--chart-3)',
-    }))
-
-  // ── Daily page views for last 30 days (heatmap) ─────────────────────────
-  const dayViewsMap: Record<string, { views: number; uniques: Set<string> }> = {}
-  ;(viewsRaw || []).forEach((v: any) => {
-    const day = v.visited_at?.slice(0, 10)
-    if (!day) return
-    if (!dayViewsMap[day]) dayViewsMap[day] = { views: 0, uniques: new Set() }
-    dayViewsMap[day].views += 1
-    if (v.visitor_id) dayViewsMap[day].uniques.add(v.visitor_id)
-  })
-  const dailyViews = Object.entries(dayViewsMap)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([day, val]) => ({ day, views: val.views, visitors: val.uniques.size }))
-
-  // ── Exam performance analytics ──────────────────────────────────────────
-  const examScores = (examResultsRaw || []).map((r: any) => Number(r.score || 0))
-  const examAvg = examScores.length ? Math.round(examScores.reduce((s, v) => s + v, 0) / examScores.length) : 0
-  const examPassed = (examResultsRaw || []).filter((r: any) => r.passed).length
-  const examFailed = (examResultsRaw || []).length - examPassed
-  const scoreRanges = [
-    { range: '0–49', count: examScores.filter((s) => s < 50).length, fill: 'var(--chart-3)' },
-    { range: '50–69', count: examScores.filter((s) => s >= 50 && s < 70).length, fill: 'var(--chart-4)' },
-    { range: '70–84', count: examScores.filter((s) => s >= 70 && s < 85).length, fill: 'var(--chart-2)' },
-    { range: '85–100', count: examScores.filter((s) => s >= 85).length, fill: 'var(--chart-1)' },
-  ]
-
-  // ── Period comparison (this month vs last month) ─────────────────────────
-  const periodComparison = [
-    {
-      label: 'الإيرادات',
-      current: revThis,
-      previous: revPrev,
-      suffix: 'ج.م',
-      change: revChange,
-      up: revChange >= 0,
-    },
-    {
-      label: 'الطلاب الجدد',
-      current: studentsThis,
-      previous: studentsPrev,
-      suffix: 'طالب',
-      change: stuChange,
-      up: stuChange >= 0,
-    },
-    {
-      label: 'الاشتراكات',
-      current: enrollThis,
-      previous: enrollPrev,
-      suffix: 'اشتراك',
-      change: enrChange,
-      up: enrChange >= 0,
-    },
-  ]
-
   return {
     success: true,
     reportStats,
@@ -328,15 +222,5 @@ export async function getReportsData() {
     revenueByCategory,
     paymentStatus,
     coursePerformance,
-    // New widgets
-    conversionFunnel,
-    topStudents,
-    deviceBreakdown,
-    dailyViews,
-    examAvg,
-    examPassed,
-    examFailed,
-    scoreRanges,
-    periodComparison,
   }
 }
