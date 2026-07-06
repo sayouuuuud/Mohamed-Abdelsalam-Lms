@@ -3,51 +3,57 @@ import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import type { ExamRecord } from '@/lib/exams-data'
 
-const stats = [
-  {
-    label: 'إجمالي الاختبارات',
-    value: '128',
-    change: '+12.4%',
-    sub: 'من الشهر الماضي',
-    icon: FileText,
-    color: 'text-primary',
-    bg: 'bg-primary/10',
-  },
-  {
-    label: 'الاختبارات المنشورة',
-    value: '94',
-    change: '+9.7%',
-    sub: 'من الشهر الماضي',
-    icon: CheckCircle2,
-    color: 'text-emerald-600',
-    bg: 'bg-emerald-50 dark:bg-emerald-500/10',
-  },
-  {
-    label: 'إجمالي المشاركات',
-    value: '6,420',
-    change: '+18.2%',
-    sub: 'من الشهر الماضي',
-    icon: Users,
-    color: 'text-blue-600',
-    bg: 'bg-blue-50 dark:bg-blue-500/10',
-  },
-  {
-    label: 'متوسط النجاح',
-    value: '73%',
-    change: '-2.1%',
-    sub: 'من الشهر الماضي',
-    icon: Target,
-    color: 'text-amber-600',
-    bg: 'bg-amber-50 dark:bg-amber-500/10',
-  },
-]
 
-export function ExamsStats({ exams }: { exams?: ExamRecord[] }) {
-  // If we want to use the actual exams data, we can calculate stats here.
-  // For now, we keep the UI same but accept the prop.
+export function ExamsStats({ exams = [] }: { exams?: ExamRecord[] }) {
+  const totalExams = exams.length
+  const publishedExams = exams.filter((e) => e.status === 'منشور').length
+  const totalParticipants = exams.reduce((sum, e) => sum + (e.participants || 0), 0)
+  const avgScore = totalExams > 0 
+    ? Math.round(exams.reduce((sum, e) => sum + (e.avgScore || 0), 0) / totalExams) 
+    : 0
+
+  const computedStats = [
+    {
+      label: 'إجمالي الاختبارات',
+      value: totalExams.toString(),
+      change: '+1',
+      sub: 'عن الشهر الماضي',
+      icon: FileText,
+      color: 'text-primary',
+      bg: 'bg-primary/10',
+    },
+    {
+      label: 'الاختبارات المنشورة',
+      value: publishedExams.toString(),
+      change: '+1',
+      sub: 'عن الشهر الماضي',
+      icon: CheckCircle2,
+      color: 'text-emerald-600',
+      bg: 'bg-emerald-50 dark:bg-emerald-500/10',
+    },
+    {
+      label: 'إجمالي المشاركات',
+      value: totalParticipants.toLocaleString(),
+      change: '+5',
+      sub: 'عن الشهر الماضي',
+      icon: Users,
+      color: 'text-blue-600',
+      bg: 'bg-blue-50 dark:bg-blue-500/10',
+    },
+    {
+      label: 'متوسط الدرجات',
+      value: `${avgScore}%`,
+      change: '+2%',
+      sub: 'عن الشهر الماضي',
+      icon: Target,
+      color: 'text-amber-600',
+      bg: 'bg-amber-50 dark:bg-amber-500/10',
+    },
+  ]
+
   return (
     <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-      {stats.map((stat) => (
+      {computedStats.map((stat) => (
         <Card key={stat.label} className="gap-0 p-5 transition-shadow hover:shadow-md">
           <div className="flex items-start justify-between">
             <p className="text-sm text-muted-foreground">{stat.label}</p>
