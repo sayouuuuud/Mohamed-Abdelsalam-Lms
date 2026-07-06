@@ -124,10 +124,10 @@ export function ViewsChart({
 
           <div className="flex flex-wrap items-center gap-4">
               {/* Metric Toggle */}
-              <div className="flex items-center gap-2 bg-muted rounded-lg p-1 border border-border">
+              <div className="flex items-center gap-2 bg-muted rounded-2xl p-1.5 border border-border">
                   <button
                       onClick={() => setMetric("views")}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm transition-colors ${metric === "views"
+                      className={`flex items-center gap-2 px-4 py-1.5 rounded-xl text-sm transition-colors ${metric === "views"
                           ? "bg-primary text-primary-foreground shadow-sm"
                           : "text-muted-foreground hover:text-foreground"
                           }`}
@@ -137,7 +137,7 @@ export function ViewsChart({
                   </button>
                   <button
                       onClick={() => setMetric("visitors")}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm transition-colors ${metric === "visitors"
+                      className={`flex items-center gap-2 px-4 py-1.5 rounded-xl text-sm transition-colors ${metric === "visitors"
                           ? "bg-primary text-primary-foreground shadow-sm"
                           : "text-muted-foreground hover:text-foreground"
                           }`}
@@ -152,14 +152,14 @@ export function ViewsChart({
                   <button
                       onClick={() => setIsRangeOpen(!isRangeOpen)}
                       onBlur={() => setTimeout(() => setIsRangeOpen(false), 200)}
-                      className="flex items-center justify-between gap-3 bg-card border border-border hover:bg-muted text-foreground text-sm rounded-lg h-9 px-3 outline-none focus:ring-1 focus:ring-primary transition-colors min-w-[120px]"
+                      className="flex items-center justify-between gap-3 bg-card border border-border hover:bg-muted text-foreground text-sm rounded-2xl h-10 px-4 outline-none focus:ring-1 focus:ring-primary transition-colors min-w-[130px]"
                   >
                       <span>{rangeLabel}</span>
                       <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isRangeOpen ? "rotate-180" : ""}`} />
                   </button>
                   
                   {isRangeOpen && (
-                      <div className="absolute top-full right-0 mt-1.5 w-full bg-card border border-border rounded-lg shadow-lg z-50 overflow-hidden flex flex-col p-1 animate-in fade-in zoom-in-95 duration-100">
+                      <div className="absolute top-full right-0 mt-1.5 w-full bg-card border border-border rounded-2xl shadow-lg z-50 overflow-hidden flex flex-col p-1.5 animate-in fade-in zoom-in-95 duration-100">
                           {[
                               { value: '7', label: 'آخر 7 أيام' },
                               { value: '30', label: 'آخر 30 يوم' },
@@ -171,7 +171,7 @@ export function ViewsChart({
                                       setRange(opt.value)
                                       setIsRangeOpen(false)
                                   }}
-                                  className={`text-right px-3 py-2 text-sm rounded-md transition-colors ${range === opt.value ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted text-foreground'}`}
+                                  className={`text-right px-3 py-2 text-sm rounded-xl transition-colors ${range === opt.value ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted text-foreground'}`}
                               >
                                   {opt.label}
                               </button>
@@ -180,7 +180,7 @@ export function ViewsChart({
                   )}
               </div>
 
-              <button className="flex items-center justify-center text-muted-foreground bg-card border border-border hover:bg-muted rounded-lg h-9 w-9 transition-colors">
+              <button className="flex items-center justify-center text-muted-foreground bg-card border border-border hover:bg-muted rounded-2xl h-10 w-10 transition-colors">
                   <Download className="h-4 w-4" />
               </button>
           </div>
