@@ -54,9 +54,9 @@ export function ViewsChart({
   const dotsPerColumn = 12
   const dotGap = 2
   const dotsHeight = (dotsPerColumn * dotSize) + ((dotsPerColumn - 1) * dotGap) // 118px
-  const paddingTop = 80 // 80px for tooltip so it doesn't get cut off
+  const paddingTop = 44 // 44px is enough for single-line tooltips
   const paddingBottom = 8 // 8px bottom padding
-  const containerHeight = paddingTop + dotsHeight + paddingBottom // 206px
+  const containerHeight = paddingTop + dotsHeight + paddingBottom // 170px
 
   const renderDots = (value: number, dayIndex: number, label: string) => {
     const normalizedValue = Math.min(value, maxValue)
