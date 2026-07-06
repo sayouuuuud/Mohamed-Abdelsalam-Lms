@@ -6,11 +6,9 @@ import { CategoryDistributionChart } from '@/components/reports/category-distrib
 import { PaymentStatusChart } from '@/components/reports/payment-status-chart'
 import { RevenueByCategoryChart } from '@/components/reports/revenue-by-category-chart'
 import { CoursePerformanceTable } from '@/components/reports/course-performance-table'
-import { ReportsHistoryTable } from '@/components/reports/reports-history-table'
-import { getReports, getReportsData } from './actions'
+import { getReportsData } from './actions'
 
 export default async function ReportsPage() {
-  const reports = await getReports()
   const data = await getReportsData()
 
   if ('error' in data) return <div>{data.error}</div>
@@ -35,7 +33,6 @@ export default async function ReportsPage() {
           <CoursePerformanceTable courses={data.coursePerformance} />
         </div>
       </div>
-      <ReportsHistoryTable reports={reports} />
     </div>
   )
 }
