@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Eye, EyeOff, Loader2, Lock, Mail, Phone, User, GraduationCap, Check, AlertCircle, ShieldCheck, ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { recordLogin } from '@/app/auth/audit-actions'
 
 type Tab = 'login' | 'register'
 
@@ -82,6 +83,10 @@ export function AuthForm({ initialTab = 'login' }: { initialTab?: Tab }) {
             profile?.role === 'admin' || profile?.role === 'assistant'
               ? '/admin/dashboard'
               : '/student'
+        }
+        // Fire-and-forget — must not block navigation.
+        if (destination === '/admin/dashboard') {
+          recordLogin().catch(() => {})
         }
         router.push(destination)
         router.refresh()
