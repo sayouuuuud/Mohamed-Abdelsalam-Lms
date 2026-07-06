@@ -26,7 +26,7 @@ export function StudentsChart({ data = [] }: { data?: any[] }) {
       filterValue={range}
       onFilterChange={setRange}
     >
-      <ChartContainer config={config} className="h-full min-h-[240px] w-full">
+      <ChartContainer config={config} className="h-full min-h-[240px] w-full" dir="ltr">
         <AreaChart data={chartData} margin={{ left: 4, right: 8, top: 8 }}>
           <defs>
             <linearGradient id="fillStudents" x1="0" y1="0" x2="0" y2="1">
@@ -40,8 +40,10 @@ export function StudentsChart({ data = [] }: { data?: any[] }) {
             tickLine={false}
             axisLine={false}
             tickMargin={8}
+            reversed={true}
           />
           <YAxis
+            orientation="right"
             tickLine={false}
             axisLine={false}
             width={44}

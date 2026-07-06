@@ -26,7 +26,7 @@ export function ActivityChart({ data = [] }: { data?: any[] }) {
       filterValue={range}
       onFilterChange={setRange}
     >
-      <ChartContainer config={config} className="h-full min-h-[240px] w-full">
+      <ChartContainer config={config} className="h-full min-h-[240px] w-full" dir="ltr">
         <BarChart data={chartData} margin={{ left: 4, right: 8, top: 8 }}>
           <CartesianGrid vertical={false} strokeDasharray="3 3" />
           <XAxis
@@ -34,8 +34,10 @@ export function ActivityChart({ data = [] }: { data?: any[] }) {
             tickLine={false}
             axisLine={false}
             tickMargin={8}
+            reversed={true}
           />
           <YAxis
+            orientation="right"
             tickLine={false}
             axisLine={false}
             width={36}
