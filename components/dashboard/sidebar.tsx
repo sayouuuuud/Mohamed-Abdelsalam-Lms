@@ -20,6 +20,7 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  ShieldCheck,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -40,6 +41,7 @@ const navItems: {
   href: string
   resource: ResourceKey
   badge?: BadgeKey
+  adminOnly?: boolean
 }[] = [
   { label: 'الصفحة الرئيسية', icon: LayoutDashboard, href: '/admin/dashboard', resource: 'dashboard' },
   { label: 'الطلاب', icon: Users, href: '/admin/students', resource: 'students' },
@@ -52,6 +54,7 @@ const navItems: {
   { label: 'الإشعارات', icon: Bell, href: '/admin/notifications', resource: 'notifications', badge: 'notifications' },
   { label: 'خصومات و الكوبونات', icon: Tag, href: '/admin/coupons', resource: 'coupons' },
   { label: 'التقارير', icon: BarChart3, href: '/admin/reports', resource: 'reports' },
+  { label: 'سجل المراقبة', icon: ShieldCheck, href: '/admin/activity', resource: 'settings', adminOnly: true },
   { label: 'الإعدادات', icon: Settings, href: '/admin/settings', resource: 'settings' },
 ]
 
@@ -69,10 +72,11 @@ export function Sidebar({
   permissions?: PermissionMap
 }) {
   const pathname = usePathname()
-  // When a permission map is provided, only show resources the user can view.
-  // Missing map (undefined) means "show everything" (safe default for admins).
+  // When a permission map is provided (assistant), hide adminOnly items and
+  // items the user has no access to. Admins (permissions = undefined) see all.
   const visibleNavItems = permissions
     ? navItems.filter((item) => {
+        if (item.adminOnly) return false
         const level = permissions[item.resource]
         return level === 'view' || level === 'manage'
       })
