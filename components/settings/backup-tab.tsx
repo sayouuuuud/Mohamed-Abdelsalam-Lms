@@ -94,19 +94,19 @@ export function BackupTab() {
 
       {/* Export */}
       <div className="rounded-2xl border border-border bg-card p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="text-right">
-            <h3 className="flex items-center justify-end gap-2 text-base font-semibold text-foreground">
-              تصدير نسخة احتياطية
-              <FileJson className="size-5 text-primary" aria-hidden="true" />
-            </h3>
-            <p className="mt-1 text-sm text-muted-foreground">
+        <div className="flex items-start gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+            <FileJson className="size-5 text-primary" aria-hidden="true" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-base font-semibold text-foreground">تصدير نسخة احتياطية</h3>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
               نزّل ملف JSON يحتوي على كل إعدادات المنصة الحالية. احتفظ بيه في مكان آمن.
             </p>
           </div>
         </div>
-        <div className="mt-4 flex justify-start">
-          <Button onClick={handleExport} disabled={exporting}>
+        <div className="mt-4">
+          <Button onClick={handleExport} disabled={exporting} className="w-full sm:w-auto">
             {exporting ? (
               <Loader2 className="size-4 animate-spin" aria-hidden="true" />
             ) : (
@@ -119,18 +119,20 @@ export function BackupTab() {
 
       {/* Restore */}
       <div className="rounded-2xl border border-border bg-card p-5">
-        <div className="text-right">
-          <h3 className="flex items-center justify-end gap-2 text-base font-semibold text-foreground">
-            استعادة من نسخة احتياطية
+        <div className="flex items-start gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
             <Upload className="size-5 text-primary" aria-hidden="true" />
-          </h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            ارفع ملف نسخة احتياطية سابقة. الاستعادة بتعمل دمج (تحديث القيم الموجودة وإضافة الناقص) من غير ما تمسح أي
-            بيانات حالية.
-          </p>
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-base font-semibold text-foreground">استعادة من نسخة احتياطية</h3>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              ارفع ملف نسخة احتياطية سابقة. الاستعادة بتعمل دمج (تحديث القيم الموجودة وإضافة الناقص) من غير ما تمسح أي
+              بيانات حالية.
+            </p>
+          </div>
         </div>
 
-        <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-right">
+        <div className="mt-4 flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
           <ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-500" aria-hidden="true" />
           <p className="text-xs leading-relaxed text-amber-700 dark:text-amber-400">
             الاستعادة هتكتب فوق الإعدادات ومحتوى الموقع الحاليين بالقيم اللي في الملف. يُفضّل تعمل تصدير نسخة احتياطية
@@ -145,11 +147,12 @@ export function BackupTab() {
           className="hidden"
           onChange={(e) => handleFilePicked(e.target.files?.[0])}
         />
-        <div className="mt-4 flex justify-start">
+        <div className="mt-4">
           <Button
             variant="outline"
             onClick={() => fileInputRef.current?.click()}
             disabled={importing}
+            className="w-full sm:w-auto"
           >
             {importing ? (
               <Loader2 className="size-4 animate-spin" aria-hidden="true" />
@@ -171,7 +174,7 @@ export function BackupTab() {
         title="تأكيد الاستعادة"
         description={
           pendingBackup
-            ? `هيتم استعادة الإعدادات ومحتوى الموقع من الملف «${pendingBackup.fileName}». القيم الحالية هتتحدّث. تحب تكمّل؟`
+            ? `هيتم استعادة الإعدادات ومحتوى الموقع من الملف «${pendingBackup.fileName}». القيم الحالية هتتحدّث. تحب تكم��ل؟`
             : 'تحب تكمّل الاستعادة؟'
         }
         confirmLabel="استعادة"
