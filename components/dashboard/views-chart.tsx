@@ -76,11 +76,12 @@ export function ViewsChart({
         {isHovered && (
           <div 
             dir="rtl" 
-            className={`absolute bottom-full mb-2 ${dayIndex > totalDays - 4 ? "right-0" : dayIndex < 4 ? "left-0" : "left-1/2 -translate-x-1/2"} bg-gray-900 dark:bg-gray-100 text-gray-50 dark:text-gray-900 px-3 py-2 rounded-lg text-xs whitespace-nowrap z-50 shadow-xl flex flex-col gap-1.5 items-center min-w-[100px] pointer-events-none`}
+            className={`absolute bottom-full mb-2 ${dayIndex > totalDays - 4 ? "right-0" : dayIndex < 4 ? "left-0" : "left-1/2 -translate-x-1/2"} bg-gray-900 dark:bg-gray-100 text-gray-50 dark:text-gray-900 px-4 py-2 rounded-full text-xs whitespace-nowrap z-50 shadow-xl flex items-center gap-3 pointer-events-none`}
           >
-            <span className="font-semibold text-gray-400 dark:text-gray-500 border-b border-gray-700 dark:border-gray-200 pb-1.5 w-full text-center">
+            <span className="font-semibold text-gray-400 dark:text-gray-500">
               {label}
             </span>
+            <div className="h-3 w-px bg-gray-700 dark:bg-gray-300" />
             <div className="flex items-center gap-1.5 font-bold">
               <span className="text-sm">{value.toLocaleString("en-US")}</span>
               <span className="text-gray-300 dark:text-gray-700">{metric === "views" ? "مشاهدة" : "زائر"}</span>
@@ -169,28 +170,28 @@ export function ViewsChart({
       </div>
 
       {/* Stats Cards */}
-      <div className="flex flex-col md:flex-row mb-6 rounded-2xl border border-border bg-muted/30 divide-y md:divide-y-0 md:divide-x md:divide-x-reverse divide-border overflow-hidden">
-          <div className="flex-1 p-4 text-center hover:bg-muted/50 transition-colors">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="bg-muted/50 rounded-lg p-3 text-center border border-border">
               <p className="text-2xl font-bold text-foreground">
                   {totalValue.toLocaleString("en-US")}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-xs text-muted-foreground">
                   الإجمالي {metric === "views" ? "المشاهدات" : "الزوار"}
               </p>
           </div>
 
-          <div className="flex-1 p-4 text-center hover:bg-muted/50 transition-colors">
+          <div className="bg-muted/50 rounded-lg p-3 text-center border border-border">
               <p className="text-2xl font-bold text-foreground">
                   {avgValue.toLocaleString("en-US")}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">متوسط يومي</p>
+              <p className="text-xs text-muted-foreground">متوسط يومي</p>
           </div>
 
-          <div className="flex-1 p-4 text-center hover:bg-muted/50 transition-colors">
+          <div className="bg-muted/50 rounded-lg p-3 text-center border border-border">
               <p className="text-2xl font-bold text-foreground">
                   {maxValue.toLocaleString("en-US")}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">أعلى يوم</p>
+              <p className="text-xs text-muted-foreground">أعلى يوم</p>
           </div>
       </div>
 
