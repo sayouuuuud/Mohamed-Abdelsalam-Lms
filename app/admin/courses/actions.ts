@@ -6,6 +6,12 @@ import { requireAdmin } from '@/lib/auth-guard'
 import { createNotification } from '@/lib/notify'
 
 // ── Types ─────────────────────────────────────────────────────────
+export type LessonAttachment = {
+  name: string
+  url: string
+  type: 'pdf' | 'doc' | 'image' | 'other'
+}
+
 export type AdminLesson = {
   id: string
   slug: string
@@ -16,6 +22,7 @@ export type AdminLesson = {
   sortOrder: number
   videoUrl: string | null
   description: string | null
+  attachments: LessonAttachment[]
 }
 
 export type AdminLecture = {
@@ -63,6 +70,7 @@ export type LessonInput = {
   contentType?: 'فيديو' | 'مقال' | 'تمرين'
   videoUrl?: string | null
   description?: string | null
+  attachments?: LessonAttachment[]
 }
 
 function slugify(input: string) {
@@ -115,7 +123,7 @@ export async function getLecturesAdmin(): Promise<AdminLecture[]> {
       .order('sort_order', { ascending: true }),
     supabase
       .from('lessons')
-      .select('id, lecture_id, slug, title, duration, is_free, sort_order, video_url, description, content_type')
+      .select('id, lecture_id, slug, title, duration, is_free, sort_order, video_url, description, content_type, attachments')
       .order('sort_order', { ascending: true }),
   ])
 
@@ -153,6 +161,7 @@ export async function getLecturesAdmin(): Promise<AdminLecture[]> {
       sortOrder: row.sort_order,
       videoUrl: row.video_url ?? null,
       description: row.description ?? null,
+      attachments: Array.isArray(row.attachments) ? row.attachments : [],
     })
     lessonsByLecture.set(row.lecture_id, list)
   }
@@ -427,6 +436,7 @@ export async function createLesson(lectureId: string, input: LessonInput) {
     sort_order: sortOrder,
     video_url: input.videoUrl ?? null,
     description: input.description ?? null,
+    attachments: input.attachments ?? [],
   })
 
   if (error) {
@@ -450,6 +460,7 @@ export async function updateLesson(id: string, input: LessonInput) {
   }
   if (input.videoUrl !== undefined) patch.video_url = input.videoUrl
   if (input.description !== undefined) patch.description = input.description
+  if (input.attachments !== undefined) patch.attachments = input.attachments
 
   const { error } = await supabase.from('lessons').update(patch).eq('id', id)
 
@@ -535,6 +546,7 @@ export async function getLectureDetailAdmin(
         sortOrder: l.sort_order,
         videoUrl: l.video_url ?? null,
         description: l.description ?? null,
+        attachments: Array.isArray((l as any).attachments) ? (l as any).attachments : [],
       }
     }),
   }
@@ -575,7 +587,7 @@ export async function getLessonDetailAdmin(
 
   const { data: row, error } = await supabase
     .from('lessons')
-    .select('id, slug, lecture_id, title, duration, is_free, sort_order, video_url, description, content_type')
+    .select('id, slug, lecture_id, title, duration, is_free, sort_order, video_url, description, content_type, attachments')
     .eq('id', lessonId)
     .single()
 
@@ -588,7 +600,7 @@ export async function getLessonDetailAdmin(
     supabase.from('lectures').select('id, title, image').eq('id', row.lecture_id).single(),
     supabase
       .from('lessons')
-      .select('id, slug, title, duration, is_free, sort_order, video_url, description, content_type')
+      .select('id, slug, title, duration, is_free, sort_order, video_url, description, content_type, attachments')
       .eq('lecture_id', row.lecture_id)
       .order('sort_order', { ascending: true }),
   ])
@@ -606,6 +618,7 @@ export async function getLessonDetailAdmin(
       sortOrder: l.sort_order,
       videoUrl: l.video_url ?? null,
       description: l.description ?? null,
+      attachments: Array.isArray(l.attachments) ? l.attachments : [],
     }
   }
 

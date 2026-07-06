@@ -9,9 +9,12 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardList,
+  Download,
+  FileImage,
   FileText,
   Loader2,
   Lock,
+  Paperclip,
   PlayCircle,
 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
@@ -153,6 +156,38 @@ export function LessonPlayer({
             <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
               {lesson.description}
             </p>
+
+            {/* Attachments */}
+            {lesson.attachments && lesson.attachments.length > 0 && (
+              <div className="mt-5 border-t border-border pt-5">
+                <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <Paperclip className="size-4 text-primary" />
+                  مرفقات الدرس
+                </p>
+                <ul className="space-y-2">
+                  {lesson.attachments.map((att, i) => {
+                    const Icon = att.type === 'image' ? FileImage : FileText
+                    return (
+                      <li key={i}>
+                        <a
+                          href={att.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          download={att.name}
+                          className="flex items-center gap-3 rounded-xl border border-border bg-secondary/40 px-4 py-2.5 text-sm transition-colors hover:bg-secondary"
+                        >
+                          <Icon className="size-4 shrink-0 text-primary" />
+                          <span className="flex-1 truncate font-medium text-foreground">
+                            {att.name}
+                          </span>
+                          <Download className="size-4 shrink-0 text-muted-foreground" />
+                        </a>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            )}
           </Card>
 
           {/* Next-up assignment callout */}
