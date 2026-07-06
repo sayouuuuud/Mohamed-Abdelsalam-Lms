@@ -212,7 +212,6 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
         id,
         title,
         category,
-        categories (name),
         course_sections (
           course_lessons (id)
         )
@@ -226,7 +225,7 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
 
   const courses: EnrolledCourse[] = (enrollments || []).map((enrollment: any) => {
     const course = enrollment.courses
-    const category = course?.categories?.name || course?.category || 'عام'
+    const category = course?.category || 'عام'
     
     // Count total lessons
     let lessonsTotal = 0
@@ -290,7 +289,7 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
       item: itemLabel,
       amount: Number(o.total),
       method: o.method as PaymentRecord['method'],
-      status: o.status === 'مقبول' ? 'ناجح' : o.status === 'مرفوض' ? 'مسترد' : 'معلّق',
+      status: o.status === 'approved' ? 'ناجح' : o.status === 'rejected' ? 'مسترد' : 'معلّق',
     }
   })
 
@@ -390,7 +389,7 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
   // Real monthly spend from accepted orders.
   const monthlySpend = monthBuckets.map((b) => {
     const amount = (ordersData || [])
-      .filter((o: any) => o.status === 'مقبول' && o.created_at)
+      .filter((o: any) => o.status === 'approved' && o.created_at)
       .filter((o: any) => {
         const d = new Date(o.created_at)
         return d.getFullYear() === b.year && d.getMonth() === b.month
