@@ -426,6 +426,7 @@ export function Header({
           className="mr-auto hidden text-muted-foreground hover:text-foreground md:flex"
           aria-label="عرض الموقع"
           title="عرض الموقع"
+          nativeButton={false}
           render={<Link href="/" target="_blank" />}
         >
           <Globe className="size-5" />

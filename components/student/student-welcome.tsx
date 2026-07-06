@@ -45,6 +45,7 @@ export function StudentWelcome({
         </p>
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <Button
+            nativeButton={false}
             render={<Link href="/student/courses" />}
             className="shrink-0 whitespace-nowrap bg-white text-sidebar hover:bg-white/90"
           >
