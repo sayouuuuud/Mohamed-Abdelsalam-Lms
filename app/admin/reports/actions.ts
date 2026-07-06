@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { hasResourceAccess } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
+import { logActivity } from '@/lib/audit-log'
 import { lastMonths, monthKeyOf, percentChange } from '@/lib/time-series'
 
 export type ReportItem = {
@@ -55,6 +56,7 @@ export async function generateReport() {
     })
 
   if (error) return { error: error.message }
+  logActivity({ action: 'create', resource: 'reports', targetLabel: 'تقرير مخصص جديد' }).catch(() => {})
   revalidatePath('/reports')
   return { success: true }
 }

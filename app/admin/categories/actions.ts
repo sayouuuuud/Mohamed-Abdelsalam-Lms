@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { hasResourceAccess } from '@/lib/auth-guard'
+import { logActivity } from '@/lib/audit-log'
 import { revalidatePath } from 'next/cache'
 
 // ── Admin-facing types (use the real uuid `id`) ───────────────────
@@ -136,6 +137,7 @@ export async function createStage(input: StageInput) {
     console.log('[v0] createStage error:', error.message)
     return { error: 'تعذّر إضافة المرحلة.' }
   }
+  logActivity({ action: 'create', resource: 'categories', targetLabel: `مرحلة: ${input.title}` }).catch(() => {})
   revalidatePath('/categories')
   revalidatePath('/')
   return { success: true }
@@ -160,6 +162,7 @@ export async function updateStage(id: string, input: StageInput) {
     console.log('[v0] updateStage error:', error.message)
     return { error: 'تعذّر تحديث المرحلة.' }
   }
+  logActivity({ action: 'update', resource: 'categories', targetId: id, targetLabel: `مرحلة: ${input.title}` }).catch(() => {})
   revalidatePath('/categories')
   revalidatePath('/')
   return { success: true }
@@ -174,6 +177,7 @@ export async function deleteStage(id: string) {
     console.log('[v0] deleteStage error:', error.message)
     return { error: 'تعذّر حذف المرحلة.' }
   }
+  logActivity({ action: 'delete', resource: 'categories', targetId: id, targetLabel: `مرحلة ID: ${id}` }).catch(() => {})
   revalidatePath('/categories')
   revalidatePath('/')
   return { success: true }
@@ -204,6 +208,7 @@ export async function createBranch(input: BranchInput) {
     console.log('[v0] createBranch error:', error.message)
     return { error: 'تعذّر إضافة الفرع.' }
   }
+  logActivity({ action: 'create', resource: 'categories', targetLabel: `فرع: ${input.title}` }).catch(() => {})
   revalidatePath('/categories')
   revalidatePath('/')
   return { success: true }
@@ -230,6 +235,7 @@ export async function updateBranch(
     console.log('[v0] updateBranch error:', error.message)
     return { error: 'تعذّر تحديث الفرع.' }
   }
+  logActivity({ action: 'update', resource: 'categories', targetId: id, targetLabel: `فرع: ${input.title}` }).catch(() => {})
   revalidatePath('/categories')
   revalidatePath('/')
   return { success: true }
@@ -244,6 +250,7 @@ export async function deleteBranch(id: string) {
     console.log('[v0] deleteBranch error:', error.message)
     return { error: 'تعذّر حذف الفرع.' }
   }
+  logActivity({ action: 'delete', resource: 'categories', targetId: id, targetLabel: `فرع ID: ${id}` }).catch(() => {})
   revalidatePath('/categories')
   revalidatePath('/')
   return { success: true }

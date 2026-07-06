@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { hasResourceAccess } from '@/lib/auth-guard'
+import { logActivity } from '@/lib/audit-log'
 import { createNotification } from '@/lib/notify'
 import { revalidatePath } from 'next/cache'
 import type { CalendarEvent, CalendarEventType } from '@/lib/calendar-data'
@@ -93,6 +94,8 @@ export async function createEvent(values: {
 
   if (error) return { error: error.message }
 
+  logActivity({ action: 'create', resource: 'calendar', targetId: code, targetLabel: `حدث: ${values.title}` }).catch(() => {})
+
   // Notify all students about the new event (exam / assignment / lesson, etc).
   await createNotification({
     type: values.type === 'اختبار' ? 'اختبار' : 'نظام',
@@ -139,6 +142,7 @@ export async function updateEvent(
     .eq('code', id)
 
   if (error) return { error: error.message }
+  logActivity({ action: 'update', resource: 'calendar', targetId: id, targetLabel: `حدث: ${values.title}` }).catch(() => {})
   revalidatePath('/calendar')
   return { success: true }
 }
@@ -151,6 +155,7 @@ export async function deleteEvent(id: string) {
 
   const { error } = await supabase.from('calendar_events').delete().eq('code', id)
   if (error) return { error: error.message }
+  logActivity({ action: 'delete', resource: 'calendar', targetId: id, targetLabel: `حدث كود: ${id}` }).catch(() => {})
   revalidatePath('/calendar')
   return { success: true }
 }

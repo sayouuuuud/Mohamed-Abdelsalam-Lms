@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { hasResourceAccess } from '@/lib/auth-guard'
+import { logActivity } from '@/lib/audit-log'
 import { revalidatePath } from 'next/cache'
 import { getSiteContent } from '@/lib/site-content'
 
@@ -36,6 +37,7 @@ export async function updateSiteContentSection(
     return { error: 'تعذّر حفظ القسم. حاول تاني.' }
   }
 
+  logActivity({ action: 'update', resource: 'settings', targetLabel: `محتوى الموقع — قسم: ${section}` }).catch(() => {})
   revalidatePath('/', 'layout')
   return { success: true }
 }
@@ -58,6 +60,7 @@ export async function resetSiteContentSection(
     return { error: 'تعذّر استعادة الافتراضي. حاول تاني.' }
   }
 
+  logActivity({ action: 'delete', resource: 'settings', targetLabel: `إعادة ضبط قسم: ${section}` }).catch(() => {})
   revalidatePath('/', 'layout')
   return { success: true }
 }
@@ -119,6 +122,7 @@ export async function updateAdminProfile(input: {
     return { error: 'تعذّر حفظ الملف الشخصي. حاول تاني.' }
   }
 
+  logActivity({ action: 'update', resource: 'settings', targetLabel: `الملف الشخصي: ${fullName}` }).catch(() => {})
   revalidatePath('/admin', 'layout')
   return { success: true }
 }
@@ -210,6 +214,7 @@ export async function updateSettings(newSettings: any) {
     }
   }
 
+  logActivity({ action: 'update', resource: 'settings', targetLabel: 'إعدادات النظام العامة' }).catch(() => {})
   // Revalidate the whole app so the root layout re-reads the new color.
   revalidatePath('/', 'layout')
   return { success: true }

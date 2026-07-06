@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { hasResourceAccess } from '@/lib/auth-guard'
+import { logActivity } from '@/lib/audit-log'
 import type {
   StudentGender,
   StudentRecord,
@@ -167,6 +168,7 @@ export async function createStudent(input: StudentInput) {
     return { error: 'تعذّر إضافة الطالب. تأكد من صلاحياتك وحاول تاني.' }
   }
 
+  logActivity({ action: 'create', resource: 'students', targetId: code, targetLabel: `طالب: ${input.name}` }).catch(() => {})
   revalidatePath('/students')
   return { success: true }
 }
@@ -185,6 +187,7 @@ export async function deleteStudent(code: string) {
     return { error: 'تعذّر حذف الطالب.' }
   }
 
+  logActivity({ action: 'delete', resource: 'students', targetId: code, targetLabel: `طالب كود: ${code}` }).catch(() => {})
   revalidatePath('/students')
   return { success: true }
 }

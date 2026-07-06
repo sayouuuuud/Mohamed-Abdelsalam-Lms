@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireAdmin } from '@/lib/auth-guard'
+import { logActivity } from '@/lib/audit-log'
 import {
   type AccessLevel,
   type ResourceKey,
@@ -162,6 +163,7 @@ export async function createAssistant(input: {
     }
   }
 
+  logActivity({ action: 'create', resource: 'settings', targetId: userId, targetLabel: `مساعد جديد: ${input.name} (${input.email})` }).catch(() => {})
   revalidatePath('/admin/settings')
   return { success: true }
 }
@@ -204,6 +206,7 @@ export async function updateAssistantPermissions(
     }
   }
 
+  logActivity({ action: 'update', resource: 'settings', targetId: profileId, targetLabel: `صلاحيات مساعد ID: ${profileId}` }).catch(() => {})
   revalidatePath('/admin/settings')
   return { success: true }
 }
@@ -231,6 +234,7 @@ export async function deleteAssistant(profileId: string) {
     return { error: 'تعذّر إزالة المساعد.' }
   }
 
+  logActivity({ action: 'delete', resource: 'settings', targetId: profileId, targetLabel: `إزالة مساعد ID: ${profileId}` }).catch(() => {})
   revalidatePath('/admin/settings')
   return { success: true }
 }

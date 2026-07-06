@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { hasResourceAccess } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
+import { logActivity } from '@/lib/audit-log'
 import type { ExamRecord, ExamStatus } from '@/lib/exams-data'
 
 // Shape sent from the exam builder (client) to be persisted.
@@ -125,6 +126,7 @@ export async function saveExam(payload: SaveExamPayload) {
     }
   }
 
+  logActivity({ action: 'create', resource: 'exams', targetId: exam.code, targetLabel: `اختبار: ${meta.title.trim()}` }).catch(() => {})
   revalidatePath('/admin/exams')
   return { success: true, code: exam.code }
 }

@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { hasResourceAccess } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
+import { logActivity } from '@/lib/audit-log'
 import {
   computeCouponStatus,
   type CouponRecord,
@@ -146,6 +147,7 @@ export async function createCoupon(values: {
 
   await syncCouponLectures(supabase, created.id, scope, values.lectureIds ?? [])
 
+  logActivity({ action: 'create', resource: 'coupons', targetId: displayCode, targetLabel: `كوبون: ${displayCode} (${values.value}%)` }).catch(() => {})
   revalidatePath('/coupons')
   return { success: true }
 }
@@ -198,6 +200,7 @@ export async function updateCoupon(
 
   await syncCouponLectures(supabase, updated.id, scope, values.lectureIds ?? [])
 
+  logActivity({ action: 'update', resource: 'coupons', targetId: id, targetLabel: `كوبون: ${id}` }).catch(() => {})
   revalidatePath('/coupons')
   return { success: true }
 }
@@ -210,6 +213,7 @@ export async function deleteCoupon(id: string) {
 
   const { error } = await supabase.from('coupons').delete().eq('display_code', id)
   if (error) return { error: error.message }
+  logActivity({ action: 'delete', resource: 'coupons', targetId: id, targetLabel: `كوبون: ${id}` }).catch(() => {})
   revalidatePath('/coupons')
   return { success: true }
 }

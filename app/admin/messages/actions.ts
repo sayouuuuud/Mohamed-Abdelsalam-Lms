@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { hasResourceAccess } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
+import { logActivity } from '@/lib/audit-log'
 import type { Conversation, ChatMessage, TicketStatus } from '@/lib/messages-data'
 
 export async function getConversations(): Promise<Conversation[]> {
@@ -99,6 +100,7 @@ export async function replyToConversation(id: string, message: string) {
     .eq('code', id)
 
   if (error) return { error: error.message }
+  logActivity({ action: 'create', resource: 'messages', targetId: id, targetLabel: `رد على محادثة: ${id}` }).catch(() => {})
   revalidatePath('/admin/messages')
   return { success: true, newMsg }
 }
@@ -115,6 +117,7 @@ export async function setTicketStatus(id: string, status: TicketStatus) {
     .eq('code', id)
 
   if (error) return { error: error.message }
+  logActivity({ action: 'update', resource: 'messages', targetId: id, targetLabel: `حالة تذكرة: ${status}` }).catch(() => {})
   revalidatePath('/admin/messages')
   return { success: true }
 }

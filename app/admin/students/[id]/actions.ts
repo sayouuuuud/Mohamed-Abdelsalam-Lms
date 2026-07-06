@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { hasResourceAccess } from '@/lib/auth-guard'
+import { logActivity } from '@/lib/audit-log'
 import type { StudentProfile, DeviceInfo, EnrolledCourse, PaymentRecord, ExamGrade, AssignmentRecord, StudentStatus } from '@/lib/student-profile-data'
 
 // ── Update student account status ─────────────────────────────────────────────
@@ -24,6 +25,7 @@ export async function updateStudentStatus(
 
   if (error) return { error: error.message }
 
+  logActivity({ action: 'update', resource: 'students', targetId: studentCode, targetLabel: `حالة طالب: ${newStatus}` }).catch(() => {})
   revalidatePath(`/admin/students/${studentCode}`)
   revalidatePath('/admin/students')
   return { success: true }
@@ -116,6 +118,7 @@ export async function sendMessageToStudent(
     }
   }
 
+  logActivity({ action: 'create', resource: 'students', targetId: studentCode, targetLabel: `رسالة لـ ${studentName} (${channel})` }).catch(() => {})
   revalidatePath(`/admin/students/${studentCode}`)
   revalidatePath('/admin/messages')
   return { success: true }

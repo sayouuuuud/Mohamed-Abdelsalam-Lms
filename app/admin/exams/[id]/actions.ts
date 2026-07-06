@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { hasResourceAccess } from '@/lib/auth-guard'
+import { logActivity } from '@/lib/audit-log'
 
 export type ExamQuestion = {
   id: string
@@ -325,6 +326,7 @@ export async function gradeSubmission(
     revalidatePath(`/admin/exams/${examCode}`)
     revalidatePath(`/student/exams/${examCode}`)
   }
+  logActivity({ action: 'update', resource: 'exams', targetId: submissionId, targetLabel: `تصحيح اختبار — النتيجة: ${score}/${total} (${status})` }).catch(() => {})
   revalidatePath('/student/exams')
 
   return { success: true, score, total, status }

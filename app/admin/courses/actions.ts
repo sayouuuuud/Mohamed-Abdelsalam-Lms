@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { hasResourceAccess } from '@/lib/auth-guard'
 import { createNotification } from '@/lib/notify'
+import { logActivity } from '@/lib/audit-log'
 
 // ── Types ─────────────────────────────────────────────────────────
 export type LessonAttachment = {
@@ -295,6 +296,7 @@ export async function createLecture(input: LectureInput) {
     }
   }
 
+  logActivity({ action: 'create', resource: 'courses', targetLabel: `محاضرة: ${input.title}` }).catch(() => {})
   revalidatePath('/courses')
   revalidatePath('/calendar')
   revalidatePath('/')
@@ -399,6 +401,7 @@ export async function updateLecture(id: string, input: LectureInput) {
     await supabase.from('calendar_events').delete().eq('lecture_id', id)
   }
 
+  logActivity({ action: 'update', resource: 'courses', targetId: id, targetLabel: `محاضرة ID: ${id}` }).catch(() => {})
   revalidatePath('/courses')
   revalidatePath('/calendar')
   revalidatePath('/')
@@ -414,6 +417,7 @@ export async function deleteLecture(id: string) {
     console.log('[v0] deleteLecture error:', error.message)
     return { error: 'تعذّر حذف المحاضرة.' }
   }
+  logActivity({ action: 'delete', resource: 'courses', targetId: id, targetLabel: `محاضرة ID: ${id}` }).catch(() => {})
   revalidatePath('/courses')
   revalidatePath('/')
   return { success: true }
@@ -443,6 +447,7 @@ export async function createLesson(lectureId: string, input: LessonInput) {
     console.log('[v0] createLesson error:', error.message)
     return { error: 'تعذّر إضافة الدرس.' }
   }
+  logActivity({ action: 'create', resource: 'courses', targetLabel: `درس: ${input.title}` }).catch(() => {})
   revalidatePath('/courses')
   revalidatePath('/')
   return { success: true }
@@ -468,6 +473,7 @@ export async function updateLesson(id: string, input: LessonInput) {
     console.log('[v0] updateLesson error:', error.message)
     return { error: 'تعذّر تحديث الدرس.' }
   }
+  logActivity({ action: 'update', resource: 'courses', targetId: id, targetLabel: `درس: ${input.title}` }).catch(() => {})
   revalidatePath('/courses')
   revalidatePath('/')
   return { success: true }
@@ -482,6 +488,7 @@ export async function deleteLesson(id: string) {
     console.log('[v0] deleteLesson error:', error.message)
     return { error: 'تعذّر حذف الدرس.' }
   }
+  logActivity({ action: 'delete', resource: 'courses', targetId: id, targetLabel: `درس ID: ${id}` }).catch(() => {})
   revalidatePath('/courses')
   revalidatePath('/')
   return { success: true }
@@ -770,6 +777,7 @@ export async function createAssignment(lectureId: string, input: AssignmentInput
     return { error: 'تعذّر حفظ أسئلة الواجب.' }
   }
 
+  logActivity({ action: 'create', resource: 'courses', targetLabel: `واجب: ${input.title}` }).catch(() => {})
   revalidatePath(`/admin/courses/${lectureId}`)
   revalidatePath('/courses')
   revalidatePath('/student')
@@ -802,6 +810,7 @@ export async function updateAssignment(id: string, input: AssignmentInput) {
     return { error: 'تعذّر حفظ أسئلة الواجب.' }
   }
 
+  logActivity({ action: 'update', resource: 'courses', targetId: id, targetLabel: `واجب: ${input.title}` }).catch(() => {})
   revalidatePath('/admin/courses')
   revalidatePath('/courses')
   revalidatePath('/student')
@@ -818,6 +827,7 @@ export async function deleteAssignment(id: string) {
     console.log('[v0] deleteAssignment error:', error.message)
     return { error: 'تعذّر حذف الواجب.' }
   }
+  logActivity({ action: 'delete', resource: 'courses', targetId: id, targetLabel: `واجب ID: ${id}` }).catch(() => {})
   revalidatePath('/courses')
   revalidatePath('/student')
   return { success: true }

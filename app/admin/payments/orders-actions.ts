@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { hasResourceAccess } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
+import { logActivity } from '@/lib/audit-log'
 
 export type OrderStatus = 'pending' | 'approved' | 'rejected'
 
@@ -85,8 +86,21 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
+  // Fetch order label for audit before updating.
+  const { data: orderRow } = await supabase
+    .from('orders')
+    .select('code, student_name, total')
+    .eq('id', id)
+    .single()
+
   const { error } = await supabase.from('orders').update({ status }).eq('id', id)
   if (error) return { error: error.message }
+
+  const action = status === 'approved' ? 'approve' : status === 'rejected' ? 'reject' : 'update'
+  const label = orderRow
+    ? `طلب ${orderRow.code} — ${orderRow.student_name} (${orderRow.total} ج.م)`
+    : `طلب ID: ${id}`
+  logActivity({ action, resource: 'payments', targetId: id, targetLabel: label }).catch(() => {})
   revalidatePath('/payments')
   return { success: true }
 }
