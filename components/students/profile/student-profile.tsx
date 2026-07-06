@@ -46,7 +46,7 @@ interface StudentProfileViewProps {
 }
 
 export function StudentProfileView({ profile, studentDbId }: StudentProfileViewProps) {
-  const { student, device } = profile
+  const { student, device, presence } = profile
   const [status, setStatus] = useState<StudentStatus>(student.status)
   const [statusOpen, setStatusOpen] = useState(false)
   const [messageOpen, setMessageOpen] = useState(false)
@@ -139,12 +139,23 @@ export function StudentProfileView({ profile, studentDbId }: StudentProfileViewP
       <Card className="gap-0 p-5">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-4">
-            <Avatar className="size-16">
-              <AvatarImage src={getStudentAvatar(student)} alt={student.name} />
-              <AvatarFallback className="bg-primary/10 text-lg font-bold text-primary">
-                {getInitials(student.name)}
-              </AvatarFallback>
-            </Avatar>
+            <div className="relative">
+              <Avatar className="size-16">
+                <AvatarImage src={getStudentAvatar(student)} alt={student.name} />
+                <AvatarFallback className="bg-primary/10 text-lg font-bold text-primary">
+                  {getInitials(student.name)}
+                </AvatarFallback>
+              </Avatar>
+              {/* Live presence dot */}
+              <span
+                className={cn(
+                  'absolute bottom-0 left-0 size-4 rounded-full border-2 border-card',
+                  presence.isOnline ? 'bg-success' : 'bg-muted-foreground/40',
+                )}
+                title={presence.isOnline ? 'متصل الآن' : `آخر ظهور: ${presence.lastSeenLabel}`}
+                aria-hidden="true"
+              />
+            </div>
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-xl font-bold text-foreground">{student.name}</h2>
@@ -155,6 +166,23 @@ export function StudentProfileView({ profile, studentDbId }: StudentProfileViewP
                   )}
                 >
                   {status}
+                </span>
+                {/* Online / last-seen badge */}
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold',
+                    presence.isOnline
+                      ? 'bg-success/10 text-success'
+                      : 'bg-secondary text-muted-foreground',
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'size-1.5 rounded-full',
+                      presence.isOnline ? 'bg-success animate-pulse' : 'bg-muted-foreground/50',
+                    )}
+                  />
+                  {presence.isOnline ? 'متصل الآن' : `آخر ظهور ${presence.lastSeenLabel}`}
                 </span>
               </div>
               <p className="mt-1 font-mono text-xs text-muted-foreground">{student.id}</p>

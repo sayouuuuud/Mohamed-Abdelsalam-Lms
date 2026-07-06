@@ -511,6 +511,18 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
     { label: 'لم يسلّم', value: missing },
   ]
 
+  // 8. Live presence — online if the student pinged within the last 2 minutes.
+  const lastSeenAt: string | null = studentRow.last_seen_at ?? null
+  const ONLINE_WINDOW_MS = 2 * 60 * 1000
+  const isOnline = lastSeenAt
+    ? Date.now() - new Date(lastSeenAt).getTime() < ONLINE_WINDOW_MS
+    : false
+  const presence = {
+    isOnline,
+    lastSeenLabel: lastSeenAt ? formatRelativeTime(lastSeenAt) : 'لم يظهر بعد',
+    lastSeenAt,
+  }
+
   return {
     student,
     studentDbId: studentId,
@@ -525,5 +537,6 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
     skills,
     stageTitle,
     assignmentBreakdown,
+    presence,
   }
 }
