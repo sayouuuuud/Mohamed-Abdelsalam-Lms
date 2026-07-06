@@ -17,6 +17,7 @@ import {
   Loader2,
   LayoutTemplate,
   UsersRound,
+  DatabaseBackup,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -26,6 +27,7 @@ import { Separator } from '@/components/ui/separator'
 import { ToggleSwitch } from '@/components/settings/toggle-switch'
 import { SiteContentTab } from '@/components/settings/site-content-tab'
 import { AssistantsTab } from '@/components/settings/assistants-tab'
+import { BackupTab } from '@/components/settings/backup-tab'
 import type { AssistantRecord } from '@/app/admin/settings/assistants-actions'
 import type { SiteContent } from '@/lib/site-content-defaults'
 import { DEFAULT_SITE_CONTENT } from '@/lib/site-content-defaults'
@@ -107,6 +109,7 @@ const baseTabs = [
   { id: 'preferences', label: 'التفضيلات', icon: SlidersHorizontal },
   { id: 'content', label: 'محتوى الموقع', icon: LayoutTemplate },
   { id: 'assistants', label: 'المساعدون', icon: UsersRound },
+  { id: 'backup', label: 'النسخ الاحتياطي', icon: DatabaseBackup },
 ] as const
 
 type TabId = (typeof baseTabs)[number]['id']
@@ -143,8 +146,10 @@ export function SettingsPanel({
   const [isPending, startTransition] = useTransition()
   const [activeTab, setActiveTab] = useState<TabId>('profile')
 
-  // The "assistants" tab is restricted to full admins only.
-  const tabs = baseTabs.filter((t) => t.id !== 'assistants' || isFullAdmin)
+  // The "assistants" and "backup" tabs are restricted to full admins only.
+  const tabs = baseTabs.filter(
+    (t) => (t.id !== 'assistants' && t.id !== 'backup') || isFullAdmin,
+  )
 
   const settings = initialSettings || {
     profile: { firstName: 'محمد', lastName: 'أحمد', email: 'mohamed@platform.com', phone: '+20 100 123 4567', bio: 'مدير منصة تعليمية متخصصة في الدورات التقنية.' },
@@ -640,6 +645,8 @@ export function SettingsPanel({
         {activeTab === 'assistants' && isFullAdmin && (
           <AssistantsTab initialAssistants={initialAssistants} />
         )}
+
+        {activeTab === 'backup' && isFullAdmin && <BackupTab />}
       </div>
     </div>
   )
