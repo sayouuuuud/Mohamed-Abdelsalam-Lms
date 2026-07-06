@@ -171,7 +171,7 @@ export function StudentSettingsPanel({ profile: initProfile }: { profile?: any }
     const notifs = { emailNotif, pushNotif, lessonReminders, gradeAlerts, smsNotif, marketingNotif }
     startTransition(async () => {
       const res = await updateStudentPreferences(activeColor, notifs)
-      
+
       if (res?.error) {
         toast.error('حدث خطأ أثناء حفظ التفضيلات')
       } else {
@@ -182,7 +182,7 @@ export function StudentSettingsPanel({ profile: initProfile }: { profile?: any }
       try {
         localStorage.setItem('student-notif-prefs', JSON.stringify(notifs))
         localStorage.setItem('student-dark-mode', String(darkMode))
-      } catch {}
+      } catch { }
     })
   }
 
@@ -362,7 +362,7 @@ export function StudentSettingsPanel({ profile: initProfile }: { profile?: any }
                 checked={marketingNotif}
                 onChange={setMarketingNotif}
                 label="رسائل تسويقية"
-                description="عروض الكورسات الجديدة وأخبار المنصة"
+                description="عروض المحاضرات الجديدة وأخبار المنصة"
               />
             </div>
             <div className="flex justify-start pt-4">
@@ -445,7 +445,7 @@ export function StudentSettingsPanel({ profile: initProfile }: { profile?: any }
                     className={cn(
                       'group relative flex size-10 items-center justify-center rounded-full transition-transform hover:scale-110',
                       activeColor === preset.id &&
-                        'ring-2 ring-offset-2 ring-offset-card ring-foreground/30',
+                      'ring-2 ring-offset-2 ring-offset-card ring-foreground/30',
                     )}
                     style={{ backgroundColor: preset.swatch }}
                   >

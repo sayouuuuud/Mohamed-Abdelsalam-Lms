@@ -10,7 +10,7 @@ const config = {
   التسويق: { label: 'التسويق', color: 'var(--chart-3)' },
   اللغات: { label: 'اللغات', color: 'var(--chart-4)' },
   الأعمال: { label: 'الأعمال', color: 'var(--chart-5)' },
-} satisfies ChartConfig
+}
 
 export function CategoryDistributionChart({ data: inputData }: { data?: any[] }) {
   const categoryDistribution = inputData || initialData

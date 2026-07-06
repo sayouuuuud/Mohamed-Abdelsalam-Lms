@@ -81,11 +81,14 @@ export async function getReportsData() {
     .from('enrollments')
     .select('id, enrolled_at', { count: 'exact' })
 
+  const { data: ordersWithItems } = await supabase
+    .from('orders')
+    .select('id, status, total, order_items(lecture_title, branch_title, price)')
+    .eq('status', 'approved')
+
   const { data: coursesData } = await supabase
     .from('courses')
-    .select(`
-      id, title, students, price, category
-    `)
+    .select('id, title, students, price, category')
 
   const approvedPayments = payments?.filter((p) => p.status === 'مقبول') || []
   const totalRevenue = approvedPayments.reduce((sum, p) => sum + Number(p.amount), 0)
@@ -197,21 +200,30 @@ export async function getReportsData() {
     .sort((a, b) => b[1] - a[1])
     .map(([name, revenue], i) => ({ name, revenue, fill: colors[i % colors.length] }))
 
-  // Course performance ranked by real revenue, with each course's share of the
-  // platform's total course revenue (replaces the previous mocked completion /
-  // rating columns).
-  const totalCourseRevenue =
-    (coursesData || []).reduce((s, c) => s + courseRevenue(c), 0) || 1
-  const coursePerformance = (coursesData || [])
+  // Course performance (Real data from orders and order_items)
+  const itemStats: Record<string, { title: string, category: string, students: number, revenue: number }> = {}
+  let totalItemsRevenue = 0
+
+  ordersWithItems?.forEach((order) => {
+    order.order_items?.forEach((item: any) => {
+      const key = item.lecture_title || 'غير معروف'
+      if (!itemStats[key]) {
+        itemStats[key] = { title: key, category: item.branch_title || 'عام', students: 0, revenue: 0 }
+      }
+      itemStats[key].students += 1
+      const itemPrice = Number(item.price) || 0
+      itemStats[key].revenue += itemPrice
+      totalItemsRevenue += itemPrice
+    })
+  })
+
+  const coursePerformance = Object.values(itemStats)
     .map((c) => ({
-      title: c.title,
-      category: c.category || 'عام',
-      students: c.students || 0,
-      revenue: courseRevenue(c),
-      share: Math.round((courseRevenue(c) / totalCourseRevenue) * 1000) / 10,
+      ...c,
+      share: totalItemsRevenue > 0 ? Math.round((c.revenue / totalItemsRevenue) * 1000) / 10 : 0,
     }))
     .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, 10)
+    .slice(0, 50)
 
   return {
     success: true,
@@ -223,4 +235,21 @@ export async function getReportsData() {
     paymentStatus,
     coursePerformance,
   }
+}
+
+export async function getAdvancedAnalytics() {
+  const supabase = await createClient()
+
+  if (!(await hasResourceAccess(supabase, 'reports'))) {
+    return { error: 'غير مسموح. لازم تكون أدمن.' }
+  }
+
+  const { data, error } = await supabase.rpc('get_advanced_analytics')
+
+  if (error) {
+    console.error('Failed to fetch advanced analytics:', error)
+    return { error: 'حدث خطأ أثناء جلب التحليلات المتقدمة' }
+  }
+
+  return { success: true, data }
 }

@@ -88,7 +88,7 @@ export function BackupTab() {
         <h2 className="text-right text-lg font-semibold text-foreground">النسخ الاحتياطي والاستعادة</h2>
         <p className="mt-1 text-right text-sm text-muted-foreground">
           احفظ نسخة من إعدادات النظام ومحتوى الموقع، واستعدها وقت ما تحتاج. النسخة تشمل الإعدادات العامة، أقسام محتوى
-          الموقع، والثيم فقط — من غير بيانات الطلاب أو الكورسات.
+          الموقع، والثيم فقط — من غير بيانات الطلاب أو المحاضرات.
         </p>
       </div>
 

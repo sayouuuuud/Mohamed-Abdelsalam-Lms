@@ -5,7 +5,7 @@ import { PanelCard } from './panel-card'
 
 const config = {
   value: { label: 'الإيراد' },
-} satisfies ChartConfig
+}
 
 export function PaymentMethodsChart({
   data,

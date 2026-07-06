@@ -19,14 +19,14 @@ export const notificationTypeFilters: {
   value: NotificationType | 'الكل'
   label: string
 }[] = [
-  { value: 'الكل', label: 'الكل' },
-  { value: 'طالب', label: 'الطلاب' },
-  { value: 'دفع', label: 'المدفوعات' },
-  { value: 'اختبار', label: 'الاختبارات' },
-  { value: 'كورس', label: 'الكورسات' },
-  { value: 'رسالة', label: 'الرسائل' },
-  { value: 'نظام', label: 'النظام' },
-]
+    { value: 'الكل', label: 'الكل' },
+    { value: 'طالب', label: 'الطلاب' },
+    { value: 'دفع', label: 'المدفوعات' },
+    { value: 'اختبار', label: 'الاختبارات' },
+    { value: 'كورس', label: 'المحاضرات' },
+    { value: 'رسالة', label: 'الرسائل' },
+    { value: 'نظام', label: 'النظام' },
+  ]
 
 // Builds a live Arabic relative-time label from an ISO timestamp, e.g.
 // "الآن" / "منذ 5 دقائق" / "منذ ساعتين" / "أمس" / "منذ 3 أيام". Computed at read

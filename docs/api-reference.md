@@ -265,11 +265,11 @@ type MonthlyStat = {
 | `setStudentGrade(grade)` | `profiles` | `{ success } \| { error }` |
 | `trackStudentDevice()` | `student_devices` | `void` |
 
-### إدارة الكورسات (`lib/student-lectures-data.ts`)
+### إدارة المحاضرات (`lib/student-lectures-data.ts`)
 
 | الدالة | الوصف |
 |--------|-------|
-| `getPurchasedCourses()` | جميع الكورسات المشتراة كـ `CourseDetail[]` |
+| `getPurchasedCourses()` | جميع المحاضرات المشتراة كـ `CourseDetail[]` |
 | `getPurchasedCourseDetail(slug)` | كورس واحد بالـ slug — `CourseDetail \| undefined` |
 | `getPurchasedAssignment(assignmentId)` | واجب واحد مع التحقق من ملكية الطالب |
 | `getPurchasedLesson(courseSlug, lessonSlug)` | درس واحد مع توكن فيديو موقّع — يدوّر الجلسة |
@@ -350,12 +350,12 @@ isAssignmentUnlocked(course: CourseDetail, assignmentId: string): boolean
 | `profiles` | إعدادات المستخدم (اسم، هاتف، صورة، درجة، تفضيلات) |
 | `students` | بيانات الطالب (كود، مرحلة، حالة) |
 | `stages` / `branches` | التصنيف الدراسي |
-| `lectures` / `lessons` | الكورسات والدروس |
+| `lectures` / `lessons` | المحاضرات والدروس |
 | `assignments` / `assignment_questions` | الواجبات وأسئلتها |
 | `assignment_submissions` | تسليمات الواجبات + الدرجات |
 | `exams` / `exam_submissions` | الاختبارات وتسليماتها |
 | `orders` / `order_items` | الطلبات الشرائية (مصدر الفواتير) |
-| `enrollments` | اشتراكات الطالب في الكورسات |
+| `enrollments` | اشتراكات الطالب في المحاضرات |
 | `calendar_events` | الجدول الدراسي |
 | `notifications` / `notification_reads` | الإشعارات وحالة القراءة |
 | `learning_activity` | تتبّع ساعات التعلّم اليومية |

@@ -1,0 +1,186 @@
+-- SQL Migration: Advanced Analytics Function
+
+drop function if exists public.get_advanced_analytics();
+
+create or replace function public.get_advanced_analytics()
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  views_data jsonb;
+  funnel_data jsonb;
+  top_students jsonb;
+  course_completion jsonb;
+  exam_insights jsonb;
+  period_comparison jsonb;
+  refunds_analysis jsonb;
+  peak_times jsonb;
+  coupon_performance jsonb;
+  dropoff_points jsonb;
+  time_to_completion jsonb;
+  notifications_engagement jsonb;
+  payment_trends jsonb;
+begin
+  -- 1. Views Report
+  select jsonb_build_object(
+    'top_pages', coalesce((
+      select jsonb_agg(t) from (
+        select path, count(*) as views 
+        from public.page_views 
+        where path != '/' and path not like '%admin%'
+        group by path 
+        order by views desc 
+        limit 5
+      ) t
+    ), '[]'::jsonb),
+    'device_distribution', coalesce((
+      select jsonb_agg(t) from (
+        select device, count(*) as value 
+        from public.page_views 
+        group by device
+      ) t
+    ), '[]'::jsonb)
+  ) into views_data;
+
+  -- 2. Funnel Data
+  select jsonb_build_object(
+    'visitors', (select count(distinct visitor_id) from public.page_views),
+    'registered', (select count(*) from public.students),
+    'buyers', (select count(distinct student_id) from public.enrollments),
+    'completed', (
+      select count(distinct e.id) 
+      from public.enrollments e
+      where exists (
+        select 1 from public.lesson_progress lp 
+        where lp.enrollment_id = e.id and lp.completed = true
+      )
+    )
+  ) into funnel_data;
+
+  -- 3. Top Students
+  select coalesce(jsonb_agg(t), '[]'::jsonb) from (
+    select s.id, s.name, s.email, 
+           (select count(*) from public.enrollments e where e.student_id = s.id) as courses_count,
+           (select coalesce(sum(o.total), 0) from public.orders o where o.student_name = s.name and o.status = 'approved') as total_spent
+    from public.students s
+    order by total_spent desc, courses_count desc
+    limit 10
+  ) t into top_students;
+
+  -- 4. Course Completion (Completed vs Enrolled)
+  select coalesce(jsonb_agg(t), '[]'::jsonb) from (
+    select c.title as name, 
+           count(e.id) as enrolled,
+           sum(case when exists (select 1 from public.lesson_progress lp where lp.enrollment_id = e.id and lp.completed = true) then 1 else 0 end) as completed
+    from public.courses c
+    left join public.enrollments e on e.course_id = c.id
+    group by c.id, c.title
+    order by enrolled desc
+    limit 5
+  ) t into course_completion;
+
+  -- 5. Exam Insights
+  select jsonb_build_object(
+    'average_score', (select coalesce(avg(score), 0) from public.exam_submissions where status = 'مصحّح'),
+    'total_passed', (select count(*) from public.exam_submissions where status = 'مصحّح' and score >= 50),
+    'total_failed', (select count(*) from public.exam_submissions where status = 'مصحّح' and score < 50)
+  ) into exam_insights;
+
+  -- 6. Refunds Analysis
+  select jsonb_build_object(
+    'refunded_count', (select count(*) from public.orders where status = 'refunded'),
+    'refunded_sum', (select coalesce(sum(total), 0) from public.orders where status = 'refunded'),
+    'cancelled_count', (select count(*) from public.orders where status = 'cancelled'),
+    'cancelled_sum', (select coalesce(sum(total), 0) from public.orders where status = 'cancelled')
+  ) into refunds_analysis;
+
+  -- 7. Peak Times (Heatmap)
+  select coalesce(jsonb_agg(t), '[]'::jsonb) from (
+    select 
+      extract(dow from created_at) as day_of_week,
+      extract(hour from created_at) as hour_of_day,
+      count(*) as activity_count
+    from public.orders
+    where status = 'approved'
+    group by day_of_week, hour_of_day
+    order by day_of_week, hour_of_day
+  ) t into peak_times;
+
+  -- 8. Coupon Performance
+  select coalesce(jsonb_agg(t), '[]'::jsonb) from (
+    select 
+      o.coupon_code as code,
+      count(*) as uses,
+      sum(o.total) as revenue_generated,
+      sum(o.discount) as total_discount
+    from public.orders o
+    where o.coupon_code is not null and o.coupon_code != '' and o.status = 'approved'
+    group by o.coupon_code
+    order by uses desc
+    limit 5
+  ) t into coupon_performance;
+
+  -- 9. Course Dropoff Points
+  select coalesce(jsonb_agg(t), '[]'::jsonb) from (
+    select cl.title as lesson, count(lp.id) as completion_count
+    from public.course_lessons cl
+    left join public.lesson_progress lp on lp.lesson_id = cl.id and lp.completed = true
+    group by cl.id, cl.title
+    order by completion_count asc
+    limit 5
+  ) t into dropoff_points;
+
+  -- 10. Time to Completion (Average days from enrollment to last progress)
+  select coalesce(jsonb_agg(t), '[]'::jsonb) from (
+    select c.title as course, 
+           avg(extract(epoch from (lp.completed_at - e.enrolled_at))/86400) as avg_days
+    from public.enrollments e
+    join public.courses c on c.id = e.course_id
+    join (
+      select enrollment_id, max(completed_at) as completed_at 
+      from public.lesson_progress 
+      where completed = true 
+      group by enrollment_id
+    ) lp on lp.enrollment_id = e.id
+    group by c.id, c.title
+    order by avg_days desc
+  ) t into time_to_completion;
+
+  -- 11. Notifications Engagement
+  select jsonb_build_object(
+    'total_sent', (select count(*) from public.notifications),
+    'total_read', (select count(*) from public.notification_reads)
+  ) into notifications_engagement;
+
+  -- 12. Payment Trends (By method)
+  select coalesce(jsonb_agg(t), '[]'::jsonb) from (
+    select 
+      to_char(created_at, 'YYYY-MM') as month,
+      method,
+      count(*) as count,
+      sum(total) as sum_amount
+    from public.orders
+    where status = 'approved'
+    group by month, method
+    order by month asc
+  ) t into payment_trends;
+
+  -- Build final JSON
+  return jsonb_build_object(
+    'views_data', views_data,
+    'funnel_data', funnel_data,
+    'top_students', top_students,
+    'course_completion', course_completion,
+    'exam_insights', exam_insights,
+    'refunds_analysis', refunds_analysis,
+    'peak_times', peak_times,
+    'coupon_performance', coupon_performance,
+    'dropoff_points', dropoff_points,
+    'time_to_completion', time_to_completion,
+    'notifications_engagement', notifications_engagement,
+    'payment_trends', payment_trends
+  );
+end;
+$$;

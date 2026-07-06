@@ -29,16 +29,16 @@ export function CoursePerformanceTable({ courses: inputCourses }: { courses?: an
   return (
     <Card className="gap-0 overflow-hidden p-0">
       <div className="flex items-center justify-between border-b border-border p-5">
-        <h3 className="text-base font-bold text-foreground">أداء الكورسات</h3>
+        <h3 className="text-base font-bold text-foreground">أداء المحاضرات</h3>
         <span className="text-xs font-medium text-muted-foreground">
           الأعلى تحقيقًا للإيراد
         </span>
       </div>
 
       {/* Desktop table */}
-      <div className="hidden overflow-x-auto md:block">
-        <table className="w-full text-right text-sm">
-          <thead>
+      <div className="hidden max-h-[300px] overflow-auto md:block">
+        <table className="w-full text-right text-sm relative">
+          <thead className="sticky top-0 bg-card z-10 shadow-sm">
             <tr className="border-b border-border text-xs text-muted-foreground">
               <th className="px-5 py-3 font-medium">الكورس</th>
               <th className="px-5 py-3 font-medium">التصنيف</th>
@@ -66,7 +66,7 @@ export function CoursePerformanceTable({ courses: inputCourses }: { courses?: an
       </div>
 
       {/* Mobile cards */}
-      <div className="divide-y divide-border md:hidden">
+      <div className="divide-y divide-border md:hidden max-h-[350px] overflow-y-auto">
         {coursePerformance.map((c) => (
           <div key={c.title} className="space-y-3 p-4">
             <div className="flex items-start justify-between gap-2">

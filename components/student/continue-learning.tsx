@@ -22,7 +22,7 @@ export function ContinueLearning({ courses = [] }: { courses?: CourseProgress[] 
             href="/student/browse"
             className="inline-flex h-8 items-center justify-center rounded-xl border border-border bg-secondary/60 px-3 text-xs font-semibold text-foreground hover:bg-secondary"
           >
-            تصفّح الكورسات
+            تصفّح المحاضرات
           </Link>
         </div>
       </PanelCard>

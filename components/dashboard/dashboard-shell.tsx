@@ -35,7 +35,7 @@ export function DashboardShell({ data }: { data?: any }) {
         totalVisitors={data.totalVisitors}
       />
 
-      {/* Row 1: الإيرادات الشهرية (wide) + أكثر الكورسات + نشاط المنصة */}
+      {/* Row 1: الإيرادات الشهرية (wide) + أكثر المحاضرات + نشاط المنصة */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
         <div className="xl:col-span-2">
           <RevenueChart data={data.revenueData} />

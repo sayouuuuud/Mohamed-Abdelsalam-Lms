@@ -7,7 +7,7 @@ const config = {
   مقبول: { label: 'مقبول', color: 'var(--chart-1)' },
   'قيد المراجعة': { label: 'قيد المراجعة', color: 'var(--chart-4)' },
   مرفوض: { label: 'مرفوض', color: 'var(--chart-3)' },
-} satisfies ChartConfig
+}
 
 export function PaymentStatusChart({ data }: { data: { name: string; value: number; fill: string }[] }) {
   const total = data.reduce((sum, s) => sum + s.value, 0)

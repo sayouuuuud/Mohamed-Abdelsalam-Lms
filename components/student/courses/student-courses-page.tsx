@@ -39,7 +39,7 @@ export function StudentCoursesPage() {
   const completedCourses = withPercent.filter((c) => c.percent === 100).length
 
   const stats = [
-    { label: 'إجمالي الكورسات', value: withPercent.length, icon: BookOpen },
+    { label: 'إجمالي المحاضرات', value: withPercent.length, icon: BookOpen },
     { label: 'كورسات مكتملة', value: completedCourses, icon: CheckCircle2 },
     {
       label: 'دروس أكملتها',
@@ -54,7 +54,7 @@ export function StudentCoursesPage() {
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-bold text-foreground">كورساتي</h1>
         <p className="text-sm text-muted-foreground">
-          تابع تقدّمك في الكورسات المسجّلة وأكمل رحلتك التعليمية.
+          تابع تقدّمك في المحاضرات المسجّلة وأكمل رحلتك التعليمية.
         </p>
       </div>
 
