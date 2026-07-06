@@ -130,7 +130,22 @@ create policy "auth_logs_admin_select"
   using (public.is_full_admin());
 
 -- ------------------------------------------------------------
--- 4) Verification queries (run after applying to confirm)
+-- 4) Helper RPC: count distinct actors in activity_logs
+--    Called by getActivityStats() to avoid loading all rows in JS.
+-- ------------------------------------------------------------
+create or replace function public.count_distinct_actors()
+returns bigint
+language sql stable security definer set search_path = public
+as $$
+  select count(distinct actor_id) from public.activity_logs;
+$$;
+
+-- Grant execute to authenticated users (RLS on the table still applies for
+-- direct queries; the function only returns the aggregate count).
+grant execute on function public.count_distinct_actors() to authenticated;
+
+-- ------------------------------------------------------------
+-- 5) Verification queries (run after applying to confirm)
 -- ------------------------------------------------------------
 -- select count(*) from public.activity_logs;    -- should be 0 initially
 -- select count(*) from public.auth_logs;        -- should be 0 initially

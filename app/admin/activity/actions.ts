@@ -123,33 +123,38 @@ export async function getActivityStats(): Promise<ActivityStats> {
   const todayStart = new Date()
   todayStart.setHours(0, 0, 0, 0)
 
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+
   const [todayRes, lastRes, actorsRes, assistantsRes] = await Promise.all([
+    // Count of today's actions
     supabase
       .from('activity_logs')
       .select('id', { count: 'exact', head: true })
       .gte('created_at', todayStart.toISOString()),
+    // Most recent event timestamp
     supabase
       .from('activity_logs')
       .select('created_at')
       .order('created_at', { ascending: false })
       .limit(1)
       .single(),
-    supabase
-      .from('activity_logs')
-      .select('actor_id'),
+    // Distinct actor count (aggregate in DB, not in JS)
+    supabase.rpc('count_distinct_actors'),
+    // Distinct assistants active in last 7 days
     supabase
       .from('auth_logs')
       .select('actor_id')
       .eq('event', 'login')
-      .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
+      .eq('actor_role', 'assistant')
+      .gte('created_at', sevenDaysAgo),
   ])
 
-  const uniqueActors = new Set((actorsRes.data ?? []).map((r: any) => r.actor_id)).size
+  // assistantsRes is a small bounded set (recent logins), safe to dedupe in JS
   const activeAssistants = new Set((assistantsRes.data ?? []).map((r: any) => r.actor_id)).size
 
   return {
     todayCount: todayRes.count ?? 0,
-    totalActors: uniqueActors,
+    totalActors: (actorsRes.data as number | null) ?? 0,
     lastEventAt: lastRes.data?.created_at ?? null,
     activeAssistants,
   }
