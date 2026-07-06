@@ -35,7 +35,7 @@ export function LearningActivityChart({ activity = [] }: { activity?: ActivityDa
             stroke="var(--color-hours)"
             strokeWidth={2}
             fill="url(#fillHours)"
-            isAnimationActive={false}
+            isAnimationActive animationDuration={700} animationEasing="ease-out"
           />
         </AreaChart>
       </ChartContainer>

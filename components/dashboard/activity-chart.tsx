@@ -45,7 +45,7 @@ export function ActivityChart({ data = [] }: { data?: any[] }) {
             dataKey="value"
             fill="var(--color-value)"
             radius={[6, 6, 0, 0]}
-            isAnimationActive={false}
+            isAnimationActive animationDuration={700} animationEasing="ease-out"
           />
         </BarChart>
       </ChartContainer>

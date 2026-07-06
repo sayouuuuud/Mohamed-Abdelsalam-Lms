@@ -51,7 +51,7 @@ export function ExamPerformanceChart({ data }: { data?: { name: string; avg: num
               dataKey="avg"
               fill="var(--color-avg)"
               radius={[6, 6, 0, 0]}
-              isAnimationActive={false}
+              isAnimationActive animationDuration={700} animationEasing="ease-out"
             />
           </BarChart>
         </ChartContainer>
