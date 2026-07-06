@@ -39,7 +39,7 @@
 
 | النطاق | الأدمن يكتب في | الطالب يقرأ من | آلية الانعكاس |
 |---|---|---|---|
-| الكورسات/المحاضرات | `lectures`, `lessons`, `branches`, `stages` | نفس الجداول عبر `getPurchasedCourses()` مقيّدة بـ`orders.status='approved'` | `revalidatePath('/student')` في أكشن الأدمن + قراءة server-side عند كل زيارة |
+| المحاضرات/المحاضرات | `lectures`, `lessons`, `branches`, `stages` | نفس الجداول عبر `getPurchasedCourses()` مقيّدة بـ`orders.status='approved'` | `revalidatePath('/student')` في أكشن الأدمن + قراءة server-side عند كل زيارة |
 | الواجبات | `assignments`, `assignment_questions` (بعد M14) | نفس الجداول مع `student_content_progress` للحالة | نفس الآلية |
 | الامتحانات | `exams`, `exam_questions` (بـ`branch_id`) | `getStudentExam(code)` + قائمة جديدة `getStudentExams()` مفلترة بـ`students.stage_id` → فروع السنة | الامتحان المنشور (`status='منشور'`) يظهر فورًا لطلاب السنة |
 | الإشعارات والإعلانات | `notifications` عبر `sendAnnouncement()` (استهداف: طالب محدد / سنة / فرع / محاضرة) | استعلام واحد يجمع الاستهدافات + `notification_reads` لحالة القراءة | إدراج صف واحد يظهر لكل المستهدفين |

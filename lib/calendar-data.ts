@@ -145,7 +145,7 @@ export const initialEvents: CalendarEvent[] = [
     date: relativeDate(3),
     time: '09:30',
     type: 'اجتماع',
-    description: 'مراجعة خطة الكورسات الجديدة',
+    description: 'مراجعة خطة المحاضرات الجديدة',
   },
   {
     id: 'EVT-06',

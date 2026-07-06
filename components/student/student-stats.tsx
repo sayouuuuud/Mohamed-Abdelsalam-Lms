@@ -22,7 +22,7 @@ export function StudentStats({
 
   const stats = [
     {
-      label: 'الكورسات المسجّلة',
+      label: 'المحاضرات المسجّلة',
       value: String(courses.length),
       sub: courses.length === 1 ? 'كورس نشط' : 'كورسات نشطة',
       icon: BookOpen,

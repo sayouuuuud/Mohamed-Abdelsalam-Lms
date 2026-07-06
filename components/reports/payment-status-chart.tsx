@@ -1,19 +1,13 @@
 'use client'
 
-import { Pie, PieChart } from 'recharts'
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from '@/components/ui/chart'
+import { DonutChart } from '@/components/ui/donut-chart'
 import { PanelCard } from '@/components/dashboard/panel-card'
 
 const config = {
   مقبول: { label: 'مقبول', color: 'var(--chart-1)' },
   'قيد المراجعة': { label: 'قيد المراجعة', color: 'var(--chart-4)' },
   مرفوض: { label: 'مرفوض', color: 'var(--chart-3)' },
-} satisfies ChartConfig
+}
 
 export function PaymentStatusChart({ data }: { data: { name: string; value: number; fill: string }[] }) {
   const total = data.reduce((sum, s) => sum + s.value, 0)
@@ -26,27 +20,13 @@ export function PaymentStatusChart({ data }: { data: { name: string; value: numb
         </div>
       ) : (
         <div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-2">
-          <ChartContainer config={config} className="h-[200px] w-full max-w-[200px]">
-            <PieChart>
-              <ChartTooltip
-                content={
-                  <ChartTooltipContent
-                    nameKey="name"
-                    formatter={(value) => [`${Number(value).toLocaleString('en')} طلب`, '']}
-                  />
-                }
-              />
-              <Pie
-                data={data}
-                dataKey="value"
-                nameKey="name"
-                innerRadius={55}
-                outerRadius={85}
-                paddingAngle={2}
-                isAnimationActive={false}
-              />
-            </PieChart>
-          </ChartContainer>
+          <div className="flex h-[200px] w-full max-w-[200px] items-center justify-center">
+            <DonutChart 
+              data={data.map(d => ({ value: d.value, color: d.fill, label: d.name }))} 
+              size={180} 
+              strokeWidth={24} 
+            />
+          </div>
 
           <ul className="flex-1 space-y-2.5">
             {data.map((s) => (

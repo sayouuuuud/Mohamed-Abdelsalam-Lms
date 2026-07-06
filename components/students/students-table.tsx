@@ -82,7 +82,7 @@ export function StudentsTable() {
             <tr className="border-b border-border text-xs text-muted-foreground">
               <th className="px-3 py-3 font-medium">الطالب</th>
               <th className="px-3 py-3 font-medium">رقم الطالب</th>
-              <th className="px-3 py-3 font-medium">الكورسات</th>
+              <th className="px-3 py-3 font-medium">المحاضرات</th>
               <th className="px-3 py-3 font-medium">نسبة التقدم</th>
               <th className="px-3 py-3 font-medium">إجمالي الإنفاق</th>
               <th className="px-3 py-3 font-medium">الحالة</th>
@@ -202,7 +202,7 @@ export function StudentsTable() {
               </span>
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-              <span>الكورسات: <strong className="text-foreground">{student.courses}</strong></span>
+              <span>المحاضرات: <strong className="text-foreground">{student.courses}</strong></span>
               <span>الإنفاق: <strong className="text-foreground">{student.spent}</strong></span>
               <span>التقدم: <strong className="text-foreground">{student.progress}%</strong></span>
               <span>انضم: <strong className="text-foreground">{student.joinedAt}</strong></span>

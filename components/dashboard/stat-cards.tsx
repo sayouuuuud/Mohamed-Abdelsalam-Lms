@@ -36,7 +36,7 @@ export function StatCards({ stats: inputStats }: { stats?: any }) {
       bg: 'bg-rose-50 dark:bg-rose-500/10',
     },
     {
-      label: 'عدد الكورسات',
+      label: 'عدد المحاضرات',
       value: (inputStats?.totalCourses || 0).toLocaleString(),
       change: coursesThisMonth > 0 ? `+${coursesThisMonth}` : 'إجمالي',
       up: true,

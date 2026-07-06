@@ -37,7 +37,7 @@ export function StudentsGrowthChart({ data: inputData }: { data?: any[] }) {
           </defs>
           <CartesianGrid vertical={false} strokeDasharray="3 3" />
           <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
-          <YAxis tickLine={false} axisLine={false} width={44} tickFormatter={(v) => `${v / 1000}K`} />
+          <YAxis tickLine={false} axisLine={false} width={44} tickFormatter={(v) => (v >= 1000 ? `${v / 1000}K` : v)} />
           <ChartTooltip
             content={
               <ChartTooltipContent

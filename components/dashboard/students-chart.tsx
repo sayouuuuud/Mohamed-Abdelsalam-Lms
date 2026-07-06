@@ -45,7 +45,7 @@ export function StudentsChart({ data = [] }: { data?: any[] }) {
             tickLine={false}
             axisLine={false}
             width={44}
-            tickFormatter={(v) => `${v / 1000}K`}
+            tickFormatter={(v) => (v >= 1000 ? `${v / 1000}K` : v)}
           />
           <ChartTooltip
             content={

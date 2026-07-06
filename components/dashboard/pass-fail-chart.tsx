@@ -1,12 +1,6 @@
 'use client'
 
-import { Cell, Label, Pie, PieChart } from 'recharts'
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from '@/components/ui/chart'
+import { DonutChart } from '@/components/ui/donut-chart'
 import { PanelCard } from './panel-card'
 
 const config = {
@@ -31,48 +25,23 @@ export function PassFailChart({
         </div>
       ) : (
         <div className="flex h-full flex-col">
-          <ChartContainer config={config} className="mx-auto aspect-square min-h-[200px] w-full max-w-[240px]">
-            <PieChart>
-              <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
-              <Pie
-                data={rows}
-                dataKey="value"
-                nameKey="name"
-                innerRadius={60}
-                strokeWidth={4}
-                isAnimationActive={false}
-              >
-                {rows.map((r) => (
-                  <Cell key={r.key} fill={`var(--color-${r.key})`} />
-                ))}
-                <Label
-                  content={({ viewBox }) => {
-                    if (viewBox && 'cx' in viewBox && 'cy' in viewBox) {
-                      return (
-                        <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="middle">
-                          <tspan
-                            x={viewBox.cx}
-                            y={viewBox.cy}
-                            className="fill-foreground text-2xl font-bold"
-                          >
-                            {total.toLocaleString()}
-                          </tspan>
-                          <tspan
-                            x={viewBox.cx}
-                            y={(viewBox.cy || 0) + 20}
-                            className="fill-muted-foreground text-xs"
-                          >
-                            تسليم
-                          </tspan>
-                        </text>
-                      )
-                    }
-                    return null
-                  }}
-                />
-              </Pie>
-            </PieChart>
-          </ChartContainer>
+          <div className="flex mx-auto aspect-square min-h-[200px] w-full max-w-[240px] items-center justify-center">
+            <DonutChart
+              data={rows.map((r: any) => ({ value: r.value, color: `var(--color-${r.key})`, label: r.name }))}
+              size={200}
+              strokeWidth={24}
+              centerContent={
+                <div className="flex flex-col items-center justify-center text-center">
+                  <span className="fill-foreground text-2xl font-bold">
+                    {total.toLocaleString()}
+                  </span>
+                  <span className="fill-muted-foreground text-xs">
+                    تسليم
+                  </span>
+                </div>
+              }
+            />
+          </div>
           <div className="mt-2 flex justify-center gap-4">
             {rows.map((r) => (
               <div key={r.key} className="flex items-center gap-1.5 text-xs">

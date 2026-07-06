@@ -69,9 +69,9 @@ export async function getReportsData() {
   }
 
   // Fetch all necessary data
-  const { data: payments } = await supabase
-    .from('payments')
-    .select('amount, status, created_at, course')
+  const { data: allOrders } = await supabase
+    .from('orders')
+    .select('id, status, total, created_at, order_items(lecture_title, branch_title, price, stage_title)')
 
   const { count: studentsCount, data: studentsDataRaw } = await supabase
     .from('students')
@@ -83,14 +83,12 @@ export async function getReportsData() {
 
   const { data: coursesData } = await supabase
     .from('courses')
-    .select(`
-      id, title, students, price, category
-    `)
+    .select('id, title, students, price, category')
 
-  const approvedPayments = payments?.filter((p) => p.status === 'مقبول') || []
-  const totalRevenue = approvedPayments.reduce((sum, p) => sum + Number(p.amount), 0)
-  const rejectedPayments = payments?.filter((p) => p.status === 'مرفوض') || []
-  const pendingPayments = payments?.filter((p) => p.status === 'قيد المراجعة') || []
+  const approvedOrders = allOrders?.filter((o) => o.status === 'approved') || []
+  const totalRevenue = approvedOrders.reduce((sum, o) => sum + Number(o.total || 0), 0)
+  const rejectedOrders = allOrders?.filter((o) => o.status === 'rejected') || []
+  const pendingOrders = allOrders?.filter((o) => o.status === 'pending') || []
 
   // Real rolling 12-month window.
   const window = lastMonths(12)
@@ -98,33 +96,37 @@ export async function getReportsData() {
   const thisKey = window[window.length - 1].key
   const prevKey = window[window.length - 2].key
 
-  // Period-over-period change = current month vs previous month.
-  const revThis = approvedPayments
-    .filter((p) => monthKeyOf(p.created_at) === thisKey)
-    .reduce((s, p) => s + Number(p.amount), 0)
-  const revPrev = approvedPayments
-    .filter((p) => monthKeyOf(p.created_at) === prevKey)
-    .reduce((s, p) => s + Number(p.amount), 0)
+  // Period-over-period change = last 30 days vs previous 30 days (avoids false drops at start of month)
+  const now = new Date()
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+  const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
+
+  const revThis = approvedOrders
+    .filter((o) => new Date(o.created_at) >= thirtyDaysAgo)
+    .reduce((s, o) => s + Number(o.total || 0), 0)
+  const revPrev = approvedOrders
+    .filter((o) => new Date(o.created_at) >= sixtyDaysAgo && new Date(o.created_at) < thirtyDaysAgo)
+    .reduce((s, o) => s + Number(o.total || 0), 0)
 
   const studentsThis = (studentsDataRaw || []).filter(
-    (s) => monthKeyOf(s.created_at) === thisKey,
+    (s) => new Date(s.created_at) >= thirtyDaysAgo
   ).length
   const studentsPrev = (studentsDataRaw || []).filter(
-    (s) => monthKeyOf(s.created_at) === prevKey,
+    (s) => new Date(s.created_at) >= sixtyDaysAgo && new Date(s.created_at) < thirtyDaysAgo
   ).length
 
   const enrollThis = (enrollmentsRaw || []).filter(
-    (e: any) => e.enrolled_at && monthKeyOf(e.enrolled_at) === thisKey,
+    (e: any) => e.enrolled_at && new Date(e.enrolled_at) >= thirtyDaysAgo
   ).length
   const enrollPrev = (enrollmentsRaw || []).filter(
-    (e: any) => e.enrolled_at && monthKeyOf(e.enrolled_at) === prevKey,
+    (e: any) => e.enrolled_at && new Date(e.enrolled_at) >= sixtyDaysAgo && new Date(e.enrolled_at) < thirtyDaysAgo
   ).length
 
-  const rejectedThis = rejectedPayments.filter(
-    (p) => monthKeyOf(p.created_at) === thisKey,
+  const rejectedThis = rejectedOrders.filter(
+    (o) => new Date(o.created_at) >= thirtyDaysAgo
   ).length
-  const rejectedPrev = rejectedPayments.filter(
-    (p) => monthKeyOf(p.created_at) === prevKey,
+  const rejectedPrev = rejectedOrders.filter(
+    (o) => new Date(o.created_at) >= sixtyDaysAgo && new Date(o.created_at) < thirtyDaysAgo
   ).length
 
   const revChange = percentChange(revThis, revPrev)
@@ -136,18 +138,24 @@ export async function getReportsData() {
     { key: 'revenue', label: 'إجمالي الإيرادات', value: totalRevenue, suffix: 'ج.م', change: Math.abs(revChange), up: revChange >= 0 },
     { key: 'students', label: 'إجمالي الطلاب', value: studentsCount || 0, suffix: 'طالب', change: Math.abs(stuChange), up: stuChange >= 0 },
     { key: 'enrollments', label: 'الاشتراكات', value: enrollmentsCount || 0, suffix: 'اشتراك', change: Math.abs(enrChange), up: enrChange >= 0 },
-    { key: 'refunds', label: 'المدفوعات المرفوضة', value: rejectedPayments.length, suffix: 'طلب', change: Math.abs(refChange), up: refChange <= 0 },
+    { key: 'refunds', label: 'المدفوعات المرفوضة', value: rejectedOrders.length, suffix: 'طلب', change: Math.abs(refChange), up: refChange <= 0 },
   ]
 
   // Monthly revenue vs a +15% stretch target (real revenue, derived target).
   const revenueBucket: Record<string, number> = {}
-  approvedPayments.forEach((p) => {
-    const k = monthKeyOf(p.created_at)
-    revenueBucket[k] = (revenueBucket[k] || 0) + Number(p.amount)
+  approvedOrders.forEach((o) => {
+    const k = monthKeyOf(o.created_at)
+    revenueBucket[k] = (revenueBucket[k] || 0) + Number(o.total || 0)
   })
   const monthlyRevenue = window.map((b) => {
     const revenue = revenueBucket[b.key] || 0
-    return { month: b.month, revenue, target: Math.round(revenue * 1.15) }
+    const prevD = new Date(b.start)
+    prevD.setMonth(prevD.getMonth() - 1)
+    const prevKey = monthKeyOf(prevD)
+    const prevRevenue = revenueBucket[prevKey] || 0
+    // Target is previous month's revenue + 15%
+    const target = prevRevenue === 0 ? revenue * 1.15 : prevRevenue * 1.15
+    return { month: b.month, revenue, target: Math.round(target) }
   })
 
   // Cumulative students growth over the window.
@@ -169,23 +177,26 @@ export async function getReportsData() {
 
   // Payment status distribution (real counts).
   const paymentStatus = [
-    { name: 'مقبول', value: approvedPayments.length, fill: 'var(--chart-1)' },
-    { name: 'قيد المراجعة', value: pendingPayments.length, fill: 'var(--chart-4)' },
-    { name: 'مرفوض', value: rejectedPayments.length, fill: 'var(--chart-3)' },
+    { name: 'مقبول', value: approvedOrders.length, fill: 'var(--chart-1)' },
+    { name: 'قيد المراجعة', value: pendingOrders.length, fill: 'var(--chart-4)' },
+    { name: 'مرفوض', value: rejectedOrders.length, fill: 'var(--chart-3)' },
   ].filter((s) => s.value > 0)
 
   const colors = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)']
   const priceOf = (c: any) => Number(String(c.price ?? '').replace(/\D/g, '') || 0)
   const courseRevenue = (c: any) => priceOf(c) * (c.students || 0)
 
-  // Students per category.
+  // Students per category (real, derived from orders)
   const categoryCount: Record<string, number> = {}
-  // Revenue per category (real, derived from price × enrolled students).
+  // Revenue per category (real, derived from orders)
   const categoryRevenue: Record<string, number> = {}
-  coursesData?.forEach((c) => {
-    const catName = c.category || 'عام'
-    categoryCount[catName] = (categoryCount[catName] || 0) + (c.students || 0)
-    categoryRevenue[catName] = (categoryRevenue[catName] || 0) + courseRevenue(c)
+  
+  approvedOrders?.forEach((order) => {
+    order.order_items?.forEach((item: any) => {
+      const catName = item.stage_title || item.branch_title || 'عام'
+      categoryRevenue[catName] = (categoryRevenue[catName] || 0) + (Number(item.price) || 0)
+      categoryCount[catName] = (categoryCount[catName] || 0) + 1
+    })
   })
 
   const categoryDistribution = Object.entries(categoryCount)
@@ -197,21 +208,30 @@ export async function getReportsData() {
     .sort((a, b) => b[1] - a[1])
     .map(([name, revenue], i) => ({ name, revenue, fill: colors[i % colors.length] }))
 
-  // Course performance ranked by real revenue, with each course's share of the
-  // platform's total course revenue (replaces the previous mocked completion /
-  // rating columns).
-  const totalCourseRevenue =
-    (coursesData || []).reduce((s, c) => s + courseRevenue(c), 0) || 1
-  const coursePerformance = (coursesData || [])
+  // Course performance (Real data from orders and order_items)
+  const itemStats: Record<string, { title: string, category: string, students: number, revenue: number }> = {}
+  let totalItemsRevenue = 0
+
+  approvedOrders?.forEach((order) => {
+    order.order_items?.forEach((item: any) => {
+      const key = item.lecture_title || 'غير معروف'
+      if (!itemStats[key]) {
+        itemStats[key] = { title: key, category: item.branch_title || 'عام', students: 0, revenue: 0 }
+      }
+      itemStats[key].students += 1
+      const itemPrice = Number(item.price) || 0
+      itemStats[key].revenue += itemPrice
+      totalItemsRevenue += itemPrice
+    })
+  })
+
+  const coursePerformance = Object.values(itemStats)
     .map((c) => ({
-      title: c.title,
-      category: c.category || 'عام',
-      students: c.students || 0,
-      revenue: courseRevenue(c),
-      share: Math.round((courseRevenue(c) / totalCourseRevenue) * 1000) / 10,
+      ...c,
+      share: totalItemsRevenue > 0 ? Math.round((c.revenue / totalItemsRevenue) * 1000) / 10 : 0,
     }))
     .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, 10)
+    .slice(0, 50)
 
   return {
     success: true,
@@ -223,4 +243,59 @@ export async function getReportsData() {
     paymentStatus,
     coursePerformance,
   }
+}
+
+export async function getAdvancedAnalytics() {
+  const supabase = await createClient()
+
+  if (!(await hasResourceAccess(supabase, 'reports'))) {
+    return { error: 'غير مسموح. لازم تكون أدمن.' }
+  }
+
+  const { data, error } = await supabase.rpc('get_advanced_analytics')
+
+  if (error) {
+    console.error('Failed to fetch advanced analytics:', error)
+    return { error: 'حدث خطأ أثناء جلب التحليلات المتقدمة' }
+  }
+
+  return { success: true, data }
+}
+
+export async function exportReportsCSV() {
+  const supabase = await createClient()
+  if (!(await hasResourceAccess(supabase, 'reports'))) {
+    return { error: 'غير مسموح. لازم تكون أدمن.' }
+  }
+
+  const data = await getReportsData()
+  if ('error' in data) return { error: data.error }
+
+  let csv = '\uFEFF' // BOM for Arabic support in Excel
+  csv += 'تقرير المنصة الشامل\n\n'
+  
+  // Section 1: Stats
+  csv += 'ملخص الأداء\n'
+  csv += 'المؤشر,القيمة\n'
+  data.reportStats?.forEach((s: any) => {
+    csv += `${s.label},${s.value} ${s.suffix || ''}\n`
+  })
+  csv += '\n'
+
+  // Section 2: Monthly Revenue
+  csv += 'الإيرادات الشهرية\n'
+  csv += 'الشهر,الإيرادات (ج.م)\n'
+  data.monthlyRevenue?.forEach((m: any) => {
+    csv += `${m.month},${m.revenue}\n`
+  })
+  csv += '\n'
+
+  // Section 3: Course Performance
+  csv += 'أداء الكورسات\n'
+  csv += 'الكورس,القسم,عدد الطلاب,الإيرادات (ج.م)\n'
+  data.coursePerformance?.forEach((c: any) => {
+    csv += `"${c.title}","${c.category}",${c.students},${c.revenue}\n`
+  })
+
+  return { success: true, csv }
 }

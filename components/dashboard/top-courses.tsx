@@ -2,7 +2,7 @@ import Image from 'next/image'
 import { PanelCard } from './panel-card'
 export function TopCourses({ courses = [] }: { courses?: any[] }) {
   return (
-    <PanelCard title="أكثر الكورسات مبيعاً" filter="هذا الشهر">
+    <PanelCard title="أكثر المحاضرات مبيعاً" filter="هذا الشهر">
       <ul className="space-y-1">
         {courses.slice(0, 4).map((course) => (
           <li

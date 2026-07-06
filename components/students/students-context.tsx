@@ -78,7 +78,7 @@ export function StudentsProvider({
             'البريد الإلكتروني': s.email,
             الهاتف: s.phone,
             الجنس: s.gender,
-            الكورسات: s.courses,
+            المحاضرات: s.courses,
             'نسبة التقدم': `${s.progress}%`,
             الإنفاق: s.spent,
             الحالة: s.status,

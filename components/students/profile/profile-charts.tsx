@@ -33,7 +33,7 @@ const spendConfig: ChartConfig = {
 }
 const skillsConfig: ChartConfig = {
   examAvg: { label: 'متوسط الامتحانات', color: 'var(--chart-1)' },
-  courseProgress: { label: 'تقدّم الكورسات', color: 'var(--chart-2)' },
+  courseProgress: { label: 'تقدّم المحاضرات', color: 'var(--chart-2)' },
 }
 const breakdownConfig: ChartConfig = {
   value: { label: 'الواجبات' },
@@ -138,7 +138,7 @@ export function ProfileCharts({ profile }: { profile: StudentProfile }) {
               </span>
               <span className="flex items-center gap-1.5 text-muted-foreground">
                 <span className="size-2.5 rounded-[3px]" style={{ backgroundColor: 'var(--chart-2)' }} />
-                تقدّم الكورسات
+                تقدّم المحاضرات
               </span>
             </div>
           </>
