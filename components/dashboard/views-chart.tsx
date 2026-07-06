@@ -179,10 +179,6 @@ export function ViewsChart({
                       </div>
                   )}
               </div>
-
-              <button className="flex items-center justify-center text-muted-foreground bg-card border border-border hover:bg-muted rounded-2xl h-10 w-10 transition-colors">
-                  <Download className="h-4 w-4" />
-              </button>
           </div>
       </div>
 
