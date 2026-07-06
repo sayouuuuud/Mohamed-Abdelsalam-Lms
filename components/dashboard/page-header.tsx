@@ -3,10 +3,10 @@ import { BookOpen, UploadCloud, Tag, UserPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 const actions = [
-  { label: 'إضافة كورس', icon: BookOpen, href: '/courses', primary: true },
-  { label: 'رفع درس', icon: UploadCloud, href: '/courses' },
-  { label: 'إنشاء كوبون', icon: Tag, href: '/coupons' },
-  { label: 'إضافة طالب', icon: UserPlus, href: '/students' },
+  { label: 'إضافة كورس', icon: BookOpen, href: '/admin/courses', primary: true },
+  { label: 'رفع درس', icon: UploadCloud, href: '/admin/courses' },
+  { label: 'إنشاء كوبون', icon: Tag, href: '/admin/coupons' },
+  { label: 'إضافة طالب', icon: UserPlus, href: '/admin/students' },
 ]
 
 export function PageHeader() {
