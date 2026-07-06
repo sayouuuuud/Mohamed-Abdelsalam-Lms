@@ -11,6 +11,7 @@ import {
   getAvailableStagesMinimal
 } from './actions'
 import { ForceGradeSelection } from '@/components/student/force-grade-selection'
+import { PresenceHeartbeat } from '@/components/student/presence-heartbeat'
 
 export default async function StudentLayout({ children }: { children: ReactNode }) {
   // Fetch the portal data in parallel instead of a slow sequential waterfall.
@@ -49,6 +50,7 @@ export default async function StudentLayout({ children }: { children: ReactNode 
       activity
     }}>
       <LayoutComponent>{children}</LayoutComponent>
+      {profile && <PresenceHeartbeat />}
       {profile && !profile.stageTitle && (
         <ForceGradeSelection stages={stages} />
       )}

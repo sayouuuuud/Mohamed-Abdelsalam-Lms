@@ -72,6 +72,12 @@ export type StudentProfile = {
   }>
   stageTitle: string
   assignmentBreakdown: Array<{ label: string; value: number }>
+  // Live presence — is the student online now and when were they last seen.
+  presence: {
+    isOnline: boolean
+    lastSeenLabel: string
+    lastSeenAt: string | null
+  }
 }
 
 // deterministic pseudo-random based on a string seed
@@ -257,6 +263,11 @@ function buildProfile(student: StudentRecord): StudentProfile {
     skills,
     stageTitle: 'الصف الثاني الثانوي',
     assignmentBreakdown,
+    presence: {
+      isOnline: rng() > 0.5,
+      lastSeenLabel: `منذ ${range(rng, 1, 12)} ساعة`,
+      lastSeenAt: null,
+    },
   }
 }
 
