@@ -60,17 +60,26 @@ export function StudentProfileView({ profile, studentDbId }: StudentProfileViewP
         )
       : 0
 
+  // Live values computed from real enrollments instead of stale static columns.
+  const coursesCount = profile.courses.length
+  const avgProgress =
+    profile.courses.length > 0
+      ? Math.round(
+          profile.courses.reduce((sum, c) => sum + c.progress, 0) / profile.courses.length,
+        )
+      : 0
+
   const kpis = [
     {
       label: 'الدورات المسجّلة',
-      value: String(student.courses),
+      value: String(coursesCount),
       icon: BookOpen,
       color: 'text-primary',
       bg: 'bg-primary/10',
     },
     {
       label: 'متوسط التقدم',
-      value: `${student.progress}%`,
+      value: `${avgProgress}%`,
       icon: TrendingUp,
       color: 'text-emerald-600',
       bg: 'bg-emerald-50 dark:bg-emerald-500/10',

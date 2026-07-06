@@ -207,11 +207,11 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
     .from('enrollments')
     .select(`
       id,
-      progress,
       enrolled_at,
       courses (
         id,
         title,
+        category,
         categories (name),
         course_sections (
           course_lessons (id)
@@ -226,7 +226,7 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
 
   const courses: EnrolledCourse[] = (enrollments || []).map((enrollment: any) => {
     const course = enrollment.courses
-    const category = course?.categories?.name || 'عام'
+    const category = course?.categories?.name || course?.category || 'عام'
     
     // Count total lessons
     let lessonsTotal = 0
@@ -339,9 +339,12 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
     .eq('student_id', studentId)
 
   const assignments: AssignmentRecord[] = (assignmentsData || []).map((a: any) => {
-    let status: AssignmentRecord['status'] = 'لم يسلّم'
-    if (a.status === 'تم التقييم' || a.status === 'مقبول') status = 'تم التسليم'
-    
+    // A row in assignment_submissions means the student did submit.
+    // Only an explicit "متأخر" status marks it late; everything else is submitted.
+    let status: AssignmentRecord['status'] = 'تم التسليم'
+    if (a.status === 'متأخر') status = 'متأخر'
+    else if (a.status === 'لم يسلّم') status = 'لم يسلّم'
+
     return {
       id: a.id,
       name: a.assignments?.title || 'واجب',
@@ -352,25 +355,49 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
     }
   })
 
-  // 7. Generate Dashboard Analytics (Mocked/Calculated for now since we don't have historical snapshots)
-  const progressTrend = [
-    { month: 'يناير', progress: Math.max(0, student.progress - 50) },
-    { month: 'فبراير', progress: Math.max(0, student.progress - 40) },
-    { month: 'مارس', progress: Math.max(0, student.progress - 30) },
-    { month: 'أبريل', progress: Math.max(0, student.progress - 20) },
-    { month: 'مايو', progress: Math.max(0, student.progress - 10) },
-    { month: 'يونيو', progress: student.progress },
+  // 7. Dashboard Analytics computed from real data (last 6 months).
+  const arMonths = [
+    'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+    'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
   ]
+  const now = new Date()
+  // Build the last 6 month buckets (oldest → newest).
+  const monthBuckets = Array.from({ length: 6 }).map((_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1)
+    return { year: d.getFullYear(), month: d.getMonth(), label: arMonths[d.getMonth()] }
+  })
 
-  const spendBase = Math.round(totalSpent / 6)
-  const monthlySpend = [
-    { month: 'يناير', amount: spendBase },
-    { month: 'فبراير', amount: spendBase },
-    { month: 'مارس', amount: spendBase },
-    { month: 'أبريل', amount: spendBase },
-    { month: 'مايو', amount: spendBase },
-    { month: 'يونيو', amount: spendBase },
-  ]
+  // Total lessons across all enrolled courses (for progress %).
+  const totalLessonsAll = courses.reduce((sum, c) => sum + c.lessonsTotal, 0)
+
+  // Flatten all completed lesson_progress entries with a completion date.
+  const completedLessons: Date[] = []
+  ;(enrollments || []).forEach((e: any) => {
+    ;(e.lesson_progress || []).forEach((lp: any) => {
+      if (lp.completed && lp.completed_at) completedLessons.push(new Date(lp.completed_at))
+    })
+  })
+
+  // Cumulative progress % at the end of each month bucket.
+  const progressTrend = monthBuckets.map((b) => {
+    const endOfMonth = new Date(b.year, b.month + 1, 0, 23, 59, 59)
+    const doneByThen = completedLessons.filter((d) => d <= endOfMonth).length
+    const progress =
+      totalLessonsAll > 0 ? Math.round((doneByThen / totalLessonsAll) * 100) : 0
+    return { month: b.label, progress }
+  })
+
+  // Real monthly spend from accepted orders.
+  const monthlySpend = monthBuckets.map((b) => {
+    const amount = (ordersData || [])
+      .filter((o: any) => o.status === 'مقبول' && o.created_at)
+      .filter((o: any) => {
+        const d = new Date(o.created_at)
+        return d.getFullYear() === b.year && d.getMonth() === b.month
+      })
+      .reduce((sum: number, o: any) => sum + Number(o.total), 0)
+    return { month: b.label, amount }
+  })
 
   // 7. Skills = comparison across the branches of the student's academic year.
   // For each branch we combine the student's average exam percentage with the
