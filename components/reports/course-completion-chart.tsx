@@ -31,7 +31,7 @@ export function CourseCompletionChart({
 
   return (
     <PanelCard title="معدل إكمال المحاضرات">
-      <div className="h-[300px] w-full">
+      <div className="h-[400px] w-full">
         {chartData.length > 0 ? (
           <ChartContainer config={config} className="h-full w-full">
             <ResponsiveContainer width="100%" height="100%">

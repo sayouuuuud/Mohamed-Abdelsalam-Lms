@@ -62,9 +62,13 @@ export default async function ReportsPage() {
           <ConversionFunnel data={adv?.funnel_data} />
         </div>
 
-        <div className="grid gap-6 mt-6 lg:grid-cols-2">
-          <TopStudentsTable data={adv?.top_students} />
-          <CourseCompletionChart data={adv?.course_completion} />
+        <div className="grid gap-6 mt-6 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <TopStudentsTable data={adv?.top_students} />
+          </div>
+          <div className="lg:col-span-1">
+            <NotificationsEngagement data={adv?.notifications_engagement} />
+          </div>
         </div>
 
         <div className="grid gap-6 mt-6 lg:grid-cols-3">
@@ -74,10 +78,6 @@ export default async function ReportsPage() {
           <div className="lg:col-span-1">
             <RefundsAnalysis data={adv?.refunds_analysis} />
           </div>
-        </div>
-
-        <div className="mt-6">
-          <PeakTimesHeatmap data={adv?.peak_times} />
         </div>
 
         <div className="grid gap-6 mt-6 lg:grid-cols-2">
@@ -91,7 +91,11 @@ export default async function ReportsPage() {
         </div>
 
         <div className="mt-6">
-          <NotificationsEngagement data={adv?.notifications_engagement} />
+          <CourseCompletionChart data={adv?.course_completion} />
+        </div>
+
+        <div className="mt-6">
+          <PeakTimesHeatmap data={adv?.peak_times} />
         </div>
       </div>
     </div>

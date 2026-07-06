@@ -19,7 +19,7 @@ export function TopStudentsTable({
 
   return (
     <PanelCard title="أكثر الطلاب نشاطاً وإنفاقاً">
-      <div className="overflow-auto max-h-[300px] scrollbar-hide">
+      <div className="overflow-auto max-h-[265px] scrollbar-hide">
         <Table>
           <TableHeader>
             <TableRow>
