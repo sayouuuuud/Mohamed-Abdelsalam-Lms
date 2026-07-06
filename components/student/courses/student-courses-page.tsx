@@ -159,6 +159,7 @@ export function StudentCoursesPage() {
 
                   <Button
                     className="mt-4 w-full"
+                    nativeButton={false}
                     render={<Link href={`/student/courses/${course.id}`} />}
                   >
                     <Play className="size-4" />

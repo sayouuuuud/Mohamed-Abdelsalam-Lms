@@ -182,6 +182,7 @@ function AssignmentCard({ assignment }: { assignment: AssignmentListItem }) {
           <Button
             className="w-full"
             variant={cta.variant}
+            nativeButton={false}
             render={<Link href={`/student/assignments/${assignment.id}`} />}
           >
             <CtaIcon className="size-4" />

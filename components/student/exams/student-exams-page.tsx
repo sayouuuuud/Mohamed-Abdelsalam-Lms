@@ -178,6 +178,7 @@ function ExamCard({ exam }: { exam: ExamListItem }) {
             <Button
               className="w-full"
               variant={exam.status === 'مكتمل' ? 'outline' : 'default'}
+              nativeButton={false}
               render={<Link href={`/student/exams/${exam.id}`} />}
             >
               {exam.status === 'مكتمل' ? (

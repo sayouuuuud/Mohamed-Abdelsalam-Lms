@@ -48,7 +48,8 @@ export function ViewsChart({
 
   const maxValue = Math.max(...metricData.map((d) => d.value), 10)
   const totalValue = metric === "views" ? viewsSum : visitorsSum
-  const avgValue = Math.round(totalValue / (totalDays || 1))
+  const avgValueRaw = totalValue / (totalDays || 1)
+  const avgValue = avgValueRaw < 1 && avgValueRaw > 0 ? Number(avgValueRaw.toFixed(1)) : Math.round(avgValueRaw)
   const dotSize = 8
   const dotsPerColumn = 12
   const dotGap = 2
@@ -81,7 +82,7 @@ export function ViewsChart({
               {label}
             </span>
             <div className="flex items-center gap-1.5 font-bold">
-              <span className="text-sm">{value.toLocaleString('ar-EG')}</span>
+              <span className="text-sm">{value.toLocaleString("en-US")}</span>
               <span className="text-gray-300 dark:text-gray-700">{metric === "views" ? "مشاهدة" : "زائر"}</span>
             </div>
           </div>
@@ -117,8 +118,8 @@ export function ViewsChart({
                   إحصائيات الزيارات
               </h3>
               <p className="text-sm text-muted-foreground mt-1">
-                  الإجمالي: {totalValue.toLocaleString("ar-EG")} | المتوسط:{" "}
-                  {avgValue.toLocaleString("ar-EG")} يومياً
+                  الإجمالي: {totalValue.toLocaleString("en-US")} | المتوسط:{" "}
+                  {avgValue.toLocaleString("en-US")} يومياً
               </p>
           </div>
 
@@ -171,7 +172,7 @@ export function ViewsChart({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div className="bg-muted/50 rounded-lg p-3 text-center border border-border">
               <p className="text-2xl font-bold text-foreground">
-                  {totalValue.toLocaleString("ar-EG")}
+                  {totalValue.toLocaleString("en-US")}
               </p>
               <p className="text-xs text-muted-foreground">
                   الإجمالي {metric === "views" ? "المشاهدات" : "الزوار"}
@@ -180,14 +181,14 @@ export function ViewsChart({
 
           <div className="bg-muted/50 rounded-lg p-3 text-center border border-border">
               <p className="text-2xl font-bold text-foreground">
-                  {avgValue.toLocaleString("ar-EG")}
+                  {avgValue.toLocaleString("en-US")}
               </p>
               <p className="text-xs text-muted-foreground">متوسط يومي</p>
           </div>
 
           <div className="bg-muted/50 rounded-lg p-3 text-center border border-border">
               <p className="text-2xl font-bold text-foreground">
-                  {maxValue.toLocaleString("ar-EG")}
+                  {maxValue.toLocaleString("en-US")}
               </p>
               <p className="text-xs text-muted-foreground">أعلى يوم</p>
           </div>

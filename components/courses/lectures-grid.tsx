@@ -196,6 +196,7 @@ export function LecturesGrid() {
                     <Button
                       size="sm"
                       className="h-8"
+                      nativeButton={false}
                       render={<Link href={`/admin/courses/${lecture.id}`} />}
                     >
                       عرض التفاصيل

@@ -47,7 +47,7 @@ export function ExamsPageHeader() {
           تصدير البيانات
         </Button>
         {canManage && (
-          <Button render={<Link href="/admin/exams/create" />}>
+          <Button nativeButton={false} render={<Link href="/admin/exams/create" />}>
             <FilePlus2 className="size-4" />
             إنشاء اختبار
           </Button>
