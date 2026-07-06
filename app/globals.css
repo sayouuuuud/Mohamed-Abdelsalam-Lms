@@ -256,3 +256,77 @@
     animation: none;
   }
 }
+
+/* ── Admin panel motion utilities ─────────────────────────────────────────── */
+
+/* Entrance: rise + fade. Use on a single element or via .ns-stagger on a parent. */
+@keyframes ns-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.ns-rise {
+  animation: ns-rise 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Staggered entrance for grids / lists — children rise one after another. */
+.ns-stagger > * {
+  animation: ns-rise 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.ns-stagger > *:nth-child(1)  { animation-delay: 0.02s; }
+.ns-stagger > *:nth-child(2)  { animation-delay: 0.06s; }
+.ns-stagger > *:nth-child(3)  { animation-delay: 0.10s; }
+.ns-stagger > *:nth-child(4)  { animation-delay: 0.14s; }
+.ns-stagger > *:nth-child(5)  { animation-delay: 0.18s; }
+.ns-stagger > *:nth-child(6)  { animation-delay: 0.22s; }
+.ns-stagger > *:nth-child(7)  { animation-delay: 0.26s; }
+.ns-stagger > *:nth-child(8)  { animation-delay: 0.30s; }
+.ns-stagger > *:nth-child(9)  { animation-delay: 0.34s; }
+.ns-stagger > *:nth-child(10) { animation-delay: 0.38s; }
+.ns-stagger > *:nth-child(11) { animation-delay: 0.42s; }
+.ns-stagger > *:nth-child(12) { animation-delay: 0.46s; }
+.ns-stagger > *:nth-child(n + 13) { animation-delay: 0.5s; }
+
+/* Interactive card: gentle lift + shadow on hover. */
+.ns-card {
+  transition:
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.22s ease,
+    border-color 0.22s ease;
+}
+.ns-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 14px 34px -16px rgb(0 0 0 / 0.28);
+}
+
+/* Icon micro-interaction inside a hovered .ns-card. */
+.ns-card .ns-icon {
+  transition:
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.22s ease;
+}
+.ns-card:hover .ns-icon {
+  transform: scale(1.08) rotate(-3deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ns-rise,
+  .ns-stagger > * {
+    animation: none;
+  }
+  .ns-card,
+  .ns-card .ns-icon {
+    transition: none;
+  }
+  .ns-card:hover {
+    transform: none;
+  }
+  .ns-card:hover .ns-icon {
+    transform: none;
+  }
+}

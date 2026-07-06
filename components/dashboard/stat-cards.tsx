@@ -70,17 +70,17 @@ export function StatCards({ stats: inputStats }: { stats?: any }) {
   ]
 
   return (
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+    <div className="ns-stagger grid grid-cols-2 gap-4 lg:grid-cols-5">
       {stats.map((stat) => (
         <Card
           key={stat.label}
-          className="gap-0 p-5 transition-shadow hover:shadow-md"
+          className="ns-card gap-0 p-5"
         >
           <div className="flex items-start justify-between">
             <p className="text-sm text-muted-foreground">{stat.label}</p>
             <div
               className={cn(
-                'flex size-10 items-center justify-center rounded-xl',
+                'ns-icon flex size-10 items-center justify-center rounded-xl',
                 stat.bg,
               )}
             >

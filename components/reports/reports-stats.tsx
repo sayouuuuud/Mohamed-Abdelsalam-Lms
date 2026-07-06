@@ -13,15 +13,15 @@ const icons = {
 export function ReportsStats({ stats: inputStats }: { stats?: any[] }) {
   const reportStats = inputStats || initialData
   return (
-    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+    <div className="ns-stagger grid grid-cols-2 gap-4 lg:grid-cols-4">
       {reportStats.map((stat) => {
         const meta = icons[stat.key as keyof typeof icons]
         const Icon = meta.icon
         return (
-          <Card key={stat.key} className="gap-0 p-5 transition-shadow hover:shadow-md">
+          <Card key={stat.key} className="ns-card gap-0 p-5">
             <div className="flex items-start justify-between">
               <p className="text-sm text-muted-foreground">{stat.label}</p>
-              <div className={cn('flex size-10 items-center justify-center rounded-xl', meta.bg)}>
+              <div className={cn('ns-icon flex size-10 items-center justify-center rounded-xl', meta.bg)}>
                 <Icon className={cn('size-5', meta.color)} />
               </div>
             </div>
