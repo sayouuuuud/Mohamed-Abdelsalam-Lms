@@ -169,28 +169,28 @@ export function ViewsChart({
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="bg-muted/50 rounded-lg p-3 text-center border border-border">
+      <div className="flex flex-col md:flex-row mb-6 rounded-2xl border border-border bg-muted/30 divide-y md:divide-y-0 md:divide-x md:divide-x-reverse divide-border overflow-hidden">
+          <div className="flex-1 p-4 text-center hover:bg-muted/50 transition-colors">
               <p className="text-2xl font-bold text-foreground">
                   {totalValue.toLocaleString("en-US")}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground mt-1">
                   الإجمالي {metric === "views" ? "المشاهدات" : "الزوار"}
               </p>
           </div>
 
-          <div className="bg-muted/50 rounded-lg p-3 text-center border border-border">
+          <div className="flex-1 p-4 text-center hover:bg-muted/50 transition-colors">
               <p className="text-2xl font-bold text-foreground">
                   {avgValue.toLocaleString("en-US")}
               </p>
-              <p className="text-xs text-muted-foreground">متوسط يومي</p>
+              <p className="text-xs text-muted-foreground mt-1">متوسط يومي</p>
           </div>
 
-          <div className="bg-muted/50 rounded-lg p-3 text-center border border-border">
+          <div className="flex-1 p-4 text-center hover:bg-muted/50 transition-colors">
               <p className="text-2xl font-bold text-foreground">
                   {maxValue.toLocaleString("en-US")}
               </p>
-              <p className="text-xs text-muted-foreground">أعلى يوم</p>
+              <p className="text-xs text-muted-foreground mt-1">أعلى يوم</p>
           </div>
       </div>
 
