@@ -104,6 +104,55 @@ export async function getStudents(): Promise<StudentRecord[]> {
   return (data as StudentRow[]).map(mapRow)
 }
 
+export async function getStudentsStats() {
+  const supabase = await createClient()
+  
+  if (!(await hasResourceAccess(supabase, 'students'))) {
+    return null
+  }
+
+  const { data: studentsRaw } = await supabase
+    .from('students')
+    .select('id, status, created_at')
+
+  if (!studentsRaw) return null
+
+  const now = new Date()
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+  const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
+
+  // Current window
+  const totalThis = studentsRaw.length
+  const activeThis = studentsRaw.filter(s => s.status === 'نشط').length
+  const suspendedThis = studentsRaw.filter(s => s.status === 'موقوف').length
+  const newThis = studentsRaw.filter(s => new Date(s.created_at) >= thirtyDaysAgo).length
+
+  // Previous window (for Total, Active, Suspended - these are cumulative, so previous is total up to 30 days ago)
+  const studentsPrevWindow = studentsRaw.filter(s => new Date(s.created_at) < thirtyDaysAgo)
+  const totalPrev = studentsPrevWindow.length
+  const activePrev = studentsPrevWindow.filter(s => s.status === 'نشط').length
+  const suspendedPrev = studentsPrevWindow.filter(s => s.status === 'موقوف').length
+  
+  // Previous window (for New - this is a discrete bucket, so it's between 60 and 30 days ago)
+  const newPrev = studentsRaw.filter(s => new Date(s.created_at) >= sixtyDaysAgo && new Date(s.created_at) < thirtyDaysAgo).length
+
+  const calcChange = (curr: number, prev: number) => {
+    if (prev === 0) return curr > 0 ? 100 : 0
+    return Math.round(((curr - prev) / prev) * 1000) / 10
+  }
+
+  return {
+    total: totalThis,
+    totalChange: calcChange(totalThis, totalPrev),
+    active: activeThis,
+    activeChange: calcChange(activeThis, activePrev),
+    new: newThis,
+    newChange: calcChange(newThis, newPrev),
+    suspended: suspendedThis,
+    suspendedChange: calcChange(suspendedThis, suspendedPrev)
+  }
+}
+
 async function generateStudentCode(
   supabase: Awaited<ReturnType<typeof createClient>>,
 ): Promise<string> {

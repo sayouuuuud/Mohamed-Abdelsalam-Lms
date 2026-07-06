@@ -1,50 +1,59 @@
 import { FileText, CheckCircle2, Users, Target, TrendingUp } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import type { ExamRecord } from '@/lib/exams-data'
 
+type ExamsStatsData = {
+  total: number
+  totalChange: number
+  published: number
+  publishedChange: number
+  participants: number
+  participantsChange: number
+  avgScore: number
+  avgScoreChange: number
+}
 
-export function ExamsStats({ exams = [] }: { exams?: ExamRecord[] }) {
-  const totalExams = exams.length
-  const publishedExams = exams.filter((e) => e.status === 'منشور').length
-  const totalParticipants = exams.reduce((sum, e) => sum + (e.participants || 0), 0)
-  const avgScore = totalExams > 0 
-    ? Math.round(exams.reduce((sum, e) => sum + (e.avgScore || 0), 0) / totalExams) 
-    : 0
+export function ExamsStats({ stats }: { stats: ExamsStatsData | null }) {
+  if (!stats) return null
+
+  const formatChange = (change: number, isPercentValue: boolean = false) => {
+    const sign = change > 0 ? '+' : ''
+    return `${sign}${change}${isPercentValue ? '' : '%'}`
+  }
 
   const computedStats = [
     {
       label: 'إجمالي الاختبارات',
-      value: totalExams.toString(),
-      change: '+1',
-      sub: 'عن الشهر الماضي',
+      value: stats.total.toString(),
+      change: formatChange(stats.totalChange),
+      sub: 'عن 30 يوم السابقة',
       icon: FileText,
       color: 'text-primary',
       bg: 'bg-primary/10',
     },
     {
       label: 'الاختبارات المنشورة',
-      value: publishedExams.toString(),
-      change: '+1',
-      sub: 'عن الشهر الماضي',
+      value: stats.published.toString(),
+      change: formatChange(stats.publishedChange),
+      sub: 'عن 30 يوم السابقة',
       icon: CheckCircle2,
       color: 'text-emerald-600',
       bg: 'bg-emerald-50 dark:bg-emerald-500/10',
     },
     {
       label: 'إجمالي المشاركات',
-      value: totalParticipants.toLocaleString(),
-      change: '+5',
-      sub: 'عن الشهر الماضي',
+      value: stats.participants.toLocaleString(),
+      change: formatChange(stats.participantsChange),
+      sub: 'عن 30 يوم السابقة',
       icon: Users,
       color: 'text-blue-600',
       bg: 'bg-blue-50 dark:bg-blue-500/10',
     },
     {
       label: 'متوسط الدرجات',
-      value: `${avgScore}%`,
-      change: '+2%',
-      sub: 'عن الشهر الماضي',
+      value: `${stats.avgScore}%`,
+      change: formatChange(stats.avgScoreChange, true) + '%',
+      sub: 'عن 30 يوم السابقة',
       icon: Target,
       color: 'text-amber-600',
       bg: 'bg-amber-50 dark:bg-amber-500/10',

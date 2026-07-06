@@ -155,3 +155,57 @@ export async function getExams(): Promise<ExamRecord[]> {
     }
   })
 }
+
+export async function getExamsStats() {
+  const supabase = await createClient()
+  if (!(await hasResourceAccess(supabase, 'exams'))) {
+    return null
+  }
+
+  const { data: examsRaw } = await supabase
+    .from('exams')
+    .select('id, status, participants, avg_score, created_at')
+
+  if (!examsRaw) return null
+
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+
+  // Current window (All time)
+  const totalThis = examsRaw.length
+  const publishedThis = examsRaw.filter(e => e.status === 'منشور').length
+  const participantsThis = examsRaw.reduce((acc, e) => acc + (e.participants || 0), 0)
+  
+  const examsWithScores = examsRaw.filter(e => e.participants && e.participants > 0)
+  const avgScoreThis = examsWithScores.length > 0
+    ? Math.round(examsWithScores.reduce((acc, e) => acc + (e.avg_score || 0), 0) / examsWithScores.length)
+    : 0
+
+  // Previous window (All time up to 30 days ago)
+  const prevExams = examsRaw.filter(e => new Date(e.created_at) < thirtyDaysAgo)
+  
+  const totalPrev = prevExams.length
+  const publishedPrev = prevExams.filter(e => e.status === 'منشور').length
+  const participantsPrev = prevExams.reduce((acc, e) => acc + (e.participants || 0), 0)
+  
+  const prevExamsWithScores = prevExams.filter(e => e.participants && e.participants > 0)
+  const avgScorePrev = prevExamsWithScores.length > 0
+    ? Math.round(prevExamsWithScores.reduce((acc, e) => acc + (e.avg_score || 0), 0) / prevExamsWithScores.length)
+    : 0
+
+  const calcChange = (curr: number, prev: number) => {
+    if (prev === 0) return curr > 0 ? 100 : 0
+    return Math.round(((curr - prev) / prev) * 1000) / 10
+  }
+
+  // Note: For average score, we use absolute difference instead of percentage change.
+  return {
+    total: totalThis,
+    totalChange: calcChange(totalThis, totalPrev),
+    published: publishedThis,
+    publishedChange: calcChange(publishedThis, publishedPrev),
+    participants: participantsThis,
+    participantsChange: calcChange(participantsThis, participantsPrev),
+    avgScore: avgScoreThis,
+    avgScoreChange: avgScoreThis - avgScorePrev // e.g. +2% or -5%
+  }
+}
