@@ -69,9 +69,9 @@ export async function getReportsData() {
   }
 
   // Fetch all necessary data
-  const { data: payments } = await supabase
-    .from('payments')
-    .select('amount, status, created_at, course')
+  const { data: allOrders } = await supabase
+    .from('orders')
+    .select('id, status, total, created_at, order_items(lecture_title, branch_title, price, stage_title)')
 
   const { count: studentsCount, data: studentsDataRaw } = await supabase
     .from('students')
@@ -81,19 +81,14 @@ export async function getReportsData() {
     .from('enrollments')
     .select('id, enrolled_at', { count: 'exact' })
 
-  const { data: ordersWithItems } = await supabase
-    .from('orders')
-    .select('id, status, total, order_items(lecture_title, branch_title, price)')
-    .eq('status', 'approved')
-
   const { data: coursesData } = await supabase
     .from('courses')
     .select('id, title, students, price, category')
 
-  const approvedPayments = payments?.filter((p) => p.status === 'مقبول') || []
-  const totalRevenue = approvedPayments.reduce((sum, p) => sum + Number(p.amount), 0)
-  const rejectedPayments = payments?.filter((p) => p.status === 'مرفوض') || []
-  const pendingPayments = payments?.filter((p) => p.status === 'قيد المراجعة') || []
+  const approvedOrders = allOrders?.filter((o) => o.status === 'approved') || []
+  const totalRevenue = approvedOrders.reduce((sum, o) => sum + Number(o.total || 0), 0)
+  const rejectedOrders = allOrders?.filter((o) => o.status === 'rejected') || []
+  const pendingOrders = allOrders?.filter((o) => o.status === 'pending') || []
 
   // Real rolling 12-month window.
   const window = lastMonths(12)
@@ -102,12 +97,12 @@ export async function getReportsData() {
   const prevKey = window[window.length - 2].key
 
   // Period-over-period change = current month vs previous month.
-  const revThis = approvedPayments
-    .filter((p) => monthKeyOf(p.created_at) === thisKey)
-    .reduce((s, p) => s + Number(p.amount), 0)
-  const revPrev = approvedPayments
-    .filter((p) => monthKeyOf(p.created_at) === prevKey)
-    .reduce((s, p) => s + Number(p.amount), 0)
+  const revThis = approvedOrders
+    .filter((o) => monthKeyOf(o.created_at) === thisKey)
+    .reduce((s, o) => s + Number(o.total || 0), 0)
+  const revPrev = approvedOrders
+    .filter((o) => monthKeyOf(o.created_at) === prevKey)
+    .reduce((s, o) => s + Number(o.total || 0), 0)
 
   const studentsThis = (studentsDataRaw || []).filter(
     (s) => monthKeyOf(s.created_at) === thisKey,
@@ -123,11 +118,11 @@ export async function getReportsData() {
     (e: any) => e.enrolled_at && monthKeyOf(e.enrolled_at) === prevKey,
   ).length
 
-  const rejectedThis = rejectedPayments.filter(
-    (p) => monthKeyOf(p.created_at) === thisKey,
+  const rejectedThis = rejectedOrders.filter(
+    (o) => monthKeyOf(o.created_at) === thisKey,
   ).length
-  const rejectedPrev = rejectedPayments.filter(
-    (p) => monthKeyOf(p.created_at) === prevKey,
+  const rejectedPrev = rejectedOrders.filter(
+    (o) => monthKeyOf(o.created_at) === prevKey,
   ).length
 
   const revChange = percentChange(revThis, revPrev)
@@ -139,14 +134,14 @@ export async function getReportsData() {
     { key: 'revenue', label: 'إجمالي الإيرادات', value: totalRevenue, suffix: 'ج.م', change: Math.abs(revChange), up: revChange >= 0 },
     { key: 'students', label: 'إجمالي الطلاب', value: studentsCount || 0, suffix: 'طالب', change: Math.abs(stuChange), up: stuChange >= 0 },
     { key: 'enrollments', label: 'الاشتراكات', value: enrollmentsCount || 0, suffix: 'اشتراك', change: Math.abs(enrChange), up: enrChange >= 0 },
-    { key: 'refunds', label: 'المدفوعات المرفوضة', value: rejectedPayments.length, suffix: 'طلب', change: Math.abs(refChange), up: refChange <= 0 },
+    { key: 'refunds', label: 'المدفوعات المرفوضة', value: rejectedOrders.length, suffix: 'طلب', change: Math.abs(refChange), up: refChange <= 0 },
   ]
 
   // Monthly revenue vs a +15% stretch target (real revenue, derived target).
   const revenueBucket: Record<string, number> = {}
-  approvedPayments.forEach((p) => {
-    const k = monthKeyOf(p.created_at)
-    revenueBucket[k] = (revenueBucket[k] || 0) + Number(p.amount)
+  approvedOrders.forEach((o) => {
+    const k = monthKeyOf(o.created_at)
+    revenueBucket[k] = (revenueBucket[k] || 0) + Number(o.total || 0)
   })
   const monthlyRevenue = window.map((b) => {
     const revenue = revenueBucket[b.key] || 0
@@ -172,9 +167,9 @@ export async function getReportsData() {
 
   // Payment status distribution (real counts).
   const paymentStatus = [
-    { name: 'مقبول', value: approvedPayments.length, fill: 'var(--chart-1)' },
-    { name: 'قيد المراجعة', value: pendingPayments.length, fill: 'var(--chart-4)' },
-    { name: 'مرفوض', value: rejectedPayments.length, fill: 'var(--chart-3)' },
+    { name: 'مقبول', value: approvedOrders.length, fill: 'var(--chart-1)' },
+    { name: 'قيد المراجعة', value: pendingOrders.length, fill: 'var(--chart-4)' },
+    { name: 'مرفوض', value: rejectedOrders.length, fill: 'var(--chart-3)' },
   ].filter((s) => s.value > 0)
 
   const colors = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)']
@@ -183,12 +178,19 @@ export async function getReportsData() {
 
   // Students per category.
   const categoryCount: Record<string, number> = {}
-  // Revenue per category (real, derived from price × enrolled students).
+  // Revenue per category (real, derived from orders)
   const categoryRevenue: Record<string, number> = {}
+  
+  approvedOrders?.forEach((order) => {
+    order.order_items?.forEach((item: any) => {
+      const catName = item.stage_title || item.branch_title || 'عام'
+      categoryRevenue[catName] = (categoryRevenue[catName] || 0) + (Number(item.price) || 0)
+    })
+  })
+  
   coursesData?.forEach((c) => {
     const catName = c.category || 'عام'
     categoryCount[catName] = (categoryCount[catName] || 0) + (c.students || 0)
-    categoryRevenue[catName] = (categoryRevenue[catName] || 0) + courseRevenue(c)
   })
 
   const categoryDistribution = Object.entries(categoryCount)
@@ -204,7 +206,7 @@ export async function getReportsData() {
   const itemStats: Record<string, { title: string, category: string, students: number, revenue: number }> = {}
   let totalItemsRevenue = 0
 
-  ordersWithItems?.forEach((order) => {
+  approvedOrders?.forEach((order) => {
     order.order_items?.forEach((item: any) => {
       const key = item.lecture_title || 'غير معروف'
       if (!itemStats[key]) {

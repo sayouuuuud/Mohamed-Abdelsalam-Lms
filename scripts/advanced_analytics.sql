@@ -83,9 +83,23 @@ begin
 
   -- 5. Exam Insights
   select jsonb_build_object(
-    'average_score', (select coalesce(avg(score), 0) from public.exam_submissions where status = 'مصحّح'),
-    'total_passed', (select count(*) from public.exam_submissions where status = 'مصحّح' and score >= 50),
-    'total_failed', (select count(*) from public.exam_submissions where status = 'مصحّح' and score < 50)
+    'average_score', (select coalesce(avg(score), 0) from public.exam_submissions where status in ('ناجح', 'راسب')),
+    'total_passed', (select count(*) from public.exam_submissions where status = 'ناجح'),
+    'total_failed', (select count(*) from public.exam_submissions where status = 'راسب'),
+    'hardest_questions', coalesce((
+      select jsonb_agg(hq) from (
+        select 
+          q.question_text as text,
+          count(a.id) filter (where a.is_correct = false) as wrong_answers,
+          count(a.id) as total_answers
+        from public.exam_answers a
+        join public.exam_questions q on q.id = a.question_id
+        group by q.id, q.question_text
+        having count(a.id) filter (where a.is_correct = false) > 0
+        order by wrong_answers desc
+        limit 5
+      ) hq
+    ), '[]'::jsonb)
   ) into exam_insights;
 
   -- 6. Refunds Analysis

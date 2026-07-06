@@ -9,7 +9,7 @@ import { CoursePerformanceTable } from '@/components/reports/course-performance-
 
 // Advanced Analytics Components
 import { ViewsInsights } from '@/components/reports/views-insights'
-import { ConversionFunnel } from '@/components/reports/conversion-funnel'
+
 import { TopStudentsTable } from '@/components/reports/top-students-table'
 import { CourseCompletionChart } from '@/components/reports/course-completion-chart'
 import { ExamPerformanceAnalysis } from '@/components/reports/exam-performance-analysis'
@@ -59,7 +59,7 @@ export default async function ReportsPage() {
         <h2 className="text-xl font-bold tracking-tight mb-4">تحليلات متقدمة</h2>
         <div className="grid gap-6 lg:grid-cols-2">
           <ViewsInsights data={adv?.views_data} />
-          <ConversionFunnel data={adv?.funnel_data} />
+          <ExamPerformanceAnalysis data={adv?.exam_insights} />
         </div>
 
         <div className="grid gap-6 mt-6 lg:grid-cols-3">
@@ -71,13 +71,8 @@ export default async function ReportsPage() {
           </div>
         </div>
 
-        <div className="grid gap-6 mt-6 lg:grid-cols-3">
-          <div className="lg:col-span-2">
-            <ExamPerformanceAnalysis data={adv?.exam_insights} />
-          </div>
-          <div className="lg:col-span-1">
-            <RefundsAnalysis data={adv?.refunds_analysis} />
-          </div>
+        <div className="grid gap-6 mt-6 lg:grid-cols-1">
+          <RefundsAnalysis data={adv?.refunds_analysis} />
         </div>
 
         <div className="grid gap-6 mt-6 lg:grid-cols-2">
