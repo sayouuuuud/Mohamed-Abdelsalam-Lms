@@ -3,6 +3,7 @@ import { StatCards } from './stat-cards'
 import { AnalyticsKpis } from './analytics-kpis'
 import { RevenueChart } from './revenue-chart'
 import { StudentsChart } from './students-chart'
+import { ViewsChart } from './views-chart'
 import { TopCourses } from './top-courses'
 import { ActivityChart } from './activity-chart'
 import { ExamPerformanceChart } from './exam-performance-chart'
@@ -26,6 +27,13 @@ export function DashboardShell({ data }: { data?: any }) {
 
       {/* KPIs: امتحانات + مدفوعات */}
       <AnalyticsKpis stats={data.examStats} />
+
+      {/* المشاهدات والزيارات — ويدجت بعرض كامل تحت الكاردات */}
+      <ViewsChart
+        data={data.viewsData}
+        totalViews={data.totalViews}
+        totalVisitors={data.totalVisitors}
+      />
 
       {/* Row 1: الإيرادات الشهرية (wide) + أكثر الكورسات + نشاط المنصة */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">

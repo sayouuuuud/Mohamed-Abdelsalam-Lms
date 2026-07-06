@@ -7,6 +7,7 @@ import { ThemeProvider } from '@/components/theme-provider'
 import { MathLoader } from '@/components/landing/math-loader'
 import { CartProvider } from '@/components/cart/cart-provider'
 import { CartModal } from '@/components/cart/cart-modal'
+import { PageViewTracker } from '@/components/analytics/page-view-tracker'
 import { colorPresets } from '@/lib/color-presets'
 import { neonPresets } from '@/lib/neon-presets'
 import { getSiteColor, getSiteNeon } from '@/app/admin/settings/actions'
@@ -122,6 +123,7 @@ export default async function RootLayout({
             <MathLoader />
             {children}
             <CartModal />
+            <PageViewTracker />
           </CartProvider>
         </ThemeProvider>
         <Toaster 
