@@ -100,22 +100,20 @@ export async function getDashboardData() {
   // ── Page views & unique visitors ──────────────────────────────────────────
   // Aggregated in the DB via get_views_daily (bots excluded). We bucket the
   // returned daily rows into the same rolling window as the other charts.
+  const dailyWindowStart = dailyWindow[0].start
   const { data: viewsDaily } = await supabase.rpc('get_views_daily', {
-    start_ts: windowStart.toISOString(),
+    start_ts: dailyWindowStart.toISOString(),
   })
   const viewsBucket: Record<string, number> = {}
   const uniquesBucket: Record<string, number> = {}
   ;(viewsDaily || []).forEach((row: any) => {
     // row.day is a `YYYY-MM-DD` date string from Postgres.
-    const dayKey = dayKeyOf(row.day)
-    const monthKey = monthKeyOf(row.day)
-    const k = isDaily ? dayKey : monthKey
+    const k = dayKeyOf(row.day)
     viewsBucket[k] = (viewsBucket[k] || 0) + Number(row.views || 0)
     uniquesBucket[k] = (uniquesBucket[k] || 0) + Number(row.uniques || 0)
   })
-  const viewsData = window.map((b) => ({
-    // @ts-ignore
-    label: isDaily ? b.day : b.month,
+  const viewsData = dailyWindow.map((b) => ({
+    label: b.day,
     views: viewsBucket[b.key] || 0,
     visitors: uniquesBucket[b.key] || 0,
   }))
