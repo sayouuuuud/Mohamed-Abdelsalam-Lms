@@ -3,10 +3,12 @@
 import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Download, Upload, ShieldAlert, FileJson, Loader2 } from 'lucide-react'
+import { Download, Upload, ShieldAlert, FileJson, Loader2, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { exportSettingsBackup, importSettingsBackup } from '@/app/admin/settings/backup-actions'
+import { wipeAllData } from '@/app/admin/settings/danger-actions'
 
 export function BackupTab() {
   const router = useRouter()
@@ -17,6 +19,25 @@ export function BackupTab() {
   // Parsed file waiting for the user to confirm the restore.
   const [pendingBackup, setPendingBackup] = useState<{ payload: unknown; fileName: string } | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
+
+  // Danger Zone: wipe all data.
+  const [wiping, startWipe] = useTransition()
+  const [wipePassword, setWipePassword] = useState('')
+  const [wipeConfirmOpen, setWipeConfirmOpen] = useState(false)
+
+  function handleWipe() {
+    startWipe(async () => {
+      const res = await wipeAllData(wipePassword)
+      if ('error' in res) {
+        toast.error(res.error)
+      } else {
+        toast.success('تم مسح كل بيانات الموقع. الصفحات العامة وحسابك اتحفظوا.')
+        setWipePassword('')
+        router.refresh()
+      }
+      setWipeConfirmOpen(false)
+    })
+  }
 
   function handleExport() {
     startExport(async () => {
@@ -164,6 +185,70 @@ export function BackupTab() {
         </div>
       </div>
 
+      {/* Danger Zone */}
+      <div className="rounded-2xl border border-destructive/40 bg-destructive/5 p-5">
+        <div className="flex items-start gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-destructive/15">
+            <Trash2 className="size-5 text-destructive" aria-hidden="true" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-base font-semibold text-destructive">منطقة الخطر — مسح كل البيانات</h3>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              بيمسح كل بيانات الموقع نهائيًا: الطلاب، الكورسات، المدفوعات، الامتحانات، الرسائل،
+              السجلات، والتقارير. اللي بيتحفظ بس: محتوى الصفحات العامة، الثيم، الإعدادات، وحسابك أنت.
+              الإجراء ده لا يمكن التراجع عنه.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-3">
+          <ShieldAlert className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden="true" />
+          <p className="text-xs leading-relaxed text-destructive">
+            يُفضّل تعمل تصدير نسخة احتياطية قبل المسح. اكتب كلمة مرور التأكيد عشان تفعّل الزر.
+          </p>
+        </div>
+
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="sm:max-w-[220px]">
+            <label htmlFor="wipe-password" className="sr-only">
+              كلمة مرور التأكيد
+            </label>
+            <Input
+              id="wipe-password"
+              type="password"
+              value={wipePassword}
+              onChange={(e) => setWipePassword(e.target.value)}
+              placeholder="كلمة مرور التأكيد"
+              dir="ltr"
+              autoComplete="off"
+            />
+          </div>
+          <Button
+            variant="destructive"
+            disabled={wiping || wipePassword.length === 0}
+            onClick={() => setWipeConfirmOpen(true)}
+            className="w-full sm:w-auto"
+          >
+            {wiping ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <Trash2 className="size-4" aria-hidden="true" />
+            )}
+            مسح كل البيانات
+          </Button>
+        </div>
+      </div>
+
+      <ConfirmDialog
+        open={wipeConfirmOpen}
+        onClose={() => setWipeConfirmOpen(false)}
+        onConfirm={handleWipe}
+        title="تأكيد مسح كل البيانات"
+        description="هيتم مسح كل بيانات الموقع نهائيًا (الطلاب، الكورسات، المدفوعات، الامتحانات، الرسائل، السجلات، التقارير). محتوى الصفحات العامة والإعدادات وحسابك بس اللي هيفضلوا. الإجراء ده لا يمكن التراجع عنه — متأكد؟"
+        confirmLabel="امسح نهائيًا"
+        cancelLabel="إلغاء"
+      />
+
       <ConfirmDialog
         open={confirmOpen}
         onClose={() => {
@@ -171,7 +256,7 @@ export function BackupTab() {
           setPendingBackup(null)
         }}
         onConfirm={handleConfirmRestore}
-        title="تأكيد الاستعادة"
+        title="تأكيد الا��تعادة"
         description={
           pendingBackup
             ? `هيتم استعادة الإعدادات ومحتوى الموقع من الملف «${pendingBackup.fileName}». القيم الحالية هتتحدّث. تحب تكم��ل؟`

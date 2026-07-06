@@ -37,7 +37,7 @@ export default async function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <ReportsPageHeader />
+      <ReportsPageHeader data={data} />
       <ReportsStats stats={data.reportStats} />
       
       {/* Existing Core Reports */}
