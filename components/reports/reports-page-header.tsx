@@ -3,20 +3,25 @@
 import { Download, Calendar, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { generateReport } from '@/app/admin/reports/actions'
+import { downloadReportsCsv, type ReportsData } from '@/lib/reports-csv'
 import { toast } from 'sonner'
 import { useState } from 'react'
 
-export function ReportsPageHeader() {
+export function ReportsPageHeader({ data }: { data: ReportsData }) {
   const [loading, setLoading] = useState(false)
 
-  async function handleGenerate() {
+  async function handleExport() {
     setLoading(true)
-    const res = await generateReport()
-    setLoading(false)
-    if (res.error) {
-      toast.error(res.error)
-    } else {
-      toast.success('تم طلب إنشاء التقرير بنجاح')
+    try {
+      // Build + download the CSV from everything on the page.
+      downloadReportsCsv(data)
+      toast.success('تم تصدير التقرير بصيغة CSV')
+      // Log the export in the reports history (fire-and-forget).
+      generateReport().catch(() => {})
+    } catch (err) {
+      toast.error('حصل خطأ أثناء تصدير التقرير')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -34,7 +39,7 @@ export function ReportsPageHeader() {
           <Calendar className="size-4" />
           آخر 6 أشهر
         </Button>
-        <Button onClick={handleGenerate} disabled={loading}>
+        <Button onClick={handleExport} disabled={loading}>
           {loading ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
           تصدير التقرير
         </Button>
