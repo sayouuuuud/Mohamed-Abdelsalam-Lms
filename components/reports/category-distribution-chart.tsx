@@ -1,12 +1,6 @@
 'use client'
 
-import { Pie, PieChart } from 'recharts'
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from '@/components/ui/chart'
+import { DonutChart } from '@/components/ui/donut-chart'
 import { PanelCard } from '@/components/dashboard/panel-card'
 import { categoryDistribution as initialData } from '@/lib/reports-data'
 
@@ -25,27 +19,13 @@ export function CategoryDistributionChart({ data: inputData }: { data?: any[] })
   return (
     <PanelCard title="توزيع الطلاب حسب التصنيف" filter="إجمالي">
       <div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-2">
-        <ChartContainer config={config} className="h-[200px] w-full max-w-[200px]">
-          <PieChart>
-            <ChartTooltip
-              content={
-                <ChartTooltipContent
-                  nameKey="name"
-                  formatter={(value) => [`${Number(value).toLocaleString('en')} طالب`, '']}
-                />
-              }
-            />
-            <Pie
-              data={categoryDistribution}
-              dataKey="value"
-              nameKey="name"
-              innerRadius={55}
-              outerRadius={85}
-              paddingAngle={2}
-              isAnimationActive={false}
-            />
-          </PieChart>
-        </ChartContainer>
+        <div className="flex h-[200px] w-full max-w-[200px] items-center justify-center">
+          <DonutChart 
+            data={categoryDistribution.map((c: any) => ({ value: c.value, color: c.fill, label: c.name }))} 
+            size={180} 
+            strokeWidth={24} 
+          />
+        </div>
 
         <ul className="flex-1 space-y-2.5">
           {categoryDistribution.map((c) => (

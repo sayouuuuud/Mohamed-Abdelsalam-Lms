@@ -1,12 +1,6 @@
 'use client'
 
-import { Cell, Label, Pie, PieChart } from 'recharts'
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from '@/components/ui/chart'
+import { DonutChart } from '@/components/ui/donut-chart'
 import { PanelCard } from './panel-card'
 
 const config = {
@@ -29,59 +23,23 @@ export function PaymentMethodsChart({
         </div>
       ) : (
         <div className="flex h-full flex-col items-center gap-4 sm:flex-row">
-          <ChartContainer
-            config={config}
-            className="aspect-square min-h-[200px] w-full max-w-[220px]"
-          >
-            <PieChart>
-              <ChartTooltip
-                cursor={false}
-                content={
-                  <ChartTooltipContent
-                    hideLabel
-                    formatter={(value, name) => [`${Number(value).toLocaleString()} ج.م`, ` ${name}`]}
-                  />
-                }
-              />
-              <Pie
-                data={rows}
-                dataKey="value"
-                nameKey="method"
-                innerRadius={55}
-                strokeWidth={4}
-                isAnimationActive={false}
-              >
-                {rows.map((r) => (
-                  <Cell key={r.method} fill={r.fill} />
-                ))}
-                <Label
-                  content={({ viewBox }) => {
-                    if (viewBox && 'cx' in viewBox && 'cy' in viewBox) {
-                      return (
-                        <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="middle">
-                          <tspan
-                            x={viewBox.cx}
-                            y={(viewBox.cy || 0) - 4}
-                            className="fill-foreground text-lg font-bold"
-                          >
-                            {new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(total)}
-                          </tspan>
-                          <tspan
-                            x={viewBox.cx}
-                            y={(viewBox.cy || 0) + 16}
-                            className="fill-muted-foreground text-xs"
-                          >
-                            إجمالي
-                          </tspan>
-                        </text>
-                      )
-                    }
-                    return null
-                  }}
-                />
-              </Pie>
-            </PieChart>
-          </ChartContainer>
+          <div className="flex aspect-square min-h-[200px] w-full max-w-[220px] items-center justify-center">
+            <DonutChart
+              data={rows.map((r: any) => ({ value: r.value, color: r.fill, label: r.method }))}
+              size={180}
+              strokeWidth={24}
+              centerContent={
+                <div className="flex flex-col items-center justify-center text-center">
+                  <span className="fill-foreground text-lg font-bold">
+                    {new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(total)}
+                  </span>
+                  <span className="fill-muted-foreground text-xs">
+                    إجمالي
+                  </span>
+                </div>
+              }
+            />
+          </div>
           <ul className="flex w-full flex-col gap-2">
             {rows.map((r) => (
               <li key={r.method} className="flex items-center justify-between gap-2 text-sm">
