@@ -40,6 +40,8 @@ import type {
   SocialPlatform,
   NavbarContent,
   SeoContent,
+  LoginPanelContent,
+  LoginPanelStat,
 } from '@/lib/site-content-defaults'
 
 // ── Shared primitives ──────────────────────────────────────────────────────
@@ -391,14 +393,14 @@ function StatsEditor({ value, onChange }: { value: StatsContent; onChange: (v: S
             <Field label="اللاحقة" hint="+ أو % أو k">
               <Input value={item.suffix} onChange={(e) => updateItem(i, { suffix: e.target.value })} dir="ltr" />
             </Field>
-            <Field label="التسمية">
+            <Field label="التسمي��">
               <Input value={item.label} onChange={(e) => updateItem(i, { label: e.target.value })} className="text-right" />
             </Field>
           </div>
         </div>
       ))}
       <Button type="button" variant="outline" size="sm" onClick={() => set('items', [...value.items, { value: 0, suffix: '+', label: '' }])} className="gap-2">
-        <Plus className="size-3.5" />إضافة رقم
+        <Plus className="size-3.5" />إ��افة رقم
       </Button>
     </div>
   )
@@ -642,6 +644,63 @@ function SeoEditor({ value, onChange }: { value: SeoContent; onChange: (v: SeoCo
   )
 }
 
+function LoginPanelEditor({ value, onChange }: { value: LoginPanelContent; onChange: (v: LoginPanelContent) => void }) {
+  const set = <K extends keyof LoginPanelContent>(k: K, v: LoginPanelContent[K]) => onChange({ ...value, [k]: v })
+  const updateStat = (i: number, patch: Partial<LoginPanelStat>) => {
+    const next = value.stats.map((s, idx) => idx === i ? { ...s, ...patch } : s)
+    set('stats', next)
+  }
+  return (
+    <div className="space-y-4">
+      <Field label="البادج (النص الصغير فوق العنوان)" hint="مثال: منصة الرياضيات الأولى للثانوية العامة">
+        <Input value={value.badge} onChange={(e) => set('badge', e.target.value)} className="text-right" />
+      </Field>
+      <Field label="العنوان الرئيسي" hint="العنوان الكبير في الجانب الأيسر">
+        <Textarea value={value.headline} onChange={(v) => set('headline', v)} rows={2} />
+      </Field>
+      <StringListEditor
+        label="المميزات (قائمة علامات الصح)"
+        items={value.perks}
+        onChange={(v) => set('perks', v)}
+        placeholder="مثال: شرح مبسّط لكل درس خطوة بخطوة"
+      />
+      <Separator />
+      <p className="text-sm font-medium text-foreground text-right">الإحصائيات (الأرقام أسفل الصفحة)</p>
+      {value.stats.map((stat, i) => (
+        <div key={i} className="flex items-center gap-3 rounded-lg border border-border p-3">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="shrink-0 text-destructive hover:text-destructive"
+            onClick={() => set('stats', value.stats.filter((_, idx) => idx !== i))}
+          >
+            <Trash2 className="size-4" />
+          </Button>
+          <div className="grid flex-1 gap-3 sm:grid-cols-2">
+            <Field label="القيمة" hint="مثال: +48k أو 98%">
+              <Input value={stat.value} onChange={(e) => updateStat(i, { value: e.target.value })} dir="ltr" />
+            </Field>
+            <Field label="التسمية">
+              <Input value={stat.label} onChange={(e) => updateStat(i, { label: e.target.value })} className="text-right" />
+            </Field>
+          </div>
+        </div>
+      ))}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => set('stats', [...value.stats, { value: '', label: '' }])}
+        className="gap-2"
+      >
+        <Plus className="size-3.5" />
+        إضافة إحصائية
+      </Button>
+    </div>
+  )
+}
+
 // ── Main export ────────────────────────────────────────────────────────────
 
 export function SiteContentTab({ initialContent }: { initialContent: SiteContent }) {
@@ -658,6 +717,7 @@ export function SiteContentTab({ initialContent }: { initialContent: SiteContent
   const [footer, setFooter] = useState<FooterContent>(initialContent.footer)
   const [navbar, setNavbar] = useState<NavbarContent>(initialContent.navbar)
   const [seo, setSeo] = useState<SeoContent>(initialContent.seo)
+  const [loginPanel, setLoginPanel] = useState<LoginPanelContent>(initialContent.login_panel)
 
   const [savingSection, setSavingSection] = useState<string | null>(null)
 
@@ -690,6 +750,7 @@ export function SiteContentTab({ initialContent }: { initialContent: SiteContent
         case 'footer': setFooter(initialContent.footer); break
         case 'navbar': setNavbar(initialContent.navbar); break
         case 'seo': setSeo(initialContent.seo); break
+        case 'login_panel': setLoginPanel(initialContent.login_panel); break
       }
       toast.success('تمت استعادة القيم الافتراضية.')
       router.refresh()
@@ -760,6 +821,14 @@ export function SiteContentTab({ initialContent }: { initialContent: SiteContent
       editor: <SeoEditor value={seo} onChange={setSeo} />,
       onSave: () => save('seo', seo),
       onReset: () => reset('seo', null),
+    },
+    {
+      id: 'login_panel',
+      title: 'صفحة تسجيل الدخول',
+      description: 'البادج، العنوان، المميزات، والإحصائيات في الجانب الأيسر',
+      editor: <LoginPanelEditor value={loginPanel} onChange={setLoginPanel} />,
+      onSave: () => save('login_panel', loginPanel),
+      onReset: () => reset('login_panel', null),
     },
   ]
 

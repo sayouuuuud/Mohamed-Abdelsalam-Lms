@@ -117,6 +117,18 @@ export type SeoContent = {
   description: string
 }
 
+export type LoginPanelStat = {
+  value: string
+  label: string
+}
+
+export type LoginPanelContent = {
+  badge: string
+  headline: string
+  perks: string[]
+  stats: LoginPanelStat[]
+}
+
 export type SiteContent = {
   hero: HeroContent
   features: FeaturesContent
@@ -126,6 +138,7 @@ export type SiteContent = {
   footer: FooterContent
   navbar: NavbarContent
   seo: SeoContent
+  login_panel: LoginPanelContent
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -326,6 +339,21 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
     title: 'منصة الأستاذ عبد السلام | تعلّم الرياضيات بسهولة',
     description:
       'منصة الأستاذ عبد السلام التعليمية للرياضيات لجميع المراحل الدراسية — شرح مبسّط، بنك أسئلة، وامتحانات تفاعلية. اختر مرحلتك وابدأ رحلة التفوق.',
+  },
+
+  login_panel: {
+    badge: 'منصة الرياضيات الأولى للثانوية العامة',
+    headline: 'الرياضيات مش صعبة، هي بس محتاجة مُعلّم صح.',
+    perks: [
+      'شرح مبسّط لكل درس خطوة بخطوة',
+      'امتحانات بعد كل درس تثبّت المعلومة',
+      'متابعة مستمرة لمستواك ودرجاتك',
+    ],
+    stats: [
+      { value: '+48k', label: 'طالب وطالبة' },
+      { value: '98%', label: 'نسبة رضا' },
+      { value: '+25', label: 'سنة خبرة' },
+    ],
   },
 }
 

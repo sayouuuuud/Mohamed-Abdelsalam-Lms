@@ -4,18 +4,13 @@ import { ArrowLeft, Check } from 'lucide-react'
 import { AuthForm } from '@/components/auth/auth-form'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { getSiteContent } from '@/lib/site-content'
 
 export const metadata: Metadata = {
   title: 'تسجيل الدخول / حساب جديد | منصة عبد السلام للرياضيات',
   description:
     'سجّل دخولك أو اعمل حساب جديد على منصة الأستاذ عبد السلام للرياضيات للثانوية العامة.',
 }
-
-const perks = [
-  'شرح مبسّط لكل درس خطوة بخطوة',
-  'امتحانات بعد كل درس تثبّت المعلومة',
-  'متابعة مستمرة لمستواك ودرجاتك',
-]
 
 export default async function AuthPage({
   searchParams,
@@ -46,6 +41,9 @@ export default async function AuthPage({
   const { mode } = await searchParams
   const initialTab = mode === 'register' ? 'register' : 'login'
 
+  const siteContent = await getSiteContent()
+  const panel = siteContent.login_panel
+
   return (
     <main className="relative min-h-screen bg-cream lg:grid lg:grid-cols-2 dark:bg-ink-base">
       {/* graph paper backdrop */}
@@ -65,13 +63,13 @@ export default async function AuthPage({
           <div className="max-w-md">
             <span className="text-sm font-semibold text-gold dark:text-teal-glow">
               <span className="font-mono">{'// '}</span>
-              منصة الرياضيات الأولى للثانوية العامة
+              {panel.badge}
             </span>
             <h1 className="mt-4 text-balance font-heading text-4xl font-bold leading-tight text-cream">
-              الرياضيات مش صعبة، هي بس محتاجة مُعلّم صح.
+              {panel.headline}
             </h1>
             <ul className="mt-8 space-y-4">
-              {perks.map((p) => (
+              {panel.perks.map((p) => (
                 <li key={p} className="flex items-center gap-3 text-cream/85">
                   <span className="grid size-6 shrink-0 place-items-center rounded-full bg-emerald-brand/20 text-emerald-brand">
                     <Check className="size-3.5" />
@@ -83,11 +81,12 @@ export default async function AuthPage({
           </div>
 
           <div className="flex items-center gap-6 text-cream/70">
-            <Stat value="+48k" label="طالب وطالبة" />
-            <span className="h-8 w-px bg-cream/15" />
-            <Stat value="98%" label="نسبة رضا" />
-            <span className="h-8 w-px bg-cream/15" />
-            <Stat value="+25" label="سنة خبرة" />
+            {panel.stats.map((s, i) => (
+              <>
+                {i > 0 && <span key={`sep-${i}`} className="h-8 w-px bg-cream/15" />}
+                <Stat key={s.label} value={s.value} label={s.label} />
+              </>
+            ))}
           </div>
         </div>
       </aside>
