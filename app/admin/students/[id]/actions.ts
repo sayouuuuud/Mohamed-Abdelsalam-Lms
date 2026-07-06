@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { hasResourceAccess } from '@/lib/auth-guard'
 import type { StudentProfile, DeviceInfo, EnrolledCourse, PaymentRecord, ExamGrade, AssignmentRecord, StudentStatus } from '@/lib/student-profile-data'
 
 // ── Update student account status ─────────────────────────────────────────────
@@ -11,6 +12,10 @@ export async function updateStudentStatus(
   newStatus: StudentStatus,
 ): Promise<{ success?: boolean; error?: string }> {
   const supabase = await createClient()
+
+  if (!(await hasResourceAccess(supabase, 'students', 'manage'))) {
+    return { error: 'غير مسموح.' }
+  }
 
   const { error } = await supabase
     .from('students')
@@ -34,6 +39,10 @@ export async function sendMessageToStudent(
   channel: 'رسالة داخلية' | 'إشعار',
 ): Promise<{ success?: boolean; error?: string }> {
   const supabase = await createClient()
+
+  if (!(await hasResourceAccess(supabase, 'students', 'manage'))) {
+    return { error: 'غير مسموح.' }
+  }
 
   const timeLabel = new Date().toLocaleString('ar-EG', {
     day: 'numeric',
@@ -148,6 +157,8 @@ function formatJoinedAt(date: string): string {
 
 export async function getStudentProfileData(code: string): Promise<StudentProfile | null> {
   const supabase = await createClient()
+
+  if (!(await hasResourceAccess(supabase, 'students'))) return null
 
   // 1. Fetch Student
   const { data: studentRow, error: studentError } = await supabase

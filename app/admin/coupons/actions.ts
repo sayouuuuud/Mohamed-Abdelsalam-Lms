@@ -96,7 +96,7 @@ export async function createCoupon(values: {
   lectureIds?: string[]
 }) {
   const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'coupons'))) {
+  if (!(await hasResourceAccess(supabase, 'coupons', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
@@ -166,7 +166,7 @@ export async function updateCoupon(
   },
 ) {
   const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'coupons'))) {
+  if (!(await hasResourceAccess(supabase, 'coupons', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
@@ -204,7 +204,7 @@ export async function updateCoupon(
 
 export async function deleteCoupon(id: string) {
   const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'coupons'))) {
+  if (!(await hasResourceAccess(supabase, 'coupons', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 

@@ -81,7 +81,7 @@ export async function getOrders(): Promise<AdminOrder[]> {
 
 export async function updateOrderStatus(id: string, status: OrderStatus) {
   const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'payments'))) {
+  if (!(await hasResourceAccess(supabase, 'payments', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
@@ -95,7 +95,7 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
 // seeded with a greeting that references the order. Returns the conversation code.
 export async function messageStudent(orderId: string) {
   const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'payments'))) {
+  if (!(await hasResourceAccess(supabase, 'payments', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 

@@ -28,7 +28,7 @@ export async function getConversations(): Promise<Conversation[]> {
 
 export async function markAsRead(id: string) {
   const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'messages'))) {
+  if (!(await hasResourceAccess(supabase, 'messages', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
@@ -44,7 +44,7 @@ export async function markAsRead(id: string) {
 
 export async function markAllAsRead() {
   const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'messages'))) {
+  if (!(await hasResourceAccess(supabase, 'messages', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
@@ -60,7 +60,7 @@ export async function markAllAsRead() {
 
 export async function replyToConversation(id: string, message: string) {
   const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'messages'))) {
+  if (!(await hasResourceAccess(supabase, 'messages', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
@@ -105,7 +105,7 @@ export async function replyToConversation(id: string, message: string) {
 
 export async function setTicketStatus(id: string, status: TicketStatus) {
   const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'messages'))) {
+  if (!(await hasResourceAccess(supabase, 'messages', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 

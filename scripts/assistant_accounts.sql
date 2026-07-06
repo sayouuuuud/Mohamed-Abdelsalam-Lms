@@ -78,6 +78,19 @@ create policy "ap_read_own" on public.assistant_permissions
 -- ------------------------------------------------------------
 -- 4) Additive assistant policies for every resource-backed table
 --    (admin policies remain untouched; these are OR'd in)
+--
+-- IMPORTANT SECURITY NOTE:
+--   Postgres IGNORES policies on any table where RLS is NOT enabled.
+--   Several core tables (students, courses, lectures, orders, branches,
+--   stages, site_content, site_theme, ...) currently do NOT have RLS
+--   enabled in this project. On those tables the policies below are
+--   inert, so the REAL enforcement for assistants is the application
+--   layer: every write path goes through a server action guarded by
+--   hasResourceAccess(..., 'manage'), and reads through 'view'.
+--   Do NOT blindly `enable row level security` on those tables here —
+--   doing so without first porting the existing admin/student access
+--   rules would lock out admins and students. Enable RLS per-table only
+--   after auditing that table's full policy set.
 -- ------------------------------------------------------------
 do $$
 declare

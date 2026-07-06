@@ -16,7 +16,7 @@ export async function updateSiteContentSection(
   value: unknown,
 ): Promise<{ success?: true; error?: string }> {
   const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'settings'))) {
+  if (!(await hasResourceAccess(supabase, 'settings', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
@@ -44,7 +44,7 @@ export async function resetSiteContentSection(
   section: string,
 ): Promise<{ success?: true; error?: string }> {
   const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'settings'))) {
+  if (!(await hasResourceAccess(supabase, 'settings', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
@@ -94,7 +94,7 @@ export async function updateAdminProfile(input: {
   avatarUrl?: string | null
 }) {
   const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'settings'))) {
+  if (!(await hasResourceAccess(supabase, 'settings', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
   const {
@@ -166,7 +166,7 @@ export async function getSiteNeon(): Promise<string> {
 
 export async function updateSettings(newSettings: any) {
   const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'settings'))) {
+  if (!(await hasResourceAccess(supabase, 'settings', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 

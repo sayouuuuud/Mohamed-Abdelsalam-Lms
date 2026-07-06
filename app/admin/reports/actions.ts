@@ -40,7 +40,7 @@ export async function getReports(): Promise<ReportItem[]> {
 
 export async function generateReport() {
   const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'reports'))) {
+  if (!(await hasResourceAccess(supabase, 'reports', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 

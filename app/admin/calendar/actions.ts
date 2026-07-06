@@ -59,7 +59,7 @@ export async function createEvent(values: {
   lectureId?: string | null
 }) {
   const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'calendar'))) {
+  if (!(await hasResourceAccess(supabase, 'calendar', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
@@ -119,7 +119,7 @@ export async function updateEvent(
   },
 ) {
   const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'calendar'))) {
+  if (!(await hasResourceAccess(supabase, 'calendar', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
@@ -145,7 +145,7 @@ export async function updateEvent(
 
 export async function deleteEvent(id: string) {
   const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'calendar'))) {
+  if (!(await hasResourceAccess(supabase, 'calendar', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 

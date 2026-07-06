@@ -65,7 +65,7 @@ function makeExamCode() {
 // option *value* (matching the existing seeded data format).
 export async function saveExam(payload: SaveExamPayload) {
   const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'exams'))) {
+  if (!(await hasResourceAccess(supabase, 'exams', 'manage'))) {
     return { success: false, error: 'غير مصرح لك' }
   }
 

@@ -36,10 +36,10 @@ export async function getStages(): Promise<StageOption[]> {
   return (data || []).map((s: any) => ({ id: s.id, title: s.title }))
 }
 
-// Ensures the current session can act on the students resource.
-// Full enforcement (view vs manage) lives in RLS via has_permission.
+// Guards student writes (create/delete). These use the service-role client,
+// so we enforce 'manage' at the app layer instead of relying on RLS.
 async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
-  return hasResourceAccess(supabase, 'students')
+  return hasResourceAccess(supabase, 'students', 'manage')
 }
 
 type StudentRow = {

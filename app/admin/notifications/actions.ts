@@ -46,7 +46,7 @@ export async function sendAnnouncement(input: {
   lectureId?: string | null
 }) {
   const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'notifications'))) {
+  if (!(await hasResourceAccess(supabase, 'notifications', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
   const title = input.title.trim()
@@ -90,7 +90,7 @@ export async function getNotifications(): Promise<NotificationRecord[]> {
 
 export async function markAsRead(id: string) {
   const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'notifications'))) {
+  if (!(await hasResourceAccess(supabase, 'notifications', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
@@ -106,7 +106,7 @@ export async function markAsRead(id: string) {
 
 export async function markAllAsRead() {
   const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'notifications'))) {
+  if (!(await hasResourceAccess(supabase, 'notifications', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
@@ -122,7 +122,7 @@ export async function markAllAsRead() {
 
 export async function deleteNotification(id: string) {
   const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'notifications'))) {
+  if (!(await hasResourceAccess(supabase, 'notifications', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 

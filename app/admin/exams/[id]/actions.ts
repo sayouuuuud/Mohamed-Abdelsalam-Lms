@@ -249,7 +249,7 @@ export async function gradeSubmission(
   manualGrades: { answerId: string; awardedPoints: number }[],
 ) {
   const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'exams'))) {
+  if (!(await hasResourceAccess(supabase, 'exams', 'manage'))) {
     return { success: false, error: 'غير مصرح لك' }
   }
 
