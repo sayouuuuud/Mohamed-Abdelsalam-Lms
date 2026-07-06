@@ -14,7 +14,7 @@ import { PaymentStatusChart } from './payment-status-chart'
 import { LatestMessages } from './latest-messages'
 import { LatestPayments } from './latest-payments'
 import { LatestStudents } from './latest-students'
-import { LatestCourses } from './latest-courses'
+import { LatestLessons } from './latest-lessons'
 
 export function DashboardShell({ data }: { data?: any }) {
   if (!data) return <PageHeader />
@@ -80,10 +80,10 @@ export function DashboardShell({ data }: { data?: any }) {
         <PaymentStatusChart data={data.paymentStatus} />
       </div>
 
-      {/* Row 5: آخر المدفوعات + آخر الكورسات */}
+      {/* Row 5: آخر المدفوعات + آخر المحاضرات */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <LatestPayments payments={data.latestPayments} />
-        <LatestCourses courses={data.latestCourses} />
+        <LatestLessons lessons={data.latestLessons} />
       </div>
     </div>
   )

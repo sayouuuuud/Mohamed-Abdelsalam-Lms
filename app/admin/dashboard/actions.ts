@@ -13,9 +13,9 @@ export async function getDashboardData() {
   }
 
   // Fetch basic stats
-  const { data: payments } = await supabase
-    .from('payments')
-    .select('amount, status, created_at, method, student_name, course, code')
+  const { data: orders } = await supabase
+    .from('orders')
+    .select('id, code, total, status, created_at, method, student_name, order_items(lecture_title)')
     .order('created_at', { ascending: false })
 
   const { count: studentsCount, data: latestStudentsData } = await supabase
@@ -28,9 +28,10 @@ export async function getDashboardData() {
     .select('id, title, status, created_at, students, price, image', { count: 'exact' })
     .order('created_at', { ascending: false })
 
-  const { count: lessonsCount } = await supabase
+  const { count: lessonsCount, data: latestLessonsData } = await supabase
     .from('course_lessons')
-    .select('id', { count: 'exact' })
+    .select('id, title, status, created_at', { count: 'exact' })
+    .order('created_at', { ascending: false })
 
   // Exam analytics source data.
   const { data: examsData } = await supabase
@@ -43,8 +44,8 @@ export async function getDashboardData() {
     .select('exam_id, score, total, grading_status')
 
   // Processing Stats
-  const approvedPayments = payments?.filter((p) => p.status === 'مقبول') || []
-  const totalRevenue = approvedPayments.reduce((sum, p) => sum + Number(p.amount), 0)
+  const approvedOrders = orders?.filter((o) => o.status === 'approved') || []
+  const totalRevenue = approvedOrders.reduce((sum, o) => sum + Number(o.total), 0)
 
   // Real rolling series for 12 months.
   const monthlyWindow = lastMonths(12)
@@ -52,9 +53,9 @@ export async function getDashboardData() {
 
   // Revenue per period.
   const revenueBucket: Record<string, number> = {}
-  approvedPayments.forEach((p) => {
-    const k = monthKeyOf(p.created_at)
-    revenueBucket[k] = (revenueBucket[k] || 0) + Number(p.amount)
+  approvedOrders.forEach((o) => {
+    const k = monthKeyOf(o.created_at)
+    revenueBucket[k] = (revenueBucket[k] || 0) + Number(o.total)
   })
   const revenueData = monthlyWindow.map((b) => ({
     month: b.month,
@@ -85,8 +86,8 @@ export async function getDashboardData() {
   // Activity per period (daily, 30 days)
   const dailyWindow = lastDays(30)
   const activityBucket: Record<string, number> = {}
-  approvedPayments.forEach((p) => {
-    const k = dayKeyOf(p.created_at)
+  approvedOrders.forEach((o) => {
+    const k = dayKeyOf(o.created_at)
     activityBucket[k] = (activityBucket[k] || 0) + 1
   })
   latestStudentsData?.forEach((s) => {
@@ -131,12 +132,12 @@ export async function getDashboardData() {
 
   const today = new Date().toDateString()
   const yesterday = new Date(Date.now() - 86400000).toDateString()
-  const salesYesterday = approvedPayments
-    .filter((p) => new Date(p.created_at).toDateString() === yesterday)
-    .reduce((s, p) => s + Number(p.amount), 0)
-  const salesToday = approvedPayments
-    .filter((p) => new Date(p.created_at).toDateString() === today)
-    .reduce((s, p) => s + Number(p.amount), 0)
+  const salesYesterday = approvedOrders
+    .filter((o) => new Date(o.created_at).toDateString() === yesterday)
+    .reduce((s, o) => s + Number(o.total), 0)
+  const salesToday = approvedOrders
+    .filter((o) => new Date(o.created_at).toDateString() === today)
+    .reduce((s, o) => s + Number(o.total), 0)
 
   const coursesThisMonth = (latestCoursesData || []).filter(
     (c) => monthKeyOf(c.created_at) === thisKey,
@@ -160,13 +161,13 @@ export async function getDashboardData() {
       image: c.image || '/courses/python.png',
     }))
 
-  // Latest Payments
-  const latestPayments = (payments || []).slice(0, 5).map((p, i) => ({
-    id: p.code ? (p.code.startsWith('#') ? p.code : `#${p.code}`) : `#PAY-${String(1000 + i)}`,
-    name: p.student_name,
-    course: p.course,
-    amount: `${p.amount} ج.م`,
-    status: p.status === 'مقبول' ? 'ناجح' : p.status === 'قيد المراجعة' ? 'معلّق' : 'مرفوض',
+  // Latest Payments (Orders)
+  const latestPayments = (orders || []).slice(0, 5).map((o, i) => ({
+    id: o.code ? (o.code.startsWith('#') ? o.code : `#${o.code}`) : `#PAY-${String(1000 + i)}`,
+    name: o.student_name,
+    course: o.order_items?.[0]?.lecture_title || 'طلب عام',
+    amount: `${o.total} ج.م`,
+    status: o.status === 'approved' ? 'ناجح' : o.status === 'pending' ? 'معلّق' : 'مرفوض',
   }))
 
   // Latest Students
@@ -176,12 +177,12 @@ export async function getDashboardData() {
     time: getRelativeTimeArabic(s.created_at),
   }))
 
-  // Latest Courses
-  const latestCourses = (latestCoursesData || []).slice(0, 3).map((c) => ({
-    title: c.title,
-    status: c.status,
-    time: getRelativeTimeArabic(c.created_at),
-    image: c.image || '/courses/javascript.png',
+  // Latest Lessons
+  const latestLessons = (latestLessonsData || []).slice(0, 5).map((l) => ({
+    title: l.title,
+    status: l.status,
+    time: getRelativeTimeArabic(l.created_at),
+    image: '/courses/javascript.png', // Fallback as lessons might not have images directly
   }))
 
   // Latest Messages (mocked lightly if db isn't populated with messages yet, or fetch real)
@@ -253,16 +254,16 @@ export async function getDashboardData() {
   ]
 
   // ── Payment analytics ─────────────────────────────────────────────────────
-  const allPayments = payments || []
-  const pendingPayments = allPayments.filter((p) => p.status === 'قيد المراجعة')
-  const pendingPaymentsCount = pendingPayments.length
-  const pendingPaymentsAmount = pendingPayments.reduce((s, p) => s + Number(p.amount), 0)
+  const allOrders = orders || []
+  const pendingOrders = allOrders.filter((o) => o.status === 'pending')
+  const pendingPaymentsCount = pendingOrders.length
+  const pendingPaymentsAmount = pendingOrders.reduce((s, o) => s + Number(o.total), 0)
 
   // Payment-method split (only approved payments count toward money in).
   const methodBucket: Record<string, number> = {}
-  approvedPayments.forEach((p) => {
-    const m = p.method || 'غير محدد'
-    methodBucket[m] = (methodBucket[m] || 0) + Number(p.amount)
+  approvedOrders.forEach((o) => {
+    const m = o.method || 'غير محدد'
+    methodBucket[m] = (methodBucket[m] || 0) + Number(o.total)
   })
   const paymentMethods = Object.entries(methodBucket)
     .map(([method, value], i) => ({ method, value, fill: `var(--chart-${(i % 5) + 1})` }))
@@ -270,8 +271,8 @@ export async function getDashboardData() {
 
   // Payment-status split (count of transactions).
   const statusBucket: Record<string, number> = {}
-  allPayments.forEach((p) => {
-    const st = p.status || 'غير محدد'
+  allOrders.forEach((o) => {
+    const st = o.status === 'approved' ? 'مقبول' : o.status === 'pending' ? 'قيد المراجعة' : 'مرفوض'
     statusBucket[st] = (statusBucket[st] || 0) + 1
   })
   const paymentStatus = [
@@ -311,7 +312,7 @@ export async function getDashboardData() {
     topCourses,
     latestPayments,
     latestStudents,
-    latestCourses,
+    latestLessons,
     latestMessages,
   }
 }
