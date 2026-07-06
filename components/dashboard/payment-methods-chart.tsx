@@ -64,7 +64,7 @@ export function PaymentMethodsChart({
                             y={(viewBox.cy || 0) - 4}
                             className="fill-foreground text-lg font-bold"
                           >
-                            {(total / 1000).toFixed(0)}K
+                            {new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(total)}
                           </tspan>
                           <tspan
                             x={viewBox.cx}
