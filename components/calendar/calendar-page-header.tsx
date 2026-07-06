@@ -5,9 +5,11 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { exportToCsv } from '@/lib/export-csv'
 import { useCalendar } from './calendar-context'
+import { useCanManage } from '@/components/dashboard/permissions-context'
 
 export function CalendarPageHeader() {
   const { events, openCreate } = useCalendar()
+  const canManage = useCanManage('calendar')
 
   const exportData = () => {
     exportToCsv(
@@ -44,10 +46,12 @@ export function CalendarPageHeader() {
           <Download className="size-4" />
           تصدير البيانات
         </Button>
-        <Button onClick={() => openCreate()}>
-          <CalendarPlus className="size-4" />
-          إضافة حدث
-        </Button>
+        {canManage && (
+          <Button onClick={() => openCreate()}>
+            <CalendarPlus className="size-4" />
+            إضافة حدث
+          </Button>
+        )}
       </div>
     </div>
   )

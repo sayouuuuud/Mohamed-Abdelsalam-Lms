@@ -36,6 +36,12 @@ function sanitizePermissions(
   return rows
 }
 
+/** True when the current session belongs to a full admin (role = 'admin'). */
+export async function isCurrentUserFullAdmin(): Promise<boolean> {
+  const supabase = await createClient()
+  return requireAdmin(supabase)
+}
+
 /** List all assistants with their permission maps. Full admins only. */
 export async function listAssistants(): Promise<AssistantRecord[]> {
   const supabase = await createClient()

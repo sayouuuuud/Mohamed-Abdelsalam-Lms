@@ -22,7 +22,10 @@ export async function GET(request: NextRequest) {
             .select('role')
             .eq('id', user.id)
             .single()
-          destination = profile?.role === 'admin' ? '/admin/dashboard' : '/student'
+          destination =
+            profile?.role === 'admin' || profile?.role === 'assistant'
+              ? '/admin/dashboard'
+              : '/student'
         }
       }
       return NextResponse.redirect(`${origin}${destination}`)

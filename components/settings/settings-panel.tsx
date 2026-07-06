@@ -636,6 +636,10 @@ export function SettingsPanel({
             initialContent={initialSiteContent ?? DEFAULT_SITE_CONTENT}
           />
         )}
+
+        {activeTab === 'assistants' && isFullAdmin && (
+          <AssistantsTab initialAssistants={initialAssistants} />
+        )}
       </div>
     </div>
   )
