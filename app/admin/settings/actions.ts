@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { requireAdmin } from '@/lib/auth-guard'
+import { hasResourceAccess } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
 import { getSiteContent } from '@/lib/site-content'
 
@@ -16,7 +16,7 @@ export async function updateSiteContentSection(
   value: unknown,
 ): Promise<{ success?: true; error?: string }> {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) {
+  if (!(await hasResourceAccess(supabase, 'settings'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
@@ -44,7 +44,7 @@ export async function resetSiteContentSection(
   section: string,
 ): Promise<{ success?: true; error?: string }> {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) {
+  if (!(await hasResourceAccess(supabase, 'settings'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
@@ -94,7 +94,7 @@ export async function updateAdminProfile(input: {
   avatarUrl?: string | null
 }) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) {
+  if (!(await hasResourceAccess(supabase, 'settings'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
   const {
@@ -166,7 +166,7 @@ export async function getSiteNeon(): Promise<string> {
 
 export async function updateSettings(newSettings: any) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) {
+  if (!(await hasResourceAccess(supabase, 'settings'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 

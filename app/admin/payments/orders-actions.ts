@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { requireAdmin } from '@/lib/auth-guard'
+import { hasResourceAccess } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
 
 export type OrderStatus = 'pending' | 'approved' | 'rejected'
@@ -81,7 +81,7 @@ export async function getOrders(): Promise<AdminOrder[]> {
 
 export async function updateOrderStatus(id: string, status: OrderStatus) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) {
+  if (!(await hasResourceAccess(supabase, 'payments'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
@@ -95,7 +95,7 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
 // seeded with a greeting that references the order. Returns the conversation code.
 export async function messageStudent(orderId: string) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) {
+  if (!(await hasResourceAccess(supabase, 'payments'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 

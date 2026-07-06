@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { requireAdmin } from '@/lib/auth-guard'
+import { hasResourceAccess } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
 
 // ── Admin-facing types (use the real uuid `id`) ───────────────────
@@ -115,7 +115,7 @@ export async function getCurriculumAdmin(): Promise<AdminStage[]> {
 // ── Stage CRUD ────────────────────────────────────────────────────
 export async function createStage(input: StageInput) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess(supabase, 'categories'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
   const { count } = await supabase
     .from('stages')
@@ -143,7 +143,7 @@ export async function createStage(input: StageInput) {
 
 export async function updateStage(id: string, input: StageInput) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess(supabase, 'categories'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
   const { error } = await supabase
     .from('stages')
@@ -167,7 +167,7 @@ export async function updateStage(id: string, input: StageInput) {
 
 export async function deleteStage(id: string) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess(supabase, 'categories'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
   const { error } = await supabase.from('stages').delete().eq('id', id)
   if (error) {
@@ -182,7 +182,7 @@ export async function deleteStage(id: string) {
 // ── Branch CRUD ───────────────────────────────────────────────────
 export async function createBranch(input: BranchInput) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess(supabase, 'categories'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
   const { count } = await supabase
     .from('branches')
@@ -214,7 +214,7 @@ export async function updateBranch(
   input: Omit<BranchInput, 'stageId'>,
 ) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess(supabase, 'categories'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
   const { error } = await supabase
     .from('branches')
@@ -237,7 +237,7 @@ export async function updateBranch(
 
 export async function deleteBranch(id: string) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess(supabase, 'categories'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
   const { error } = await supabase.from('branches').delete().eq('id', id)
   if (error) {

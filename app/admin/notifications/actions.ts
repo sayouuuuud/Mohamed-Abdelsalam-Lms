@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { requireAdmin } from '@/lib/auth-guard'
+import { hasResourceAccess } from '@/lib/auth-guard'
 import { createNotification } from '@/lib/notify'
 import { revalidatePath } from 'next/cache'
 import {
@@ -46,7 +46,7 @@ export async function sendAnnouncement(input: {
   lectureId?: string | null
 }) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) {
+  if (!(await hasResourceAccess(supabase, 'notifications'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
   const title = input.title.trim()
@@ -90,7 +90,7 @@ export async function getNotifications(): Promise<NotificationRecord[]> {
 
 export async function markAsRead(id: string) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) {
+  if (!(await hasResourceAccess(supabase, 'notifications'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
@@ -106,7 +106,7 @@ export async function markAsRead(id: string) {
 
 export async function markAllAsRead() {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) {
+  if (!(await hasResourceAccess(supabase, 'notifications'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
@@ -122,7 +122,7 @@ export async function markAllAsRead() {
 
 export async function deleteNotification(id: string) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) {
+  if (!(await hasResourceAccess(supabase, 'notifications'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 

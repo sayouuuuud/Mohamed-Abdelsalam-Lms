@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { hasResourceAccess } from '@/lib/auth-guard'
 import type {
   StudentGender,
   StudentRecord,
@@ -35,18 +36,10 @@ export async function getStages(): Promise<StageOption[]> {
   return (data || []).map((s: any) => ({ id: s.id, title: s.title }))
 }
 
-// Ensures the current session belongs to an admin before privileged writes.
+// Ensures the current session can act on the students resource.
+// Full enforcement (view vs manage) lives in RLS via has_permission.
 async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return false
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-  return profile?.role === 'admin'
+  return hasResourceAccess(supabase, 'students')
 }
 
 type StudentRow = {

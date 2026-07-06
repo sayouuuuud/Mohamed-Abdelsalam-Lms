@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requireAdmin } from '@/lib/auth-guard'
+import { hasResourceAccess } from '@/lib/auth-guard'
 import { createNotification } from '@/lib/notify'
 
 // ── Types ─────────────────────────────────────────────────────────
@@ -218,7 +218,7 @@ export async function getBranchOptions(): Promise<BranchOption[]> {
 // ── Lecture CRUD ──────────────────────────────────────────────────
 export async function createLecture(input: LectureInput) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess(supabase, 'courses'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
   const { count } = await supabase
     .from('lectures')
@@ -328,7 +328,7 @@ async function notifyLectureGrade(
 
 export async function updateLecture(id: string, input: LectureInput) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess(supabase, 'courses'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
   const patch: Record<string, any> = {
     branch_id: input.branchId,
@@ -407,7 +407,7 @@ export async function updateLecture(id: string, input: LectureInput) {
 
 export async function deleteLecture(id: string) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess(supabase, 'courses'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
   const { error } = await supabase.from('lectures').delete().eq('id', id)
   if (error) {
@@ -422,7 +422,7 @@ export async function deleteLecture(id: string) {
 // ── Lesson CRUD ───────────────────────────────────────────────────
 export async function createLesson(lectureId: string, input: LessonInput) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess(supabase, 'courses'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
   const sortOrder = await nextContentOrder(supabase, lectureId)
 
@@ -450,7 +450,7 @@ export async function createLesson(lectureId: string, input: LessonInput) {
 
 export async function updateLesson(id: string, input: LessonInput) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess(supabase, 'courses'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
   const patch: Record<string, any> = {
     title: input.title,
@@ -475,7 +475,7 @@ export async function updateLesson(id: string, input: LessonInput) {
 
 export async function deleteLesson(id: string) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess(supabase, 'courses'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
   const { error } = await supabase.from('lessons').delete().eq('id', id)
   if (error) {
@@ -739,7 +739,7 @@ async function replaceAssignmentQuestions(
 
 export async function createAssignment(lectureId: string, input: AssignmentInput) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess(supabase, 'courses'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
   const sortOrder = await nextContentOrder(supabase, lectureId)
 
@@ -778,7 +778,7 @@ export async function createAssignment(lectureId: string, input: AssignmentInput
 
 export async function updateAssignment(id: string, input: AssignmentInput) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess(supabase, 'courses'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
   const { error } = await supabase
     .from('assignments')
@@ -810,7 +810,7 @@ export async function updateAssignment(id: string, input: AssignmentInput) {
 
 export async function deleteAssignment(id: string) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess(supabase, 'courses'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
   await supabase.from('assignment_questions').delete().eq('assignment_id', id)
   const { error } = await supabase.from('assignments').delete().eq('id', id)
@@ -830,7 +830,7 @@ export async function reorderLectureContent(
   items: { kind: 'lesson' | 'assignment'; id: string }[],
 ) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess(supabase, 'courses'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
   const updates = items.map((item, i) => {
     const table = item.kind === 'lesson' ? 'lessons' : 'assignments'

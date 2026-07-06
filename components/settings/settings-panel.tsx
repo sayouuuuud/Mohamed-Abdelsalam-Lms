@@ -16,6 +16,7 @@ import {
   Check,
   Loader2,
   LayoutTemplate,
+  UsersRound,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -24,6 +25,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { ToggleSwitch } from '@/components/settings/toggle-switch'
 import { SiteContentTab } from '@/components/settings/site-content-tab'
+import { AssistantsTab } from '@/components/settings/assistants-tab'
+import type { AssistantRecord } from '@/app/admin/settings/assistants-actions'
 import type { SiteContent } from '@/lib/site-content-defaults'
 import { DEFAULT_SITE_CONTENT } from '@/lib/site-content-defaults'
 import { neonPresets, applyNeonPreset, type NeonPresetId } from '@/lib/neon-presets'
@@ -97,15 +100,16 @@ function applyColorPreset(id: PresetId) {
   localStorage.setItem('color-preset', id)
 }
 
-const tabs = [
+const baseTabs = [
   { id: 'profile', label: 'الملف الشخصي', icon: User },
   { id: 'notifications', label: 'الإشعارات', icon: Bell },
   { id: 'security', label: 'الأمان', icon: Shield },
   { id: 'preferences', label: 'التفضيلات', icon: SlidersHorizontal },
   { id: 'content', label: 'محتوى الموقع', icon: LayoutTemplate },
+  { id: 'assistants', label: 'المساعدون', icon: UsersRound },
 ] as const
 
-type TabId = (typeof tabs)[number]['id']
+type TabId = (typeof baseTabs)[number]['id']
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -119,6 +123,8 @@ export function SettingsPanel({
   initialSettings,
   adminProfile,
   initialSiteContent,
+  isFullAdmin = false,
+  initialAssistants = [],
 }: {
   initialSettings?: any
   adminProfile?: {
@@ -130,10 +136,15 @@ export function SettingsPanel({
     initials: string
   } | null
   initialSiteContent?: SiteContent
+  isFullAdmin?: boolean
+  initialAssistants?: AssistantRecord[]
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [activeTab, setActiveTab] = useState<TabId>('profile')
+
+  // The "assistants" tab is restricted to full admins only.
+  const tabs = baseTabs.filter((t) => t.id !== 'assistants' || isFullAdmin)
 
   const settings = initialSettings || {
     profile: { firstName: 'محمد', lastName: 'أحمد', email: 'mohamed@platform.com', phone: '+20 100 123 4567', bio: 'مدير منصة تعليمية متخصصة في الدورات التقنية.' },
