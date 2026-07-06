@@ -76,13 +76,12 @@ export function ViewsChart({
         {isHovered && (
           <div 
             dir="rtl" 
-            className={`absolute bottom-full mb-2 ${dayIndex > totalDays - 4 ? "right-0" : dayIndex < 4 ? "left-0" : "left-1/2 -translate-x-1/2"} bg-gray-900 dark:bg-gray-100 text-gray-50 dark:text-gray-900 px-4 py-2 rounded-full text-xs whitespace-nowrap z-50 shadow-xl flex items-center gap-3 pointer-events-none`}
+            className={`absolute bottom-full mb-2 ${dayIndex > totalDays - 4 ? "right-0" : dayIndex < 4 ? "left-0" : "left-1/2 -translate-x-1/2"} bg-gray-900 dark:bg-gray-100 text-gray-50 dark:text-gray-900 px-4 py-2 rounded-full text-xs whitespace-nowrap z-50 shadow-xl flex items-center gap-2 pointer-events-none`}
           >
             <span className="font-semibold text-gray-400 dark:text-gray-500">
               {label}
             </span>
-            <div className="h-3 w-px bg-gray-700 dark:bg-gray-300" />
-            <div className="flex items-center gap-1.5 font-bold">
+            <div className="flex items-center gap-1 font-bold">
               <span className="text-sm">{value.toLocaleString("en-US")}</span>
               <span className="text-gray-300 dark:text-gray-700">{metric === "views" ? "مشاهدة" : "زائر"}</span>
             </div>
