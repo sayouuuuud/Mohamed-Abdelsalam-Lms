@@ -30,6 +30,9 @@ export function RevenueReportChart({ data: inputData }: { data?: any[] }) {
       filterValue={range}
       onFilterChange={setRange}
     >
+      <div className="mb-4 text-xs text-muted-foreground">
+        المستهدف يمثل الإيرادات المتوقعة للنمو (بنسبة 15% زيادة عن إيرادات الشهر السابق).
+      </div>
       <ChartContainer config={config} className="h-[260px] w-full">
         <BarChart data={monthlyRevenue} margin={{ left: 4, right: 8, top: 8 }}>
           <CartesianGrid vertical={false} strokeDasharray="3 3" />

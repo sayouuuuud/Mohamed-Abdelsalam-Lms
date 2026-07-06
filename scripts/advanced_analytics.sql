@@ -44,7 +44,7 @@ begin
     ), '[]'::jsonb)
   ) into views_data;
 
-  -- 2. Funnel Data
+  -- 2. Funnel Data (Overall completed courses)
   select jsonb_build_object(
     'visitors', (select count(distinct visitor_id) from public.page_views),
     'registered', (select count(*) from public.students),
@@ -52,10 +52,9 @@ begin
     'completed', (
       select count(distinct e.id) 
       from public.enrollments e
-      where exists (
-        select 1 from public.lesson_progress lp 
-        where lp.enrollment_id = e.id and lp.completed = true
-      )
+      where (
+        select count(*) from public.lesson_progress lp where lp.enrollment_id = e.id and lp.completed = true
+      ) >= nullif((select count(*) from public.course_lessons cl join public.course_sections cs on cs.id = cl.section_id where cs.course_id = e.course_id), 0)
     )
   ) into funnel_data;
 
@@ -73,7 +72,11 @@ begin
   select coalesce(jsonb_agg(t), '[]'::jsonb) from (
     select c.title as name, 
            count(e.id) as enrolled,
-           sum(case when exists (select 1 from public.lesson_progress lp where lp.enrollment_id = e.id and lp.completed = true) then 1 else 0 end) as completed
+           sum(case when 
+               (select count(*) from public.lesson_progress lp where lp.enrollment_id = e.id and lp.completed = true) 
+               >= 
+               nullif((select count(*) from public.course_lessons cl join public.course_sections cs on cs.id = cl.section_id where cs.course_id = c.id), 0)
+           then 1 else 0 end) as completed
     from public.courses c
     left join public.enrollments e on e.course_id = c.id
     group by c.id, c.title
@@ -110,16 +113,16 @@ begin
     'cancelled_sum', (select coalesce(sum(total), 0) from public.orders where status = 'cancelled')
   ) into refunds_analysis;
 
-  -- 7. Peak Times (Heatmap)
+  -- 7. Peak Times (Heatmap) - GitHub Style (Last 365 days)
   select coalesce(jsonb_agg(t), '[]'::jsonb) from (
     select 
-      extract(dow from created_at) as day_of_week,
-      extract(hour from created_at) as hour_of_day,
+      to_char(date_trunc('day', created_at), 'YYYY-MM-DD') as date,
       count(*) as activity_count
     from public.orders
     where status = 'approved'
-    group by day_of_week, hour_of_day
-    order by day_of_week, hour_of_day
+      and created_at >= (now() - interval '365 days')
+    group by date_trunc('day', created_at)
+    order by date_trunc('day', created_at)
   ) t into peak_times;
 
   -- 8. Coupon Performance

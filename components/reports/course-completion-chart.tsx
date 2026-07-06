@@ -30,7 +30,7 @@ export function CourseCompletionChart({
   const chartData = data || []
 
   return (
-    <PanelCard title="معدل إكمال المحاضرات">
+    <PanelCard title="معدل إكمال الكورسات">
       <div className="h-[400px] w-full">
         {chartData.length > 0 ? (
           <ChartContainer config={config} className="h-full w-full">

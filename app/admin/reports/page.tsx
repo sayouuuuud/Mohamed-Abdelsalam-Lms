@@ -23,6 +23,9 @@ import { PaymentMethodsTrends } from '@/components/reports/payment-methods-trend
 
 import { getReportsData, getAdvancedAnalytics } from './actions'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function ReportsPage() {
   const data = await getReportsData()
   const advancedData = await getAdvancedAnalytics()

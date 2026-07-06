@@ -30,10 +30,6 @@ export function ReportsPageHeader() {
       </div>
 
       <div className="flex items-center gap-2">
-        <Button variant="outline">
-          <Calendar className="size-4" />
-          آخر 6 أشهر
-        </Button>
         <Button onClick={handleGenerate} disabled={loading}>
           {loading ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
           تصدير التقرير

@@ -96,33 +96,37 @@ export async function getReportsData() {
   const thisKey = window[window.length - 1].key
   const prevKey = window[window.length - 2].key
 
-  // Period-over-period change = current month vs previous month.
+  // Period-over-period change = last 30 days vs previous 30 days (avoids false drops at start of month)
+  const now = new Date()
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+  const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
+
   const revThis = approvedOrders
-    .filter((o) => monthKeyOf(o.created_at) === thisKey)
+    .filter((o) => new Date(o.created_at) >= thirtyDaysAgo)
     .reduce((s, o) => s + Number(o.total || 0), 0)
   const revPrev = approvedOrders
-    .filter((o) => monthKeyOf(o.created_at) === prevKey)
+    .filter((o) => new Date(o.created_at) >= sixtyDaysAgo && new Date(o.created_at) < thirtyDaysAgo)
     .reduce((s, o) => s + Number(o.total || 0), 0)
 
   const studentsThis = (studentsDataRaw || []).filter(
-    (s) => monthKeyOf(s.created_at) === thisKey,
+    (s) => new Date(s.created_at) >= thirtyDaysAgo
   ).length
   const studentsPrev = (studentsDataRaw || []).filter(
-    (s) => monthKeyOf(s.created_at) === prevKey,
+    (s) => new Date(s.created_at) >= sixtyDaysAgo && new Date(s.created_at) < thirtyDaysAgo
   ).length
 
   const enrollThis = (enrollmentsRaw || []).filter(
-    (e: any) => e.enrolled_at && monthKeyOf(e.enrolled_at) === thisKey,
+    (e: any) => e.enrolled_at && new Date(e.enrolled_at) >= thirtyDaysAgo
   ).length
   const enrollPrev = (enrollmentsRaw || []).filter(
-    (e: any) => e.enrolled_at && monthKeyOf(e.enrolled_at) === prevKey,
+    (e: any) => e.enrolled_at && new Date(e.enrolled_at) >= sixtyDaysAgo && new Date(e.enrolled_at) < thirtyDaysAgo
   ).length
 
   const rejectedThis = rejectedOrders.filter(
-    (o) => monthKeyOf(o.created_at) === thisKey,
+    (o) => new Date(o.created_at) >= thirtyDaysAgo
   ).length
   const rejectedPrev = rejectedOrders.filter(
-    (o) => monthKeyOf(o.created_at) === prevKey,
+    (o) => new Date(o.created_at) >= sixtyDaysAgo && new Date(o.created_at) < thirtyDaysAgo
   ).length
 
   const revChange = percentChange(revThis, revPrev)
@@ -256,4 +260,42 @@ export async function getAdvancedAnalytics() {
   }
 
   return { success: true, data }
+}
+
+export async function exportReportsCSV() {
+  const supabase = await createClient()
+  if (!(await hasResourceAccess(supabase, 'reports'))) {
+    return { error: 'غير مسموح. لازم تكون أدمن.' }
+  }
+
+  const data = await getReportsData()
+  if ('error' in data) return { error: data.error }
+
+  let csv = '\uFEFF' // BOM for Arabic support in Excel
+  csv += 'تقرير المنصة الشامل\n\n'
+  
+  // Section 1: Stats
+  csv += 'ملخص الأداء\n'
+  csv += 'المؤشر,القيمة\n'
+  data.reportStats?.forEach((s: any) => {
+    csv += `${s.label},${s.value} ${s.suffix || ''}\n`
+  })
+  csv += '\n'
+
+  // Section 2: Monthly Revenue
+  csv += 'الإيرادات الشهرية\n'
+  csv += 'الشهر,الإيرادات (ج.م)\n'
+  data.monthlyRevenue?.forEach((m: any) => {
+    csv += `${m.month},${m.revenue}\n`
+  })
+  csv += '\n'
+
+  // Section 3: Course Performance
+  csv += 'أداء الكورسات\n'
+  csv += 'الكورس,القسم,عدد الطلاب,الإيرادات (ج.م)\n'
+  data.coursePerformance?.forEach((c: any) => {
+    csv += `"${c.title}","${c.category}",${c.students},${c.revenue}\n`
+  })
+
+  return { success: true, csv }
 }
