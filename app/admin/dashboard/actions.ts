@@ -106,6 +106,31 @@ export async function getDashboardData(range: string = '30d') {
     value: activityBucket[b.key] || 0,
   }))
 
+  // ── Page views & unique visitors ──────────────────────────────────────────
+  // Aggregated in the DB via get_views_daily (bots excluded). We bucket the
+  // returned daily rows into the same rolling window as the other charts.
+  const { data: viewsDaily } = await supabase.rpc('get_views_daily', {
+    start_ts: windowStart.toISOString(),
+  })
+  const viewsBucket: Record<string, number> = {}
+  const uniquesBucket: Record<string, number> = {}
+  ;(viewsDaily || []).forEach((row: any) => {
+    // row.day is a `YYYY-MM-DD` date string from Postgres.
+    const dayKey = dayKeyOf(row.day)
+    const monthKey = monthKeyOf(row.day)
+    const k = isDaily ? dayKey : monthKey
+    viewsBucket[k] = (viewsBucket[k] || 0) + Number(row.views || 0)
+    uniquesBucket[k] = (uniquesBucket[k] || 0) + Number(row.uniques || 0)
+  })
+  const viewsData = window.map((b) => ({
+    // @ts-ignore
+    label: isDaily ? b.day : b.month,
+    views: viewsBucket[b.key] || 0,
+    visitors: uniquesBucket[b.key] || 0,
+  }))
+  const totalViews = Object.values(viewsBucket).reduce((s, v) => s + v, 0)
+  const totalVisitors = Object.values(uniquesBucket).reduce((s, v) => s + v, 0)
+
   // Real period-over-period changes (this month vs last month) for the stat
   // cards, plus today-vs-yesterday for daily sales.
   const thisKey = window[window.length - 1].key
@@ -291,6 +316,9 @@ export async function getDashboardData(range: string = '30d') {
     revenueData,
     studentsData,
     activityData,
+    viewsData,
+    totalViews,
+    totalVisitors,
     topCourses,
     latestPayments,
     latestStudents,
