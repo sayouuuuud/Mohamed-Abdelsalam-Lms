@@ -52,6 +52,7 @@ export type AssignmentRecord = {
 
 export type StudentProfile = {
   student: StudentRecord
+  studentDbId: string   // students.id (UUID) — for server actions
   device: DeviceInfo
   totalSpent: number
   courses: EnrolledCourse[]
@@ -244,6 +245,7 @@ function buildProfile(student: StudentRecord): StudentProfile {
 
   return {
     student,
+    studentDbId: student.id,
     device,
     totalSpent,
     courses,

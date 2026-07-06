@@ -14,5 +14,5 @@ export default async function StudentProfilePage({
     notFound()
   }
 
-  return <StudentProfileView profile={profile} />
+  return <StudentProfileView profile={profile} studentDbId={profile.studentDbId} />
 }

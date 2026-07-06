@@ -1,7 +1,116 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import type { StudentProfile, DeviceInfo, EnrolledCourse, PaymentRecord, ExamGrade, AssignmentRecord } from '@/lib/student-profile-data'
+import { revalidatePath } from 'next/cache'
+import type { StudentProfile, DeviceInfo, EnrolledCourse, PaymentRecord, ExamGrade, AssignmentRecord, StudentStatus } from '@/lib/student-profile-data'
+
+// ── Update student account status ─────────────────────────────────────────────
+export async function updateStudentStatus(
+  studentId: string,           // students.id (UUID)
+  studentCode: string,         // students.code  (for revalidation)
+  newStatus: StudentStatus,
+): Promise<{ success?: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('students')
+    .update({ status: newStatus })
+    .eq('id', studentId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath(`/admin/students/${studentCode}`)
+  revalidatePath('/admin/students')
+  return { success: true }
+}
+
+// ── Send a message / notification to a student ────────────────────────────────
+export async function sendMessageToStudent(
+  studentId: string,   // students.id (UUID)
+  studentCode: string,
+  studentName: string,
+  subject: string,
+  body: string,
+  channel: 'رسالة داخلية' | 'إشعار',
+): Promise<{ success?: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  const timeLabel = new Date().toLocaleString('ar-EG', {
+    day: 'numeric',
+    month: 'long',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+
+  if (channel === 'إشعار') {
+    // Insert into notifications table
+    const code = `NOTIF-${Date.now()}`
+    const { error } = await supabase.from('notifications').insert({
+      code,
+      student_id: studentId,
+      type: 'رسالة إدارية',
+      title: subject || 'رسالة من الإدارة',
+      description: body,
+      time_label: timeLabel,
+    })
+    if (error) return { error: error.message }
+  } else {
+    // Insert or append into messages table
+    // Check if an existing open thread exists for this student
+    const { data: existing } = await supabase
+      .from('messages')
+      .select('id, code, chat_history, student_unread')
+      .eq('student_id', studentId)
+      .eq('status', 'open')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    const newMsg = {
+      id: `m${Date.now()}`,
+      fromMe: true,
+      text: body,
+      time: 'الآن',
+    }
+
+    if (existing) {
+      // Append to existing thread
+      const history = (existing.chat_history as any[]) ?? []
+      const { error } = await supabase
+        .from('messages')
+        .update({
+          chat_history: [...history, newMsg],
+          content: body,
+          time_label: timeLabel,
+          student_unread: (existing.student_unread ?? 0) + 1,
+        })
+        .eq('id', existing.id)
+      if (error) return { error: error.message }
+    } else {
+      // Create a new thread
+      const code = `MSG-ADMIN-${Date.now()}`
+      const { error } = await supabase.from('messages').insert({
+        code,
+        student_id: studentId,
+        sender_name: studentName,
+        subject: subject || 'رسالة من الإدارة',
+        content: body,
+        time_label: timeLabel,
+        unread_count: 0,
+        student_unread: 1,
+        is_read: true,
+        sender_role: 'أدمن',
+        chat_history: [newMsg],
+        status: 'open',
+      })
+      if (error) return { error: error.message }
+    }
+  }
+
+  revalidatePath(`/admin/students/${studentCode}`)
+  revalidatePath('/admin/messages')
+  return { success: true }
+}
 
 function formatRelativeTime(date: string | Date): string {
   try {
@@ -364,6 +473,7 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
 
   return {
     student,
+    studentDbId: studentId,
     device,
     totalSpent,
     courses,

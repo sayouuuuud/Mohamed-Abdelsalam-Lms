@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import {
@@ -18,6 +18,7 @@ import {
   TrendingUp,
   Wallet,
   Award,
+  Loader2,
 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -26,6 +27,7 @@ import { getInitials } from '@/lib/get-initials'
 import { cn } from '@/lib/utils'
 import { getStudentAvatar } from '@/lib/students-data'
 import type { StudentProfile, StudentStatus } from '@/lib/student-profile-data'
+import { updateStudentStatus } from '@/app/admin/students/[id]/actions'
 import { MessageModal } from './message-modal'
 import { ProfileCharts } from './profile-charts'
 import { ProfileTables } from './profile-tables'
@@ -38,11 +40,17 @@ const statusStyles: Record<StudentStatus, string> = {
   موقوف: 'bg-destructive/10 text-destructive',
 }
 
-export function StudentProfileView({ profile }: { profile: StudentProfile }) {
+interface StudentProfileViewProps {
+  profile: StudentProfile
+  studentDbId: string   // students.id (UUID) — needed for DB updates
+}
+
+export function StudentProfileView({ profile, studentDbId }: StudentProfileViewProps) {
   const { student, device } = profile
   const [status, setStatus] = useState<StudentStatus>(student.status)
   const [statusOpen, setStatusOpen] = useState(false)
   const [messageOpen, setMessageOpen] = useState(false)
+  const [isPending, startTransition] = useTransition()
 
   const avgGrade =
     profile.exams.length > 0
@@ -93,9 +101,18 @@ export function StudentProfileView({ profile }: { profile: StudentProfile }) {
   ]
 
   const handleStatusChange = (next: StudentStatus) => {
-    setStatus(next)
     setStatusOpen(false)
-    toast.success(`تم تغيير حالة الطالب إلى "${next}"`)
+    const prev = status
+    setStatus(next) // optimistic update
+    startTransition(async () => {
+      const result = await updateStudentStatus(studentDbId, student.id, next)
+      if (result.error) {
+        setStatus(prev) // rollback on error
+        toast.error(`فشل تغيير الحالة: ${result.error}`)
+      } else {
+        toast.success(`تم تغيير حالة الطالب إلى "${next}"`)
+      }
+    })
   }
 
   return (
@@ -143,9 +160,14 @@ export function StudentProfileView({ profile }: { profile: StudentProfile }) {
                 variant="outline"
                 className="border-border bg-card text-foreground hover:bg-secondary"
                 onClick={() => setStatusOpen((v) => !v)}
+                disabled={isPending}
               >
+                {isPending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <ChevronDown className="size-4" />
+                )}
                 تغيير الحالة
-                <ChevronDown className="size-4" />
               </Button>
               {statusOpen && (
                 <>
@@ -261,6 +283,8 @@ export function StudentProfileView({ profile }: { profile: StudentProfile }) {
       <MessageModal
         open={messageOpen}
         onClose={() => setMessageOpen(false)}
+        studentId={studentDbId}
+        studentCode={student.id}
         studentName={student.name}
       />
     </div>
