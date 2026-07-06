@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { requireAdmin } from '@/lib/auth-guard'
+import { isStaff } from '@/lib/auth-guard'
 
 export type AdminSidebarBadges = {
   orders: number
@@ -15,7 +15,7 @@ export type AdminSidebarBadges = {
 //  - notifications: إشعارات غير مقروءة (notifications.read = false)
 export async function getAdminSidebarBadges(): Promise<AdminSidebarBadges> {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) {
+  if (!(await isStaff(supabase))) {
     return { orders: 0, messages: 0, notifications: 0 }
   }
 

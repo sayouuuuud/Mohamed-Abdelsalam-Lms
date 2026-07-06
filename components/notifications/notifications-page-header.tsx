@@ -2,6 +2,7 @@
 
 import { CheckCheck, Send } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useCanManage } from '@/components/dashboard/permissions-context'
 
 export function NotificationsPageHeader({
   onMarkAllRead,
@@ -12,6 +13,7 @@ export function NotificationsPageHeader({
   unreadCount: number
   onCompose: () => void
 }) {
+  const canManage = useCanManage('notifications')
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
       <div className="text-right">
@@ -31,10 +33,12 @@ export function NotificationsPageHeader({
           <CheckCheck className="size-4" />
           تعليم الكل كمقروء
         </Button>
-        <Button onClick={onCompose}>
-          <Send className="size-4" />
-          إرسال إشعار للطلاب
-        </Button>
+        {canManage && (
+          <Button onClick={onCompose}>
+            <Send className="size-4" />
+            إرسال إشعار للطلاب
+          </Button>
+        )}
       </div>
     </div>
   )

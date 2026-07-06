@@ -20,6 +20,7 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  ShieldCheck,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -30,6 +31,7 @@ import {
   getAdminSidebarBadges,
   type AdminSidebarBadges,
 } from '@/app/admin/badges-actions'
+import type { PermissionMap, ResourceKey } from '@/lib/permissions'
 
 type BadgeKey = keyof AdminSidebarBadges
 
@@ -37,20 +39,23 @@ const navItems: {
   label: string
   icon: typeof LayoutDashboard
   href: string
+  resource: ResourceKey
   badge?: BadgeKey
+  adminOnly?: boolean
 }[] = [
-  { label: 'الصفحة الرئيسية', icon: LayoutDashboard, href: '/admin/dashboard' },
-  { label: 'الطلاب', icon: Users, href: '/admin/students' },
-  { label: 'التصنيفات', icon: Layers, href: '/admin/categories' },
-  { label: 'المحاضرات', icon: BookOpen, href: '/admin/courses' },
-  { label: 'الاختبارات', icon: ClipboardList, href: '/admin/exams' },
-  { label: 'التقويم', icon: CalendarDays, href: '/admin/calendar' },
-  { label: 'الطلبات', icon: ShoppingCart, href: '/admin/payments', badge: 'orders' },
-  { label: 'رسائل', icon: MessageSquare, href: '/admin/messages', badge: 'messages' },
-  { label: 'الإشعارات', icon: Bell, href: '/admin/notifications', badge: 'notifications' },
-  { label: 'خصومات و الكوبونات', icon: Tag, href: '/admin/coupons' },
-  { label: 'التقارير', icon: BarChart3, href: '/admin/reports' },
-  { label: 'الإعدادات', icon: Settings, href: '/admin/settings' },
+  { label: 'الصفحة الرئيسية', icon: LayoutDashboard, href: '/admin/dashboard', resource: 'dashboard' },
+  { label: 'الطلاب', icon: Users, href: '/admin/students', resource: 'students' },
+  { label: 'التصنيفات', icon: Layers, href: '/admin/categories', resource: 'categories' },
+  { label: 'المحاضرات', icon: BookOpen, href: '/admin/courses', resource: 'courses' },
+  { label: 'الاختبارات', icon: ClipboardList, href: '/admin/exams', resource: 'exams' },
+  { label: 'التقويم', icon: CalendarDays, href: '/admin/calendar', resource: 'calendar' },
+  { label: 'الطلبات', icon: ShoppingCart, href: '/admin/payments', resource: 'payments', badge: 'orders' },
+  { label: 'رسائل', icon: MessageSquare, href: '/admin/messages', resource: 'messages', badge: 'messages' },
+  { label: 'الإشعارات', icon: Bell, href: '/admin/notifications', resource: 'notifications', badge: 'notifications' },
+  { label: 'خصومات و الكوبونات', icon: Tag, href: '/admin/coupons', resource: 'coupons' },
+  { label: 'التقارير', icon: BarChart3, href: '/admin/reports', resource: 'reports' },
+  { label: 'سجل المراقبة', icon: ShieldCheck, href: '/admin/activity', resource: 'settings', adminOnly: true },
+  { label: 'الإعدادات', icon: Settings, href: '/admin/settings', resource: 'settings' },
 ]
 
 export function Sidebar({
@@ -58,13 +63,24 @@ export function Sidebar({
   onClose,
   collapsed,
   onToggleCollapse,
+  permissions,
 }: {
   open: boolean
   onClose: () => void
   collapsed: boolean
   onToggleCollapse: () => void
+  permissions?: PermissionMap
 }) {
   const pathname = usePathname()
+  // When a permission map is provided (assistant), hide adminOnly items and
+  // items the user has no access to. Admins (permissions = undefined) see all.
+  const visibleNavItems = permissions
+    ? navItems.filter((item) => {
+        if (item.adminOnly) return false
+        const level = permissions[item.resource]
+        return level === 'view' || level === 'manage'
+      })
+    : navItems
   const logout = useLogout()
   const [badges, setBadges] = useState<AdminSidebarBadges>({
     orders: 0,
@@ -148,7 +164,7 @@ export function Sidebar({
         {/* Nav */}
         <nav className="flex flex-1 flex-col px-2 py-2">
           <div className="flex flex-1 flex-col justify-around">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const active =
               item.href === '/'
                 ? pathname === '/'

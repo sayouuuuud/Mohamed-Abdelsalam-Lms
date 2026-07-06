@@ -1,8 +1,9 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { requireAdmin } from '@/lib/auth-guard'
+import { hasResourceAccess } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
+import { logActivity } from '@/lib/audit-log'
 import { lastMonths, monthKeyOf, percentChange } from '@/lib/time-series'
 
 export type ReportItem = {
@@ -40,7 +41,7 @@ export async function getReports(): Promise<ReportItem[]> {
 
 export async function generateReport() {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) {
+  if (!(await hasResourceAccess(supabase, 'reports', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
@@ -55,6 +56,7 @@ export async function generateReport() {
     })
 
   if (error) return { error: error.message }
+  logActivity({ action: 'create', resource: 'reports', targetLabel: 'تقرير مخصص جديد' }).catch(() => {})
   revalidatePath('/reports')
   return { success: true }
 }
@@ -62,7 +64,7 @@ export async function generateReport() {
 export async function getReportsData() {
   const supabase = await createClient()
 
-  if (!(await requireAdmin(supabase))) {
+  if (!(await hasResourceAccess(supabase, 'reports'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 

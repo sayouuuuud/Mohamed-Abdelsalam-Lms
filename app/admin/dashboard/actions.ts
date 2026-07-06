@@ -1,13 +1,13 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { requireAdmin } from '@/lib/auth-guard'
+import { hasResourceAccess } from '@/lib/auth-guard'
 import { lastMonths, monthKeyOf, percentChange } from '@/lib/time-series'
 
 export async function getDashboardData() {
   const supabase = await createClient()
 
-  if (!(await requireAdmin(supabase))) {
+  if (!(await hasResourceAccess(supabase, 'dashboard'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 

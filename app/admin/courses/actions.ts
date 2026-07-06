@@ -2,10 +2,17 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requireAdmin } from '@/lib/auth-guard'
+import { hasResourceAccess } from '@/lib/auth-guard'
 import { createNotification } from '@/lib/notify'
+import { logActivity } from '@/lib/audit-log'
 
 // ── Types ─────────────────────────────────────────────────────────
+export type LessonAttachment = {
+  name: string
+  url: string
+  type: 'pdf' | 'doc' | 'image' | 'other'
+}
+
 export type AdminLesson = {
   id: string
   slug: string
@@ -16,6 +23,7 @@ export type AdminLesson = {
   sortOrder: number
   videoUrl: string | null
   description: string | null
+  attachments: LessonAttachment[]
 }
 
 export type AdminLecture = {
@@ -63,6 +71,7 @@ export type LessonInput = {
   contentType?: 'فيديو' | 'مقال' | 'تمرين'
   videoUrl?: string | null
   description?: string | null
+  attachments?: LessonAttachment[]
 }
 
 function slugify(input: string) {
@@ -115,7 +124,7 @@ export async function getLecturesAdmin(): Promise<AdminLecture[]> {
       .order('sort_order', { ascending: true }),
     supabase
       .from('lessons')
-      .select('id, lecture_id, slug, title, duration, is_free, sort_order, video_url, description, content_type')
+      .select('id, lecture_id, slug, title, duration, is_free, sort_order, video_url, description, content_type, attachments')
       .order('sort_order', { ascending: true }),
   ])
 
@@ -153,6 +162,7 @@ export async function getLecturesAdmin(): Promise<AdminLecture[]> {
       sortOrder: row.sort_order,
       videoUrl: row.video_url ?? null,
       description: row.description ?? null,
+      attachments: Array.isArray(row.attachments) ? row.attachments : [],
     })
     lessonsByLecture.set(row.lecture_id, list)
   }
@@ -209,7 +219,7 @@ export async function getBranchOptions(): Promise<BranchOption[]> {
 // ── Lecture CRUD ──────────────────────────────────────────────────
 export async function createLecture(input: LectureInput) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess(supabase, 'courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
   const { count } = await supabase
     .from('lectures')
@@ -286,6 +296,7 @@ export async function createLecture(input: LectureInput) {
     }
   }
 
+  logActivity({ action: 'create', resource: 'courses', targetLabel: `محاضرة: ${input.title}` }).catch(() => {})
   revalidatePath('/courses')
   revalidatePath('/calendar')
   revalidatePath('/')
@@ -319,7 +330,7 @@ async function notifyLectureGrade(
 
 export async function updateLecture(id: string, input: LectureInput) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess(supabase, 'courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
   const patch: Record<string, any> = {
     branch_id: input.branchId,
@@ -390,6 +401,7 @@ export async function updateLecture(id: string, input: LectureInput) {
     await supabase.from('calendar_events').delete().eq('lecture_id', id)
   }
 
+  logActivity({ action: 'update', resource: 'courses', targetId: id, targetLabel: `محاضرة ID: ${id}` }).catch(() => {})
   revalidatePath('/courses')
   revalidatePath('/calendar')
   revalidatePath('/')
@@ -398,13 +410,14 @@ export async function updateLecture(id: string, input: LectureInput) {
 
 export async function deleteLecture(id: string) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess(supabase, 'courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
   const { error } = await supabase.from('lectures').delete().eq('id', id)
   if (error) {
     console.log('[v0] deleteLecture error:', error.message)
     return { error: 'تعذّر حذف المحاضرة.' }
   }
+  logActivity({ action: 'delete', resource: 'courses', targetId: id, targetLabel: `محاضرة ID: ${id}` }).catch(() => {})
   revalidatePath('/courses')
   revalidatePath('/')
   return { success: true }
@@ -413,7 +426,7 @@ export async function deleteLecture(id: string) {
 // ── Lesson CRUD ───────────────────────────────────────────────────
 export async function createLesson(lectureId: string, input: LessonInput) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess(supabase, 'courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
   const sortOrder = await nextContentOrder(supabase, lectureId)
 
@@ -427,12 +440,14 @@ export async function createLesson(lectureId: string, input: LessonInput) {
     sort_order: sortOrder,
     video_url: input.videoUrl ?? null,
     description: input.description ?? null,
+    attachments: input.attachments ?? [],
   })
 
   if (error) {
     console.log('[v0] createLesson error:', error.message)
     return { error: 'تعذّر إضافة الدرس.' }
   }
+  logActivity({ action: 'create', resource: 'courses', targetLabel: `درس: ${input.title}` }).catch(() => {})
   revalidatePath('/courses')
   revalidatePath('/')
   return { success: true }
@@ -440,7 +455,7 @@ export async function createLesson(lectureId: string, input: LessonInput) {
 
 export async function updateLesson(id: string, input: LessonInput) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess(supabase, 'courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
   const patch: Record<string, any> = {
     title: input.title,
@@ -450,6 +465,7 @@ export async function updateLesson(id: string, input: LessonInput) {
   }
   if (input.videoUrl !== undefined) patch.video_url = input.videoUrl
   if (input.description !== undefined) patch.description = input.description
+  if (input.attachments !== undefined) patch.attachments = input.attachments
 
   const { error } = await supabase.from('lessons').update(patch).eq('id', id)
 
@@ -457,6 +473,7 @@ export async function updateLesson(id: string, input: LessonInput) {
     console.log('[v0] updateLesson error:', error.message)
     return { error: 'تعذّر تحديث الدرس.' }
   }
+  logActivity({ action: 'update', resource: 'courses', targetId: id, targetLabel: `درس: ${input.title}` }).catch(() => {})
   revalidatePath('/courses')
   revalidatePath('/')
   return { success: true }
@@ -464,13 +481,14 @@ export async function updateLesson(id: string, input: LessonInput) {
 
 export async function deleteLesson(id: string) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess(supabase, 'courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
   const { error } = await supabase.from('lessons').delete().eq('id', id)
   if (error) {
     console.log('[v0] deleteLesson error:', error.message)
     return { error: 'تعذّر حذف الدرس.' }
   }
+  logActivity({ action: 'delete', resource: 'courses', targetId: id, targetLabel: `درس ID: ${id}` }).catch(() => {})
   revalidatePath('/courses')
   revalidatePath('/')
   return { success: true }
@@ -535,6 +553,7 @@ export async function getLectureDetailAdmin(
         sortOrder: l.sort_order,
         videoUrl: l.video_url ?? null,
         description: l.description ?? null,
+        attachments: Array.isArray((l as any).attachments) ? (l as any).attachments : [],
       }
     }),
   }
@@ -575,7 +594,7 @@ export async function getLessonDetailAdmin(
 
   const { data: row, error } = await supabase
     .from('lessons')
-    .select('id, slug, lecture_id, title, duration, is_free, sort_order, video_url, description, content_type')
+    .select('id, slug, lecture_id, title, duration, is_free, sort_order, video_url, description, content_type, attachments')
     .eq('id', lessonId)
     .single()
 
@@ -588,7 +607,7 @@ export async function getLessonDetailAdmin(
     supabase.from('lectures').select('id, title, image').eq('id', row.lecture_id).single(),
     supabase
       .from('lessons')
-      .select('id, slug, title, duration, is_free, sort_order, video_url, description, content_type')
+      .select('id, slug, title, duration, is_free, sort_order, video_url, description, content_type, attachments')
       .eq('lecture_id', row.lecture_id)
       .order('sort_order', { ascending: true }),
   ])
@@ -606,6 +625,7 @@ export async function getLessonDetailAdmin(
       sortOrder: l.sort_order,
       videoUrl: l.video_url ?? null,
       description: l.description ?? null,
+      attachments: Array.isArray(l.attachments) ? l.attachments : [],
     }
   }
 
@@ -726,7 +746,7 @@ async function replaceAssignmentQuestions(
 
 export async function createAssignment(lectureId: string, input: AssignmentInput) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess(supabase, 'courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
   const sortOrder = await nextContentOrder(supabase, lectureId)
 
@@ -757,6 +777,7 @@ export async function createAssignment(lectureId: string, input: AssignmentInput
     return { error: 'تعذّر حفظ أسئلة الواجب.' }
   }
 
+  logActivity({ action: 'create', resource: 'courses', targetLabel: `واجب: ${input.title}` }).catch(() => {})
   revalidatePath(`/admin/courses/${lectureId}`)
   revalidatePath('/courses')
   revalidatePath('/student')
@@ -765,7 +786,7 @@ export async function createAssignment(lectureId: string, input: AssignmentInput
 
 export async function updateAssignment(id: string, input: AssignmentInput) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess(supabase, 'courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
   const { error } = await supabase
     .from('assignments')
@@ -789,6 +810,7 @@ export async function updateAssignment(id: string, input: AssignmentInput) {
     return { error: 'تعذّر حفظ أسئلة الواجب.' }
   }
 
+  logActivity({ action: 'update', resource: 'courses', targetId: id, targetLabel: `واجب: ${input.title}` }).catch(() => {})
   revalidatePath('/admin/courses')
   revalidatePath('/courses')
   revalidatePath('/student')
@@ -797,7 +819,7 @@ export async function updateAssignment(id: string, input: AssignmentInput) {
 
 export async function deleteAssignment(id: string) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess(supabase, 'courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
   await supabase.from('assignment_questions').delete().eq('assignment_id', id)
   const { error } = await supabase.from('assignments').delete().eq('id', id)
@@ -805,6 +827,7 @@ export async function deleteAssignment(id: string) {
     console.log('[v0] deleteAssignment error:', error.message)
     return { error: 'تعذّر حذف الواجب.' }
   }
+  logActivity({ action: 'delete', resource: 'courses', targetId: id, targetLabel: `واجب ID: ${id}` }).catch(() => {})
   revalidatePath('/courses')
   revalidatePath('/student')
   return { success: true }
@@ -817,7 +840,7 @@ export async function reorderLectureContent(
   items: { kind: 'lesson' | 'assignment'; id: string }[],
 ) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess(supabase, 'courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
   const updates = items.map((item, i) => {
     const table = item.kind === 'lesson' ? 'lessons' : 'assignments'

@@ -337,11 +337,28 @@ export async function getStudentCertificates() {
 async function getStudentTargeting(supabase: any, student: any) {
   const stageId: string | null = student.stage_id ?? null
 
+  // Source 1: lecture IDs from enrollments (legacy path)
   const { data: enrollments } = await supabase
     .from('enrollments')
     .select('course_id')
     .eq('student_id', student.id)
-  const lectureIds: string[] = (enrollments ?? []).map((e: any) => e.course_id)
+  const enrolledLectureIds: string[] = (enrollments ?? []).map((e: any) => e.course_id)
+
+  // Source 2: lecture IDs from approved orders (primary purchase path)
+  let orderedLectureIds: string[] = []
+  if (student.user_id) {
+    const { data: orderItems } = await supabase
+      .from('orders')
+      .select('order_items(lecture_id)')
+      .eq('student_id', student.user_id)
+      .eq('status', 'approved')
+    orderedLectureIds = (orderItems ?? [])
+      .flatMap((o: any) => (o.order_items ?? []).map((i: any) => i.lecture_id))
+      .filter(Boolean)
+  }
+
+  // Merge both sources
+  const lectureIds: string[] = Array.from(new Set([...enrolledLectureIds, ...orderedLectureIds]))
 
   let branchIds: string[] = []
   if (lectureIds.length > 0) {

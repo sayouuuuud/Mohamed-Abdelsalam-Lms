@@ -6,8 +6,10 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { exportToCsv } from '@/lib/export-csv'
 import { examRecords } from '@/lib/exams-data'
+import { useCanManage } from '@/components/dashboard/permissions-context'
 
 export function ExamsPageHeader() {
+  const canManage = useCanManage('exams')
   const exportData = () => {
     exportToCsv(
       'exams.csv',
@@ -44,10 +46,12 @@ export function ExamsPageHeader() {
           <Download className="size-4" />
           تصدير البيانات
         </Button>
-        <Button render={<Link href="/admin/exams/create" />}>
-          <FilePlus2 className="size-4" />
-          إنشاء اختبار
-        </Button>
+        {canManage && (
+          <Button render={<Link href="/admin/exams/create" />}>
+            <FilePlus2 className="size-4" />
+            إنشاء اختبار
+          </Button>
+        )}
       </div>
     </div>
   )

@@ -1,8 +1,9 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { requireAdmin } from '@/lib/auth-guard'
+import { hasResourceAccess } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
+import { logActivity } from '@/lib/audit-log'
 import {
   computeCouponStatus,
   type CouponRecord,
@@ -96,7 +97,7 @@ export async function createCoupon(values: {
   lectureIds?: string[]
 }) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) {
+  if (!(await hasResourceAccess(supabase, 'coupons', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
@@ -146,6 +147,7 @@ export async function createCoupon(values: {
 
   await syncCouponLectures(supabase, created.id, scope, values.lectureIds ?? [])
 
+  logActivity({ action: 'create', resource: 'coupons', targetId: displayCode, targetLabel: `كوبون: ${displayCode} (${values.value}%)` }).catch(() => {})
   revalidatePath('/coupons')
   return { success: true }
 }
@@ -166,7 +168,7 @@ export async function updateCoupon(
   },
 ) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) {
+  if (!(await hasResourceAccess(supabase, 'coupons', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
@@ -198,18 +200,20 @@ export async function updateCoupon(
 
   await syncCouponLectures(supabase, updated.id, scope, values.lectureIds ?? [])
 
+  logActivity({ action: 'update', resource: 'coupons', targetId: id, targetLabel: `كوبون: ${id}` }).catch(() => {})
   revalidatePath('/coupons')
   return { success: true }
 }
 
 export async function deleteCoupon(id: string) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) {
+  if (!(await hasResourceAccess(supabase, 'coupons', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
   const { error } = await supabase.from('coupons').delete().eq('display_code', id)
   if (error) return { error: error.message }
+  logActivity({ action: 'delete', resource: 'coupons', targetId: id, targetLabel: `كوبون: ${id}` }).catch(() => {})
   revalidatePath('/coupons')
   return { success: true }
 }

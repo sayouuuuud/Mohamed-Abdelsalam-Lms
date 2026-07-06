@@ -3,9 +3,11 @@
 import { UserPlus, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useStudents } from './students-context'
+import { useCanManage } from '@/components/dashboard/permissions-context'
 
 export function StudentsPageHeader() {
   const { openCreate, exportData } = useStudents()
+  const canManage = useCanManage('students')
 
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -25,10 +27,12 @@ export function StudentsPageHeader() {
           <Download className="size-4" />
           تصدير البيانات
         </Button>
-        <Button onClick={openCreate}>
-          <UserPlus className="size-4" />
-          إضافة طالب
-        </Button>
+        {canManage && (
+          <Button onClick={openCreate}>
+            <UserPlus className="size-4" />
+            إضافة طالب
+          </Button>
+        )}
       </div>
     </div>
   )

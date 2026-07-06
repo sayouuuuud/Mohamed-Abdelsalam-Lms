@@ -2,7 +2,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { requireAdmin } from '@/lib/auth-guard'
+import { hasResourceAccess } from '@/lib/auth-guard'
+import { logActivity } from '@/lib/audit-log'
 
 export type ExamQuestion = {
   id: string
@@ -41,7 +42,7 @@ export type ExamDetailsData = {
 
 export async function getExamDetails(code: string): Promise<ExamDetailsData | null> {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) return null
+  if (!(await hasResourceAccess(supabase, 'exams'))) return null
 
   // 1. Fetch exam
   const { data: exam, error: examError } = await supabase
@@ -172,7 +173,7 @@ export async function getSubmissionForGrading(
   submissionId: string,
 ): Promise<GradingSubmission | null> {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) return null
+  if (!(await hasResourceAccess(supabase, 'exams'))) return null
 
   const { data: submission } = await supabase
     .from('exam_submissions')
@@ -249,7 +250,7 @@ export async function gradeSubmission(
   manualGrades: { answerId: string; awardedPoints: number }[],
 ) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) {
+  if (!(await hasResourceAccess(supabase, 'exams', 'manage'))) {
     return { success: false, error: 'غير مصرح لك' }
   }
 
@@ -325,6 +326,7 @@ export async function gradeSubmission(
     revalidatePath(`/admin/exams/${examCode}`)
     revalidatePath(`/student/exams/${examCode}`)
   }
+  logActivity({ action: 'update', resource: 'exams', targetId: submissionId, targetLabel: `تصحيح اختبار — النتيجة: ${score}/${total} (${status})` }).catch(() => {})
   revalidatePath('/student/exams')
 
   return { success: true, score, total, status }

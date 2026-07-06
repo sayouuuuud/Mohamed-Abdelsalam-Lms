@@ -1,7 +1,128 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import type { StudentProfile, DeviceInfo, EnrolledCourse, PaymentRecord, ExamGrade, AssignmentRecord } from '@/lib/student-profile-data'
+import { revalidatePath } from 'next/cache'
+import { hasResourceAccess } from '@/lib/auth-guard'
+import { logActivity } from '@/lib/audit-log'
+import type { StudentProfile, DeviceInfo, EnrolledCourse, PaymentRecord, ExamGrade, AssignmentRecord, StudentStatus } from '@/lib/student-profile-data'
+
+// ── Update student account status ─────────────────────────────────────────────
+export async function updateStudentStatus(
+  studentId: string,           // students.id (UUID)
+  studentCode: string,         // students.code  (for revalidation)
+  newStatus: StudentStatus,
+): Promise<{ success?: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  if (!(await hasResourceAccess(supabase, 'students', 'manage'))) {
+    return { error: 'غير مسموح.' }
+  }
+
+  const { error } = await supabase
+    .from('students')
+    .update({ status: newStatus })
+    .eq('id', studentId)
+
+  if (error) return { error: error.message }
+
+  logActivity({ action: 'update', resource: 'students', targetId: studentCode, targetLabel: `حالة طالب: ${newStatus}` }).catch(() => {})
+  revalidatePath(`/admin/students/${studentCode}`)
+  revalidatePath('/admin/students')
+  return { success: true }
+}
+
+// ── Send a message / notification to a student ────────────────────────────────
+export async function sendMessageToStudent(
+  studentId: string,   // students.id (UUID)
+  studentCode: string,
+  studentName: string,
+  subject: string,
+  body: string,
+  channel: 'رسالة داخلية' | 'إشعار',
+): Promise<{ success?: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  if (!(await hasResourceAccess(supabase, 'students', 'manage'))) {
+    return { error: 'غير مسموح.' }
+  }
+
+  const timeLabel = new Date().toLocaleString('ar-EG', {
+    day: 'numeric',
+    month: 'long',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+
+  if (channel === 'إشعار') {
+    // Insert into notifications table
+    const code = `NOTIF-${Date.now()}`
+    const { error } = await supabase.from('notifications').insert({
+      code,
+      student_id: studentId,
+      type: 'رسالة إدارية',
+      title: subject || 'رسالة من الإدارة',
+      description: body,
+      time_label: timeLabel,
+    })
+    if (error) return { error: error.message }
+  } else {
+    // Insert or append into messages table
+    // Check if an existing open thread exists for this student
+    const { data: existing } = await supabase
+      .from('messages')
+      .select('id, code, chat_history, student_unread')
+      .eq('student_id', studentId)
+      .eq('status', 'open')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    const newMsg = {
+      id: `m${Date.now()}`,
+      fromMe: true,
+      text: body,
+      time: 'الآن',
+    }
+
+    if (existing) {
+      // Append to existing thread
+      const history = (existing.chat_history as any[]) ?? []
+      const { error } = await supabase
+        .from('messages')
+        .update({
+          chat_history: [...history, newMsg],
+          content: body,
+          time_label: timeLabel,
+          student_unread: (existing.student_unread ?? 0) + 1,
+        })
+        .eq('id', existing.id)
+      if (error) return { error: error.message }
+    } else {
+      // Create a new thread
+      const code = `MSG-ADMIN-${Date.now()}`
+      const { error } = await supabase.from('messages').insert({
+        code,
+        student_id: studentId,
+        sender_name: studentName,
+        subject: subject || 'رسالة من الإدارة',
+        content: body,
+        time_label: timeLabel,
+        unread_count: 0,
+        student_unread: 1,
+        is_read: true,
+        sender_role: 'أدمن',
+        chat_history: [newMsg],
+        status: 'open',
+      })
+      if (error) return { error: error.message }
+    }
+  }
+
+  logActivity({ action: 'create', resource: 'students', targetId: studentCode, targetLabel: `رسالة لـ ${studentName} (${channel})` }).catch(() => {})
+  revalidatePath(`/admin/students/${studentCode}`)
+  revalidatePath('/admin/messages')
+  return { success: true }
+}
 
 function formatRelativeTime(date: string | Date): string {
   try {
@@ -39,6 +160,8 @@ function formatJoinedAt(date: string): string {
 
 export async function getStudentProfileData(code: string): Promise<StudentProfile | null> {
   const supabase = await createClient()
+
+  if (!(await hasResourceAccess(supabase, 'students'))) return null
 
   // 1. Fetch Student
   const { data: studentRow, error: studentError } = await supabase
@@ -98,12 +221,11 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
     .from('enrollments')
     .select(`
       id,
-      progress,
       enrolled_at,
       courses (
         id,
         title,
-        categories (name),
+        category,
         course_sections (
           course_lessons (id)
         )
@@ -117,7 +239,7 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
 
   const courses: EnrolledCourse[] = (enrollments || []).map((enrollment: any) => {
     const course = enrollment.courses
-    const category = course?.categories?.name || 'عام'
+    const category = course?.category || 'عام'
     
     // Count total lessons
     let lessonsTotal = 0
@@ -149,30 +271,41 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
     }
   })
 
-  // 4. Fetch Payments
-  let paymentsQuery = supabase.from('payments').select('*')
-  
-  if (studentRow.email && studentRow.phone) {
-    paymentsQuery = paymentsQuery.or(`student_email.eq.${studentRow.email},student_phone.eq.${studentRow.phone}`)
-  } else if (studentRow.email) {
-    paymentsQuery = paymentsQuery.eq('student_email', studentRow.email)
-  } else if (studentRow.phone) {
-    paymentsQuery = paymentsQuery.eq('student_phone', studentRow.phone)
-  } else {
-    // If no email or phone, match by name as a fallback
-    paymentsQuery = paymentsQuery.eq('student_name', studentRow.name)
-  }
+  // 4. Fetch Payments from orders (matched by student.user_id = orders.student_id)
+  const { data: ordersData } = await supabase
+    .from('orders')
+    .select(`
+      id,
+      code,
+      total,
+      subtotal,
+      discount,
+      method,
+      status,
+      created_at,
+      coupon_code,
+      order_items (
+        lecture_title,
+        branch_title,
+        stage_title,
+        price
+      )
+    `)
+    .eq('student_id', studentRow.user_id)
+    .order('created_at', { ascending: false })
 
-  const { data: paymentsData } = await paymentsQuery
-
-  const payments: PaymentRecord[] = (paymentsData || []).map((p: any) => ({
-    id: p.code || p.id,
-    date: formatJoinedAt(p.created_at),
-    item: p.course,
-    amount: Number(p.amount),
-    method: p.method as PaymentRecord['method'],
-    status: p.status === 'مقبول' ? 'ناجح' : p.status === 'مرفوض' ? 'مسترد' : 'معلّق',
-  }))
+  const payments: PaymentRecord[] = (ordersData || []).map((o: any) => {
+    const items: string[] = (o.order_items || []).map((i: any) => i.lecture_title).filter(Boolean)
+    const itemLabel = items.length > 0 ? items.join('، ') : 'طلب'
+    return {
+      id: o.code || o.id,
+      date: formatJoinedAt(o.created_at),
+      item: itemLabel,
+      amount: Number(o.total),
+      method: o.method as PaymentRecord['method'],
+      status: o.status === 'approved' ? 'ناجح' : o.status === 'rejected' ? 'مسترد' : 'معلّق',
+    }
+  })
 
   const totalSpent = payments.reduce((acc, p) => p.status === 'ناجح' ? acc + p.amount : acc, 0)
 
@@ -219,9 +352,12 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
     .eq('student_id', studentId)
 
   const assignments: AssignmentRecord[] = (assignmentsData || []).map((a: any) => {
-    let status: AssignmentRecord['status'] = 'لم يسلّم'
-    if (a.status === 'تم التقييم' || a.status === 'مقبول') status = 'تم التسليم'
-    
+    // A row in assignment_submissions means the student did submit.
+    // Only an explicit "متأخر" status marks it late; everything else is submitted.
+    let status: AssignmentRecord['status'] = 'تم التسليم'
+    if (a.status === 'متأخر') status = 'متأخر'
+    else if (a.status === 'لم يسلّم') status = 'لم يسلّم'
+
     return {
       id: a.id,
       name: a.assignments?.title || 'واجب',
@@ -232,25 +368,49 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
     }
   })
 
-  // 7. Generate Dashboard Analytics (Mocked/Calculated for now since we don't have historical snapshots)
-  const progressTrend = [
-    { month: 'يناير', progress: Math.max(0, student.progress - 50) },
-    { month: 'فبراير', progress: Math.max(0, student.progress - 40) },
-    { month: 'مارس', progress: Math.max(0, student.progress - 30) },
-    { month: 'أبريل', progress: Math.max(0, student.progress - 20) },
-    { month: 'مايو', progress: Math.max(0, student.progress - 10) },
-    { month: 'يونيو', progress: student.progress },
+  // 7. Dashboard Analytics computed from real data (last 6 months).
+  const arMonths = [
+    'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+    'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
   ]
+  const now = new Date()
+  // Build the last 6 month buckets (oldest → newest).
+  const monthBuckets = Array.from({ length: 6 }).map((_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1)
+    return { year: d.getFullYear(), month: d.getMonth(), label: arMonths[d.getMonth()] }
+  })
 
-  const spendBase = Math.round(totalSpent / 6)
-  const monthlySpend = [
-    { month: 'يناير', amount: spendBase },
-    { month: 'فبراير', amount: spendBase },
-    { month: 'مارس', amount: spendBase },
-    { month: 'أبريل', amount: spendBase },
-    { month: 'مايو', amount: spendBase },
-    { month: 'يونيو', amount: spendBase },
-  ]
+  // Total lessons across all enrolled courses (for progress %).
+  const totalLessonsAll = courses.reduce((sum, c) => sum + c.lessonsTotal, 0)
+
+  // Flatten all completed lesson_progress entries with a completion date.
+  const completedLessons: Date[] = []
+  ;(enrollments || []).forEach((e: any) => {
+    ;(e.lesson_progress || []).forEach((lp: any) => {
+      if (lp.completed && lp.completed_at) completedLessons.push(new Date(lp.completed_at))
+    })
+  })
+
+  // Cumulative progress % at the end of each month bucket.
+  const progressTrend = monthBuckets.map((b) => {
+    const endOfMonth = new Date(b.year, b.month + 1, 0, 23, 59, 59)
+    const doneByThen = completedLessons.filter((d) => d <= endOfMonth).length
+    const progress =
+      totalLessonsAll > 0 ? Math.round((doneByThen / totalLessonsAll) * 100) : 0
+    return { month: b.label, progress }
+  })
+
+  // Real monthly spend from accepted orders.
+  const monthlySpend = monthBuckets.map((b) => {
+    const amount = (ordersData || [])
+      .filter((o: any) => o.status === 'approved' && o.created_at)
+      .filter((o: any) => {
+        const d = new Date(o.created_at)
+        return d.getFullYear() === b.year && d.getMonth() === b.month
+      })
+      .reduce((sum: number, o: any) => sum + Number(o.total), 0)
+    return { month: b.label, amount }
+  })
 
   // 7. Skills = comparison across the branches of the student's academic year.
   // For each branch we combine the student's average exam percentage with the
@@ -282,8 +442,11 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
       // Student's enrollments joined to each course's branch.
       const { data: branchEnrollments } = await supabase
         .from('enrollments')
-        .select('progress, courses!inner (branch_id)')
+        .select('id, courses!inner (id, branch_id)')
         .eq('student_id', studentId)
+
+      // Build a map: course_id -> progress (already computed from lesson_progress in section 3)
+      const courseProgressMap = new Map(courses.map((c) => [c.id, c.progress]))
 
       skills = branchRows.map((branch: any) => {
         // Average exam percentage for this branch (graded submissions only).
@@ -303,17 +466,17 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
               )
             : 0
 
-        // Average course progress for this branch.
+        // Average course progress for this branch (from already-computed lesson_progress).
         const branchCourses = (branchEnrollments || []).filter(
           (e: any) => e.courses?.branch_id === branch.id,
         )
         const courseProgress =
           branchCourses.length > 0
             ? Math.round(
-                branchCourses.reduce(
-                  (sum: number, e: any) => sum + (e.progress || 0),
-                  0,
-                ) / branchCourses.length,
+                branchCourses.reduce((sum: number, e: any) => {
+                  const pct = courseProgressMap.get(e.courses?.id) ?? 0
+                  return sum + pct
+                }, 0) / branchCourses.length,
               )
             : 0
 
@@ -350,6 +513,7 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
 
   return {
     student,
+    studentDbId: studentId,
     device,
     totalSpent,
     courses,

@@ -3,9 +3,11 @@
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useCurriculum } from './curriculum-context'
+import { useCanManage } from '@/components/dashboard/permissions-context'
 
 export function CurriculumPageHeader() {
   const { openCreateStage } = useCurriculum()
+  const canManage = useCanManage('categories')
 
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -16,10 +18,12 @@ export function CurriculumPageHeader() {
         </p>
       </div>
 
-      <Button onClick={openCreateStage}>
-        <Plus className="size-4" />
-        إضافة تصنيف رئيسي
-      </Button>
+      {canManage && (
+        <Button onClick={openCreateStage}>
+          <Plus className="size-4" />
+          إضافة تصنيف رئيسي
+        </Button>
+      )}
     </div>
   )
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -8,9 +8,13 @@ import {
   ArrowRight,
   CheckCircle2,
   Film,
+  FileText,
   Lock,
+  Paperclip,
   Pencil,
   PlayCircle,
+  Trash2,
+  Upload,
 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -20,7 +24,7 @@ import { Modal, Field } from '@/components/ui/modal'
 import { VideoUploadField } from '@/components/ui/video-upload-field'
 import { VideoPlayer } from '@/components/student/courses/video-player'
 import { cn } from '@/lib/utils'
-import { type AdminLesson, updateLesson } from '@/app/admin/courses/actions'
+import { type AdminLesson, type LessonAttachment, updateLesson } from '@/app/admin/courses/actions'
 
 const textareaClass =
   'w-full resize-none rounded-xl border border-border bg-secondary/60 px-4 py-2.5 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:bg-card'
@@ -49,6 +53,9 @@ export function AdminLessonDetail({
   const [isFree, setIsFree] = useState(lesson.isFree)
   const [video, setVideo] = useState(lesson.videoUrl ?? '')
   const [description, setDescription] = useState(lesson.description ?? '')
+  const [attachments, setAttachments] = useState<LessonAttachment[]>(lesson.attachments ?? [])
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const openEdit = () => {
     setTitle(lesson.title)
@@ -56,7 +63,59 @@ export function AdminLessonDetail({
     setIsFree(lesson.isFree)
     setVideo(lesson.videoUrl ?? '')
     setDescription(lesson.description ?? '')
+    setAttachments(lesson.attachments ?? [])
     setEditOpen(true)
+  }
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
+    if (!files.length) return
+    setUploading(true)
+    try {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      const added: LessonAttachment[] = []
+      for (const file of files) {
+        const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
+        const fileType: LessonAttachment['type'] =
+          ext === 'pdf' ? 'pdf'
+          : ['doc', 'docx'].includes(ext) ? 'doc'
+          : ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext) ? 'image'
+          : 'other'
+        // Use the existing public `media` bucket under lesson-attachments/
+        const safeName = file.name.replace(/\s+/g, '_')
+        const path = `lesson-attachments/${Date.now()}-${safeName}`
+        const res = await fetch(
+          `${supabaseUrl}/storage/v1/object/media/${path}`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${supabaseKey}`,
+              'Content-Type': file.type,
+              'x-upsert': 'true',
+            },
+            body: file,
+          },
+        )
+        if (!res.ok) {
+          toast.error(`فشل رفع ${file.name}`)
+          continue
+        }
+        const url = `${supabaseUrl}/storage/v1/object/public/media/${path}`
+        added.push({ name: file.name, url, type: fileType })
+      }
+      setAttachments((prev) => [...prev, ...added])
+      if (added.length) toast.success(`تم رفع ${added.length} ملف`)
+    } catch {
+      toast.error('حدث خطأ أثناء رفع الملفات')
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  const removeAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index))
   }
 
   const handleSave = async (e: React.FormEvent) => {
@@ -68,6 +127,7 @@ export function AdminLessonDetail({
       isFree,
       videoUrl: video || null,
       description: description.trim() || null,
+      attachments,
     }
     const res = await updateLesson(lesson.id, input)
     if (res.error) return toast.error(res.error)
@@ -259,6 +319,58 @@ export function AdminLessonDetail({
             />
             <span className="text-sm text-foreground">درس مجاني (متاح للمعاينة)</span>
           </label>
+
+          {/* Attachments */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                <Paperclip className="size-4" />
+                مرفقات الدرس
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={uploading}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload className="size-3.5" />
+                {uploading ? 'جاري الرفع...' : 'رفع ملف'}
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.gif,.webp,.ppt,.pptx,.xls,.xlsx"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+            </div>
+            {attachments.length === 0 ? (
+              <p className="text-xs text-muted-foreground">لا توجد مرفقات بعد.</p>
+            ) : (
+              <ul className="space-y-1.5">
+                {attachments.map((att, i) => (
+                  <li
+                    key={i}
+                    className="flex items-center gap-2 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-sm"
+                  >
+                    <FileText className="size-4 shrink-0 text-primary" />
+                    <span className="flex-1 truncate text-foreground">{att.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(i)}
+                      className="shrink-0 text-rose-500 hover:text-rose-700"
+                      aria-label="حذف المرفق"
+                    >
+                      <Trash2 className="size-4" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
           <div className="flex justify-start gap-2 pt-2">
             <Button type="submit">حفظ التغييرات</Button>
             <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>

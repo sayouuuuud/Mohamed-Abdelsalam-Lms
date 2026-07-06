@@ -1,8 +1,9 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { requireAdmin } from '@/lib/auth-guard'
+import { hasResourceAccess } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
+import { logActivity } from '@/lib/audit-log'
 import type { ExamRecord, ExamStatus } from '@/lib/exams-data'
 
 // Shape sent from the exam builder (client) to be persisted.
@@ -65,7 +66,7 @@ function makeExamCode() {
 // option *value* (matching the existing seeded data format).
 export async function saveExam(payload: SaveExamPayload) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) {
+  if (!(await hasResourceAccess(supabase, 'exams', 'manage'))) {
     return { success: false, error: 'غير مصرح لك' }
   }
 
@@ -125,6 +126,7 @@ export async function saveExam(payload: SaveExamPayload) {
     }
   }
 
+  logActivity({ action: 'create', resource: 'exams', targetId: exam.code, targetLabel: `اختبار: ${meta.title.trim()}` }).catch(() => {})
   revalidatePath('/admin/exams')
   return { success: true, code: exam.code }
 }

@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { hasResourceAccess } from '@/lib/auth-guard'
+import { logActivity } from '@/lib/audit-log'
 import type {
   StudentGender,
   StudentRecord,
@@ -35,18 +37,10 @@ export async function getStages(): Promise<StageOption[]> {
   return (data || []).map((s: any) => ({ id: s.id, title: s.title }))
 }
 
-// Ensures the current session belongs to an admin before privileged writes.
+// Guards student writes (create/delete). These use the service-role client,
+// so we enforce 'manage' at the app layer instead of relying on RLS.
 async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return false
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-  return profile?.role === 'admin'
+  return hasResourceAccess(supabase, 'students', 'manage')
 }
 
 type StudentRow = {
@@ -174,6 +168,7 @@ export async function createStudent(input: StudentInput) {
     return { error: 'تعذّر إضافة الطالب. تأكد من صلاحياتك وحاول تاني.' }
   }
 
+  logActivity({ action: 'create', resource: 'students', targetId: code, targetLabel: `طالب: ${input.name}` }).catch(() => {})
   revalidatePath('/students')
   return { success: true }
 }
@@ -192,6 +187,7 @@ export async function deleteStudent(code: string) {
     return { error: 'تعذّر حذف الطالب.' }
   }
 
+  logActivity({ action: 'delete', resource: 'students', targetId: code, targetLabel: `طالب كود: ${code}` }).catch(() => {})
   revalidatePath('/students')
   return { success: true }
 }

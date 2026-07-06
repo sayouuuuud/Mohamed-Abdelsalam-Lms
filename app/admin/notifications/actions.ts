@@ -1,9 +1,10 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { requireAdmin } from '@/lib/auth-guard'
+import { hasResourceAccess } from '@/lib/auth-guard'
 import { createNotification } from '@/lib/notify'
 import { revalidatePath } from 'next/cache'
+import { logActivity } from '@/lib/audit-log'
 import {
   formatRelativeArabic,
   type NotificationRecord,
@@ -46,7 +47,7 @@ export async function sendAnnouncement(input: {
   lectureId?: string | null
 }) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) {
+  if (!(await hasResourceAccess(supabase, 'notifications', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
   const title = input.title.trim()
@@ -62,6 +63,7 @@ export async function sendAnnouncement(input: {
   })
   if (res.error) return { error: 'تعذّر إرسال الإشعار. حاول تاني.' }
 
+  logActivity({ action: 'create', resource: 'notifications', targetLabel: `إشعار: ${title}` }).catch(() => {})
   revalidatePath('/notifications')
   revalidatePath('/student/notifications')
   return { success: true }
@@ -90,7 +92,7 @@ export async function getNotifications(): Promise<NotificationRecord[]> {
 
 export async function markAsRead(id: string) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) {
+  if (!(await hasResourceAccess(supabase, 'notifications', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
@@ -106,7 +108,7 @@ export async function markAsRead(id: string) {
 
 export async function markAllAsRead() {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) {
+  if (!(await hasResourceAccess(supabase, 'notifications', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
@@ -122,12 +124,13 @@ export async function markAllAsRead() {
 
 export async function deleteNotification(id: string) {
   const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) {
+  if (!(await hasResourceAccess(supabase, 'notifications', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
   const { error } = await supabase.from('notifications').delete().eq('code', id)
   if (error) return { error: error.message }
+  logActivity({ action: 'delete', resource: 'notifications', targetId: id, targetLabel: `إشعار كود: ${id}` }).catch(() => {})
   revalidatePath('/notifications')
   return { success: true }
 }

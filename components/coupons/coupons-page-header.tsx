@@ -3,9 +3,11 @@
 import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useCoupons } from './coupons-context'
+import { useCanManage } from '@/components/dashboard/permissions-context'
 
 export function CouponsPageHeader() {
   const { openCreate } = useCoupons()
+  const canManage = useCanManage('coupons')
 
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -16,10 +18,12 @@ export function CouponsPageHeader() {
         </p>
       </div>
 
-      <Button onClick={openCreate}>
-        <Plus className="size-4" />
-        إنشاء كوبون
-      </Button>
+      {canManage && (
+        <Button onClick={openCreate}>
+          <Plus className="size-4" />
+          إنشاء كوبون
+        </Button>
+      )}
     </div>
   )
 }

@@ -61,6 +61,7 @@ type LectureRow = {
     video_url: string | null
     description: string | null
     content_type: string | null
+    attachments: { name: string; url: string; type: string }[] | null
   }[]
   assignments?: AssignmentRow[]
 }
@@ -84,6 +85,13 @@ function mapOneLesson(l: LectureRow['lessons'][number]): Lesson {
     description:
       l.description ||
       'درس مشروح بالفيديو خطوة بخطوة مع أمثلة محلولة وتطبيقات على المسائل.',
+    attachments: Array.isArray(l.attachments) ? l.attachments.map((a) => ({
+      name: a.name,
+      url: a.url,
+      type: (['pdf','doc','image','other'] as const).includes(a.type as any)
+        ? (a.type as 'pdf' | 'doc' | 'image' | 'other')
+        : 'other',
+    })) : [],
   }
 }
 
@@ -231,7 +239,7 @@ const ASSIGNMENT_SELECT = `
 const LECTURE_SELECT = `
   id, slug, title, description, image, instructor,
   branches:branch_id ( title, image, stages:stage_id ( title ) ),
-  lessons ( id, slug, title, duration, is_free, sort_order, video_url, description, content_type ),
+  lessons ( id, slug, title, duration, is_free, sort_order, video_url, description, content_type, attachments ),
   ${ASSIGNMENT_SELECT}
 `
 
@@ -239,7 +247,7 @@ const LECTURE_SELECT = `
 const LECTURE_SELECT_NO_IMAGE = `
   id, slug, title, description, instructor,
   branches:branch_id ( title, image, stages:stage_id ( title ) ),
-  lessons ( id, slug, title, duration, is_free, sort_order, video_url, description, content_type ),
+  lessons ( id, slug, title, duration, is_free, sort_order, video_url, description, content_type, attachments ),
   ${ASSIGNMENT_SELECT}
 `
 

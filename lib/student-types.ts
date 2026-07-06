@@ -43,6 +43,12 @@ export type ActivityDay = {
 
 export type LessonType = 'فيديو' | 'مقال' | 'تمرين'
 
+export type LessonAttachment = {
+  name: string
+  url: string
+  type: 'pdf' | 'doc' | 'image' | 'other'
+}
+
 export type Lesson = {
   id: string
   /** UUID من قاعدة البيانات — يُستخدم لحفظ التقدّم */
@@ -54,6 +60,7 @@ export type Lesson = {
   locked: boolean
   videoUrl?: string
   description?: string
+  attachments?: LessonAttachment[]
 }
 
 export type CourseProgress = {

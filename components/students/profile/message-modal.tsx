@@ -1,33 +1,51 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { Send } from 'lucide-react'
+import { Send, Loader2 } from 'lucide-react'
 import { Modal, Field } from '@/components/ui/modal'
 import { Button } from '@/components/ui/button'
+import { sendMessageToStudent } from '@/app/admin/students/[id]/actions'
 
 interface MessageModalProps {
   open: boolean
   onClose: () => void
+  studentId: string    // students.id (UUID)
+  studentCode: string  // students.code
   studentName: string
 }
 
-const channels = ['البريد الإلكتروني', 'إشعار داخل المنصة', 'رسالة نصية'] as const
+const channels = ['رسالة داخلية', 'إشعار'] as const
 
-export function MessageModal({ open, onClose, studentName }: MessageModalProps) {
-  const [channel, setChannel] = useState<(typeof channels)[number]>('البريد الإلكتروني')
+export function MessageModal({ open, onClose, studentId, studentCode, studentName }: MessageModalProps) {
+  const [channel, setChannel] = useState<(typeof channels)[number]>('رسالة داخلية')
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
+  const [isPending, startTransition] = useTransition()
 
   const handleSend = () => {
     if (!body.trim()) {
       toast.error('اكتب نص الرسالة أولاً')
       return
     }
-    toast.success(`تم إرسال الرسالة إلى ${studentName}`)
-    setSubject('')
-    setBody('')
-    onClose()
+    startTransition(async () => {
+      const result = await sendMessageToStudent(
+        studentId,
+        studentCode,
+        studentName,
+        subject,
+        body,
+        channel,
+      )
+      if (result.error) {
+        toast.error(`فشل الإرسال: ${result.error}`)
+      } else {
+        toast.success(`تم إرسال الرسالة إلى ${studentName}`)
+        setSubject('')
+        setBody('')
+        onClose()
+      }
+    })
   }
 
   return (
@@ -79,11 +97,15 @@ export function MessageModal({ open, onClose, studentName }: MessageModalProps) 
         </Field>
 
         <div className="flex justify-start gap-2 pt-1">
-          <Button onClick={handleSend}>
-            <Send className="size-4" />
-            إرسال
+          <Button onClick={handleSend} disabled={isPending}>
+            {isPending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Send className="size-4" />
+            )}
+            {isPending ? 'جاري الإرسال...' : 'إرسال'}
           </Button>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={onClose} disabled={isPending}>
             إلغاء
           </Button>
         </div>

@@ -34,7 +34,9 @@ export default async function AuthPage({
       .eq('id', user.id)
       .single()
 
-    if (profile?.role === 'admin') {
+    if (profile?.role === 'admin' || profile?.role === 'assistant') {
+      // Assistants land on the dashboard; middleware forwards them to their
+      // first permitted page if they lack dashboard access.
       redirect('/admin/dashboard')
     } else {
       redirect('/student')
