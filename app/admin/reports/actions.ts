@@ -145,7 +145,13 @@ export async function getReportsData() {
   })
   const monthlyRevenue = window.map((b) => {
     const revenue = revenueBucket[b.key] || 0
-    return { month: b.month, revenue, target: Math.round(revenue * 1.15) }
+    const prevD = new Date(b.start)
+    prevD.setMonth(prevD.getMonth() - 1)
+    const prevKey = monthKeyOf(prevD)
+    const prevRevenue = revenueBucket[prevKey] || 0
+    // Target is previous month's revenue + 15%
+    const target = prevRevenue === 0 ? revenue * 1.15 : prevRevenue * 1.15
+    return { month: b.month, revenue, target: Math.round(target) }
   })
 
   // Cumulative students growth over the window.

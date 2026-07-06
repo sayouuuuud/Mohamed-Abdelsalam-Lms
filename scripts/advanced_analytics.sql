@@ -145,7 +145,7 @@ begin
     left join public.lesson_progress lp on lp.lesson_id = cl.id and lp.completed = true
     group by cl.id, cl.title, cs.title, c.title
     order by completion_count asc
-    limit 5
+    limit 20
   ) t into dropoff_points;
 
   -- 10. Time to Completion (Average days from enrollment to last progress)
@@ -162,6 +162,7 @@ begin
     ) lp on lp.enrollment_id = e.id
     group by c.id, c.title
     order by avg_days desc
+    limit 20
   ) t into time_to_completion;
 
   -- 11. Notifications Engagement
