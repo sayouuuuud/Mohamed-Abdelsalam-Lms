@@ -138,10 +138,12 @@ begin
 
   -- 9. Course Dropoff Points
   select coalesce(jsonb_agg(t), '[]'::jsonb) from (
-    select cl.title as lesson, count(lp.id) as completion_count
+    select c.title || ' - ' || cs.title || ' - ' || cl.title as lesson, count(lp.id) as completion_count
     from public.course_lessons cl
+    join public.course_sections cs on cs.id = cl.section_id
+    join public.courses c on c.id = cs.course_id
     left join public.lesson_progress lp on lp.lesson_id = cl.id and lp.completed = true
-    group by cl.id, cl.title
+    group by cl.id, cl.title, cs.title, c.title
     order by completion_count asc
     limit 5
   ) t into dropoff_points;

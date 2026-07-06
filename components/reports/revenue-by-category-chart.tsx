@@ -36,7 +36,7 @@ export function RevenueByCategoryChart({
               type="number"
               tickLine={false}
               axisLine={false}
-              tickFormatter={(v) => `${v / 1000}K`}
+              tickFormatter={(v) => (v >= 1000 ? `${v / 1000}K` : v)}
             />
             <YAxis
               type="category"

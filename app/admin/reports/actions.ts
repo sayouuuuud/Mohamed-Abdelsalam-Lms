@@ -176,7 +176,7 @@ export async function getReportsData() {
   const priceOf = (c: any) => Number(String(c.price ?? '').replace(/\D/g, '') || 0)
   const courseRevenue = (c: any) => priceOf(c) * (c.students || 0)
 
-  // Students per category.
+  // Students per category (real, derived from orders)
   const categoryCount: Record<string, number> = {}
   // Revenue per category (real, derived from orders)
   const categoryRevenue: Record<string, number> = {}
@@ -185,12 +185,8 @@ export async function getReportsData() {
     order.order_items?.forEach((item: any) => {
       const catName = item.stage_title || item.branch_title || 'عام'
       categoryRevenue[catName] = (categoryRevenue[catName] || 0) + (Number(item.price) || 0)
+      categoryCount[catName] = (categoryCount[catName] || 0) + 1
     })
-  })
-  
-  coursesData?.forEach((c) => {
-    const catName = c.category || 'عام'
-    categoryCount[catName] = (categoryCount[catName] || 0) + (c.students || 0)
   })
 
   const categoryDistribution = Object.entries(categoryCount)

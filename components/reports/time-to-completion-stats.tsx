@@ -23,10 +23,18 @@ export function TimeToCompletionStats({
                 <span className="text-sm font-medium text-foreground">{s.course}</span>
               </div>
               <div className="flex items-baseline gap-1">
-                <span className="text-xl font-bold text-foreground">
-                  {Math.round(s.avg_days)}
-                </span>
-                <span className="text-xs text-muted-foreground">أيام</span>
+                {Math.round(s.avg_days) === 0 ? (
+                  <span className="text-xl font-bold text-foreground">
+                    أقل من يوم
+                  </span>
+                ) : (
+                  <>
+                    <span className="text-xl font-bold text-foreground">
+                      {Math.round(s.avg_days)}
+                    </span>
+                    <span className="text-xs text-muted-foreground">أيام</span>
+                  </>
+                )}
               </div>
             </div>
           ))
