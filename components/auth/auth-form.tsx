@@ -2,7 +2,6 @@
 
 import { useState, type FormEvent } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { Eye, EyeOff, Loader2, Lock, Mail, Phone, User, GraduationCap, Check, AlertCircle, ShieldCheck, ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
@@ -17,7 +16,6 @@ const grades = [
 ]
 
 export function AuthForm({ initialTab = 'login' }: { initialTab?: Tab }) {
-  const router = useRouter()
   const [tab, setTab] = useState<Tab>(initialTab)
   const [showPassword, setShowPassword] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -88,8 +86,11 @@ export function AuthForm({ initialTab = 'login' }: { initialTab?: Tab }) {
         if (destination === '/admin/dashboard') {
           recordLogin().catch(() => {})
         }
-        router.push(destination)
-        router.refresh()
+        // Hard navigation so the freshly-set auth cookies reach the server on
+        // the very first request. A soft router.push races the cookie sync and
+        // makes the middleware bounce the user until they manually refresh.
+        window.location.assign(destination)
+        return
       } else {
         // Register via our own endpoint, which creates the user and emails an
         // activation code through our SMTP (Gmail).
@@ -123,8 +124,7 @@ export function AuthForm({ initialTab = 'login' }: { initialTab?: Tab }) {
             setError('تم إنشاء حسابك. سجّل دخولك للمتابعة.')
             return
           }
-          router.push('/student')
-          router.refresh()
+          window.location.assign('/student')
           return
         }
         // Code emailed -> show the activation-code step.
@@ -159,8 +159,8 @@ export function AuthForm({ initialTab = 'login' }: { initialTab?: Tab }) {
         return
       }
       // Account activated + signed in -> students go to their portal.
-      router.push('/student')
-      router.refresh()
+      window.location.assign('/student')
+      return
     } catch {
       setError('حصل خطأ غير متوقّع. حاول تاني.')
     } finally {
@@ -349,7 +349,7 @@ export function AuthForm({ initialTab = 'login' }: { initialTab?: Tab }) {
         {tab === 'register' && (
           <Field
             id="name"
-            label="الاسم بالكامل"
+            label="ال��سم بالكامل"
             icon={<User className="size-4" />}
             type="text"
             placeholder="اكتب اسمك"
