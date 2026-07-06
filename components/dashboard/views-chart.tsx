@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo, useState } from 'react'
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 import {
   ChartContainer,
@@ -19,6 +20,15 @@ const config = {
 
 type ViewsPoint = { label: string; views: number; visitors: number }
 
+// Client-side slice of the trailing points in the already-fetched series.
+// `count: 0` means show everything the global filter returned.
+const RANGE_OPTIONS = [
+  { label: 'آخر 7 نقاط', value: '7' },
+  { label: 'آخر 14 نقطة', value: '14' },
+  { label: 'آخر 30 نقطة', value: '30' },
+  { label: 'الكل', value: '0' },
+]
+
 export function ViewsChart({
   data = [],
   totalViews = 0,
@@ -28,8 +38,30 @@ export function ViewsChart({
   totalViews?: number
   totalVisitors?: number
 }) {
+  const [range, setRange] = useState('0')
+
+  const { chartData, viewsSum, visitorsSum } = useMemo(() => {
+    const count = Number(range)
+    const sliced = count > 0 ? data.slice(-count) : data
+    // When showing everything, keep the server-computed totals; otherwise
+    // recompute from the visible slice so the summary matches the filter.
+    if (count <= 0 || sliced.length === data.length) {
+      return { chartData: data, viewsSum: totalViews, visitorsSum: totalVisitors }
+    }
+    return {
+      chartData: sliced,
+      viewsSum: sliced.reduce((s, p) => s + (p.views || 0), 0),
+      visitorsSum: sliced.reduce((s, p) => s + (p.visitors || 0), 0),
+    }
+  }, [data, range, totalViews, totalVisitors])
+
   return (
-    <PanelCard title="المشاهدات والزيارات">
+    <PanelCard
+      title="المشاهدات والزيارات"
+      filterOptions={RANGE_OPTIONS}
+      filterValue={range}
+      onFilterChange={setRange}
+    >
       {/* Totals summary */}
       <div className="mb-4 flex flex-wrap gap-6">
         <div className="flex items-center gap-3">
@@ -39,7 +71,7 @@ export function ViewsChart({
           <div>
             <p className="text-xs text-muted-foreground">إجمالي المشاهدات</p>
             <p className="text-lg font-bold text-foreground">
-              {totalViews.toLocaleString('en')}
+              {viewsSum.toLocaleString('en')}
             </p>
           </div>
         </div>
@@ -50,14 +82,14 @@ export function ViewsChart({
           <div>
             <p className="text-xs text-muted-foreground">زوّار فريدون</p>
             <p className="text-lg font-bold text-foreground">
-              {totalVisitors.toLocaleString('en')}
+              {visitorsSum.toLocaleString('en')}
             </p>
           </div>
         </div>
       </div>
 
       <ChartContainer config={config} className="h-full min-h-[260px] w-full">
-        <AreaChart data={data} margin={{ left: 4, right: 8, top: 8 }}>
+        <AreaChart data={chartData} margin={{ left: 4, right: 8, top: 8 }}>
           <defs>
             <linearGradient id="fillViews" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="var(--color-views)" stopOpacity={0.25} />
