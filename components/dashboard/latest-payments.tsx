@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 
 export function LatestPayments({ payments = [] }: { payments?: any[] }) {
   return (
-    <PanelCard title="آخر المدفوعات" action="عرض الكل">
+    <PanelCard title="آخر المدفوعات" action="عرض الكل" actionHref="/admin/payments">
       <ul className="divide-y divide-border">
         {payments.map((payment) => (
           <li key={payment.id} className="flex items-center gap-3 py-3 first:pt-0">

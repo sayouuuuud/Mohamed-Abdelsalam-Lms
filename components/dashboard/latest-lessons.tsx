@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils'
 
 export function LatestLessons({ lessons = [] }: { lessons?: any[] }) {
   return (
-    <PanelCard title="آخر المحاضرات المضافة" action="عرض الكل">
+    <PanelCard title="آخر المحاضرات المضافة" action="عرض الكل" actionHref="/admin/courses">
       <ul className="divide-y divide-border">
         {lessons.map((lesson) => (
           <li key={lesson.title} className="flex items-center gap-3 py-3 first:pt-0">

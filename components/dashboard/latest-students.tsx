@@ -4,7 +4,7 @@ import { getInitials } from '@/lib/get-initials'
 
 export function LatestStudents({ students = [] }: { students?: any[] }) {
   return (
-    <PanelCard title="آخر الطلاب المسجلين" action="عرض الكل">
+    <PanelCard title="آخر الطلاب المسجلين" action="عرض الكل" actionHref="/admin/students">
       <ul className="divide-y divide-border">
         {students.map((student) => (
           <li key={student.email} className="flex items-center gap-3 py-3 first:pt-0">
