@@ -28,6 +28,13 @@ export function DashboardShell({ data }: { data?: any }) {
       {/* KPIs: امتحانات + مدفوعات */}
       <AnalyticsKpis stats={data.examStats} />
 
+      {/* المشاهدات والزيارات — ويدجت بعرض كامل تحت الكاردات */}
+      <ViewsChart
+        data={data.viewsData}
+        totalViews={data.totalViews}
+        totalVisitors={data.totalVisitors}
+      />
+
       {/* Row 1: الإيرادات الشهرية (wide) + أكثر الكورسات + نشاط المنصة */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
         <div className="xl:col-span-2">
@@ -53,13 +60,6 @@ export function DashboardShell({ data }: { data?: any }) {
           <StudentsChart data={data.studentsData} />
         </div>
       </div>
-
-      {/* المشاهدات والزيارات — ويدجت بعرض كامل */}
-      <ViewsChart
-        data={data.viewsData}
-        totalViews={data.totalViews}
-        totalVisitors={data.totalVisitors}
-      />
 
       {/* Row 3: تحليلات الامتحانات — المتوسطات (wide) + النجاح/الرسوب + توزيع الدرجات */}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-4">
