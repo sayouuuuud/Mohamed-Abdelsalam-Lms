@@ -1,10 +1,8 @@
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { PanelCard } from './panel-card'
 import { getInitials } from '@/lib/get-initials'
-import { students as initialData } from '@/lib/dashboard-data'
 
-export function LatestStudents({ students: inputStudents }: { students?: any[] }) {
-  const students = inputStudents || initialData
+export function LatestStudents({ students = [] }: { students?: any[] }) {
   return (
     <PanelCard title="آخر الطلاب المسجلين" action="عرض الكل">
       <ul className="divide-y divide-border">

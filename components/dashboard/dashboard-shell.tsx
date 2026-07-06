@@ -36,7 +36,7 @@ export function DashboardShell({ data }: { data?: any }) {
           <TopCourses courses={data.topCourses} />
         </div>
         <div className="xl:col-span-1">
-          <ActivityChart />
+          <ActivityChart data={data.activityData} />
         </div>
       </div>
 

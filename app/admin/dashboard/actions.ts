@@ -2,24 +2,29 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { hasResourceAccess } from '@/lib/auth-guard'
-import { lastMonths, monthKeyOf, percentChange } from '@/lib/time-series'
+import { lastMonths, monthKeyOf, percentChange, getRangeStartDate, lastDays, dayKeyOf } from '@/lib/time-series'
 
-export async function getDashboardData() {
+export async function getDashboardData(range: string = '30d') {
   const supabase = await createClient()
 
   if (!(await hasResourceAccess(supabase, 'dashboard'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
+  const startDate = getRangeStartDate(range)
+  const startDateStr = startDate.toISOString()
+
   // Fetch basic stats
   const { data: payments } = await supabase
     .from('payments')
     .select('amount, status, created_at, method, student_name, course')
+    .gte('created_at', startDateStr)
     .order('created_at', { ascending: false })
 
   const { count: studentsCount, data: latestStudentsData } = await supabase
     .from('students')
     .select('id, name, email, created_at', { count: 'exact' })
+    .gte('created_at', startDateStr)
     .order('created_at', { ascending: false })
 
   const { count: coursesCount, data: latestCoursesData } = await supabase
@@ -45,24 +50,25 @@ export async function getDashboardData() {
   const approvedPayments = payments?.filter((p) => p.status === 'مقبول') || []
   const totalRevenue = approvedPayments.reduce((sum, p) => sum + Number(p.amount), 0)
 
-  // Real rolling 12-month series, bucketed by the actual calendar month each
-  // payment / signup happened in. Charts slice the last 3/6/12 client-side.
-  const window = lastMonths(12)
+  // Real rolling series based on range.
+  const isDaily = range === '7d' || range === '30d'
+  const windowCount = range === '7d' ? 7 : range === '30d' ? 30 : range === '3m' ? 3 : range === '6m' ? 6 : 12
+  const window = isDaily ? lastDays(windowCount) : lastMonths(windowCount)
   const windowStart = window[0].start
 
-  // Revenue per month.
+  // Revenue per period.
   const revenueBucket: Record<string, number> = {}
   approvedPayments.forEach((p) => {
-    const k = monthKeyOf(p.created_at)
+    const k = isDaily ? dayKeyOf(p.created_at) : monthKeyOf(p.created_at)
     revenueBucket[k] = (revenueBucket[k] || 0) + Number(p.amount)
   })
   const revenueData = window.map((b) => ({
-    month: b.month,
+    // @ts-ignore
+    month: isDaily ? b.day : b.month,
     revenue: revenueBucket[b.key] || 0,
   }))
 
-  // Cumulative students. Seed with everyone who joined before the window so the
-  // running total is accurate, then add each month's new signups.
+  // Cumulative students.
   const signupsBucket: Record<string, number> = {}
   let baseStudents = 0
   latestStudentsData?.forEach((s) => {
@@ -71,14 +77,34 @@ export async function getDashboardData() {
       baseStudents += 1
       return
     }
-    const k = monthKeyOf(date)
+    const k = isDaily ? dayKeyOf(date) : monthKeyOf(date)
     signupsBucket[k] = (signupsBucket[k] || 0) + 1
   })
   let cumulativeStudents = baseStudents
   const studentsData = window.map((b) => {
     cumulativeStudents += signupsBucket[b.key] || 0
-    return { month: b.month, students: cumulativeStudents }
+    return { 
+      // @ts-ignore
+      month: isDaily ? b.day : b.month, 
+      students: cumulativeStudents 
+    }
   })
+
+  // Activity per period (payments + signups)
+  const activityBucket: Record<string, number> = {}
+  approvedPayments.forEach((p) => {
+    const k = isDaily ? dayKeyOf(p.created_at) : monthKeyOf(p.created_at)
+    activityBucket[k] = (activityBucket[k] || 0) + 1
+  })
+  latestStudentsData?.forEach((s) => {
+    const k = isDaily ? dayKeyOf(s.created_at) : monthKeyOf(s.created_at)
+    activityBucket[k] = (activityBucket[k] || 0) + 1
+  })
+  const activityData = window.map((b) => ({
+    // @ts-ignore
+    day: isDaily ? b.day : b.month,
+    value: activityBucket[b.key] || 0,
+  }))
 
   // Real period-over-period changes (this month vs last month) for the stat
   // cards, plus today-vs-yesterday for daily sales.
@@ -264,6 +290,7 @@ export async function getDashboardData() {
     },
     revenueData,
     studentsData,
+    activityData,
     topCourses,
     latestPayments,
     latestStudents,

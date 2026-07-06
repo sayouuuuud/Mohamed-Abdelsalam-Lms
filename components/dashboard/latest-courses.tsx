@@ -1,14 +1,12 @@
 import Image from 'next/image'
 import { PanelCard } from './panel-card'
-import { recentCourses as initialData } from '@/lib/dashboard-data'
 import { cn } from '@/lib/utils'
 
-export function LatestCourses({ courses: inputCourses }: { courses?: any[] }) {
-  const recentCourses = inputCourses || initialData
+export function LatestCourses({ courses = [] }: { courses?: any[] }) {
   return (
     <PanelCard title="آخر الكورسات المضافة" action="عرض الكل">
       <ul className="divide-y divide-border">
-        {recentCourses.map((course) => (
+        {courses.map((course) => (
           <li key={course.title} className="flex items-center gap-3 py-3 first:pt-0">
             <div className="relative size-11 shrink-0 overflow-hidden rounded-lg">
               <Image

@@ -1,11 +1,9 @@
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Mail, CheckCircle2 } from 'lucide-react'
 import { PanelCard } from './panel-card'
-import { messages as initialData } from '@/lib/dashboard-data'
 import { getInitials } from '@/lib/get-initials'
 
-export function LatestMessages({ messages: inputMessages }: { messages?: any[] }) {
-  const messages = inputMessages || initialData
+export function LatestMessages({ messages = [] }: { messages?: any[] }) {
   return (
     <PanelCard title="آخر الرسائل" action="عرض الكل">
       <ul className="space-y-3">

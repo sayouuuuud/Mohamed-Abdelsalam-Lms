@@ -1,13 +1,10 @@
 import Image from 'next/image'
 import { PanelCard } from './panel-card'
-import { topCourses as initialData } from '@/lib/dashboard-data'
-
-export function TopCourses({ courses: inputCourses }: { courses?: any[] }) {
-  const topCourses = inputCourses || initialData
+export function TopCourses({ courses = [] }: { courses?: any[] }) {
   return (
-    <PanelCard title="أكثر الكورسات مبيعاً" filter="هذا الشهر">
+    <PanelCard title="أكثر الكورسات مبيعاً">
       <ul className="space-y-1">
-        {topCourses.slice(0, 4).map((course) => (
+        {courses.slice(0, 4).map((course) => (
           <li
             key={course.title}
             className="flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-secondary/60"

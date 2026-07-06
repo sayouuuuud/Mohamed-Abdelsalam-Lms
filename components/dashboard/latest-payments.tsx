@@ -2,10 +2,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { PanelCard } from './panel-card'
 import { getInitials } from '@/lib/get-initials'
 import { cn } from '@/lib/utils'
-import { payments as initialData } from '@/lib/dashboard-data'
 
-export function LatestPayments({ payments: inputPayments }: { payments?: any[] }) {
-  const payments = inputPayments || initialData
+export function LatestPayments({ payments = [] }: { payments?: any[] }) {
   return (
     <PanelCard title="آخر المدفوعات" action="عرض الكل">
       <ul className="divide-y divide-border">

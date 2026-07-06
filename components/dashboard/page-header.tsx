@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { BookOpen, UploadCloud, Tag, UserPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { DashboardFilter } from './dashboard-filter'
 
 const actions = [
   { label: 'إضافة كورس', icon: BookOpen, href: '/admin/courses', primary: true },
@@ -19,23 +20,26 @@ export function PageHeader() {
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {actions.map((action) => (
-          <Button
-            key={action.label}
-            variant={action.primary ? 'default' : 'outline'}
-            className={
-              action.primary
-                ? ''
-                : 'border-border bg-card text-foreground hover:bg-secondary'
-            }
-            nativeButton={false}
-            render={<Link href={action.href} />}
-          >
-            <action.icon className="size-4" />
-            {action.label}
-          </Button>
-        ))}
+      <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4">
+        <DashboardFilter />
+        <div className="flex flex-wrap gap-2">
+          {actions.map((action) => (
+            <Button
+              key={action.label}
+              variant={action.primary ? 'default' : 'outline'}
+              className={
+                action.primary
+                  ? ''
+                  : 'border-border bg-card text-foreground hover:bg-secondary'
+              }
+              nativeButton={false}
+              render={<Link href={action.href} />}
+            >
+              <action.icon className="size-4" />
+              {action.label}
+            </Button>
+          ))}
+        </div>
       </div>
     </div>
   )
