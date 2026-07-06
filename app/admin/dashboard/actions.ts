@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { hasResourceAccess } from '@/lib/auth-guard'
 import { lastMonths, monthKeyOf, percentChange, getRangeStartDate, lastDays, dayKeyOf } from '@/lib/time-series'
+import { getRelativeTimeArabic } from '@/lib/utils'
 
 export async function getDashboardData() {
   const supabase = await createClient()
@@ -14,7 +15,7 @@ export async function getDashboardData() {
   // Fetch basic stats
   const { data: payments } = await supabase
     .from('payments')
-    .select('amount, status, created_at, method, student_name, course')
+    .select('amount, status, created_at, method, student_name, course, code')
     .order('created_at', { ascending: false })
 
   const { count: studentsCount, data: latestStudentsData } = await supabase
@@ -161,7 +162,7 @@ export async function getDashboardData() {
 
   // Latest Payments
   const latestPayments = (payments || []).slice(0, 5).map((p, i) => ({
-    id: `#PAY-${String(1000 + i)}`,
+    id: p.code ? (p.code.startsWith('#') ? p.code : `#${p.code}`) : `#PAY-${String(1000 + i)}`,
     name: p.student_name,
     course: p.course,
     amount: `${p.amount} ج.م`,
@@ -172,14 +173,14 @@ export async function getDashboardData() {
   const latestStudents = (latestStudentsData || []).slice(0, 5).map((s) => ({
     name: s.name,
     email: s.email,
-    time: 'مؤخراً',
+    time: getRelativeTimeArabic(s.created_at),
   }))
 
   // Latest Courses
   const latestCourses = (latestCoursesData || []).slice(0, 3).map((c) => ({
     title: c.title,
     status: c.status,
-    time: 'مؤخراً',
+    time: getRelativeTimeArabic(c.created_at),
     image: c.image || '/courses/javascript.png',
   }))
 
@@ -193,7 +194,7 @@ export async function getDashboardData() {
   const latestMessages = (messagesData || []).map((m: any) => ({
     name: m.conversations?.student_name || 'طالب غير معروف',
     text: m.text,
-    time: 'مؤخراً',
+    time: getRelativeTimeArabic(m.created_at),
     unread: !m.read,
   }))
 

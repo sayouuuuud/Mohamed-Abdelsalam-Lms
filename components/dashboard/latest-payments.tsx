@@ -31,7 +31,7 @@ export function LatestPayments({ payments = [] }: { payments?: any[] }) {
               </span>
             </div>
             <div className="text-end">
-              <p className="text-xs text-muted-foreground">{payment.id}</p>
+              <p dir="ltr" className="text-xs text-muted-foreground text-right">{payment.id}</p>
               <p className="text-sm font-bold text-foreground">{payment.amount}</p>
             </div>
           </li>
