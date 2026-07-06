@@ -50,7 +50,12 @@ export function ViewsChart({
   const totalValue = metric === "views" ? viewsSum : visitorsSum
   const avgValue = Math.round(totalValue / (totalDays || 1))
   const dotSize = 8
-  const dotsPerColumn = 10
+  const dotsPerColumn = 12
+  const dotGap = 2
+  const dotsHeight = (dotsPerColumn * dotSize) + ((dotsPerColumn - 1) * dotGap) // 118px
+  const paddingTop = 56 // 56px for tooltip
+  const paddingBottom = 8 // 8px bottom padding
+  const containerHeight = paddingTop + dotsHeight + paddingBottom // 182px
 
   const renderDots = (value: number, dayIndex: number, label: string) => {
     const normalizedValue = Math.min(value, maxValue)
@@ -60,15 +65,25 @@ export function ViewsChart({
 
     return (
       <div
-        className="flex flex-col-reverse gap-[2px] cursor-pointer relative group"
+        className="flex flex-col-reverse cursor-pointer relative group"
+        style={{ gap: `${dotGap}px` }}
         onMouseEnter={() => setHoveredDay(dayIndex)}
         onMouseLeave={() => setHoveredDay(null)}
         onClick={() => setSelectedDay(selectedDay === dayIndex ? null : dayIndex)}
       >
         {/* Tooltip */}
         {isHovered && (
-          <div dir="rtl" className={`absolute bottom-full mb-2 ${dayIndex > totalDays - 3 ? "left-0" : dayIndex < 4 ? "right-0" : "left-1/2 -translate-x-1/2"} bg-gray-900 text-white px-2 py-1 rounded text-xs whitespace-nowrap z-10 shadow-lg`}>
-            {label}: {value.toLocaleString('ar-EG')} {metric === "views" ? "مشاهدة" : "زائر"}
+          <div 
+            dir="rtl" 
+            className={`absolute bottom-full mb-2 ${dayIndex > totalDays - 4 ? "right-0" : dayIndex < 4 ? "left-0" : "left-1/2 -translate-x-1/2"} bg-gray-900 dark:bg-gray-100 text-gray-50 dark:text-gray-900 px-3 py-2 rounded-lg text-xs whitespace-nowrap z-50 shadow-xl flex flex-col gap-1.5 items-center min-w-[100px] pointer-events-none`}
+          >
+            <span className="font-semibold text-gray-400 dark:text-gray-500 border-b border-gray-700 dark:border-gray-200 pb-1.5 w-full text-center">
+              {label}
+            </span>
+            <div className="flex items-center gap-1.5 font-bold">
+              <span className="text-sm">{value.toLocaleString('ar-EG')}</span>
+              <span className="text-gray-300 dark:text-gray-700">{metric === "views" ? "مشاهدة" : "زائر"}</span>
+            </div>
           </div>
         )}
         {Array.from({ length: dotsPerColumn }).map((_, index) => (
@@ -179,9 +194,12 @@ export function ViewsChart({
       </div>
 
       {/* Chart Area */}
-      <div className="relative mt-8" dir="ltr">
+      <div className="relative mt-2" dir="ltr">
           {/* Y-axis labels */}
-          <div className="absolute right-0 top-0 bottom-8 flex flex-col justify-between text-xs text-muted-foreground font-medium z-0">
+          <div 
+              className="absolute right-0 flex flex-col justify-between text-[10px] text-muted-foreground font-medium z-0"
+              style={{ top: paddingTop, height: dotsHeight }}
+          >
               <span>{maxValue}</span>
               <span>{Math.round(maxValue * 0.66)}</span>
               <span>{Math.round(maxValue * 0.33)}</span>
@@ -191,7 +209,7 @@ export function ViewsChart({
           {/* Target line with tooltip */}
           <div
               className="absolute right-8 left-0 flex items-center z-0"
-              style={{ top: `${((maxValue - targetValue) / maxValue) * 100}%` }}
+              style={{ top: paddingTop + ((maxValue - targetValue) / maxValue) * dotsHeight - 10 }}
           >
               <div className="bg-primary text-primary-foreground text-[10px] sm:text-xs px-2 py-0.5 sm:py-1 rounded-full flex items-center gap-1 shadow-sm">
                   <TrendingUp className="h-3 w-3" />
@@ -205,8 +223,8 @@ export function ViewsChart({
 
           {/* Dots Chart */}
           <div
-              className="mr-12 flex items-end justify-between gap-1 overflow-x-auto overflow-y-hidden pb-4 scrollbar-hide z-10 relative"
-              style={{ height: 220 }}
+              className="mr-8 flex items-end justify-between overflow-x-auto overflow-y-hidden scrollbar-hide z-10 relative"
+              style={{ height: containerHeight, paddingTop, paddingBottom, gap: '4px' }}
           >
               {metricData.map((item) => (
                   <div key={item.dayIndex} className="flex flex-col items-center flex-shrink-0 px-[1px]">
