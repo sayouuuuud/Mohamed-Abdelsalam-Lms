@@ -51,10 +51,11 @@ export function ViewsChart({
   const totalValue = metric === "views" ? viewsSum : visitorsSum
   const avgValueRaw = totalValue / (totalDays || 1)
   const avgValue = avgValueRaw < 1 && avgValueRaw > 0 ? Number(avgValueRaw.toFixed(1)) : Math.round(avgValueRaw)
-  const dotSize = 8
+  const dotWidth = totalDays <= 7 ? 40 : 8
+  const dotHeight = 8
   const dotsPerColumn = 12
   const dotGap = 2
-  const dotsHeight = (dotsPerColumn * dotSize) + ((dotsPerColumn - 1) * dotGap) // 118px
+  const dotsHeight = (dotsPerColumn * dotHeight) + ((dotsPerColumn - 1) * dotGap) // 118px
   const paddingTop = 44 // 44px is enough for single-line tooltips
   const paddingBottom = 8 // 8px bottom padding
   const containerHeight = paddingTop + dotsHeight + paddingBottom // 170px
@@ -93,8 +94,8 @@ export function ViewsChart({
             key={index}
             className={`rounded-full transition-colors duration-200 ${index >= filledDots ? 'bg-gray-200/50 dark:bg-white/5' : ''}`}
             style={{
-              width: dotSize,
-              height: dotSize,
+              width: dotWidth,
+              height: dotHeight,
               backgroundColor:
                 index < filledDots
                   ? (isSelected || isHovered ? "var(--primary)" : "#86efac")
@@ -236,7 +237,7 @@ export function ViewsChart({
           {/* X-axis labels */}
           <div className="mr-12 flex justify-between mt-2 text-xs text-muted-foreground font-medium">
               {metricData
-                  .filter((_, i) => (metricData.length - 1 - i) % (totalDays > 20 ? 5 : 2) === 0)
+                  .filter((_, i) => (metricData.length - 1 - i) % (totalDays > 20 ? 5 : totalDays > 7 ? 2 : 1) === 0)
                   .map((item) => (
                       <span key={item.dayIndex}>
                           {item.label}
