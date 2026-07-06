@@ -25,6 +25,7 @@ export function ViewsChart({
   const [metric, setMetric] = useState<"views" | "visitors">("views")
   const [selectedDay, setSelectedDay] = useState<number | null>(null)
   const [hoveredDay, setHoveredDay] = useState<number | null>(null)
+  const [isRangeOpen, setIsRangeOpen] = useState(false)
 
   const { chartData, viewsSum, visitorsSum, totalDays } = useMemo(() => {
     const count = Number(range)
@@ -146,21 +147,40 @@ export function ViewsChart({
                   </button>
               </div>
 
-              {/* Using native select if DropdownMenu is not present or just HTML/Tailwind */}
+              {/* Custom Select Dropdown */}
               <div className="relative">
-                  <select
-                      value={range}
-                      onChange={(e) => setRange(e.target.value)}
-                      className="appearance-none bg-card border border-border hover:bg-muted text-foreground text-sm rounded-md h-9 px-3 pr-8 outline-none focus:ring-1 focus:ring-primary"
+                  <button
+                      onClick={() => setIsRangeOpen(!isRangeOpen)}
+                      onBlur={() => setTimeout(() => setIsRangeOpen(false), 200)}
+                      className="flex items-center justify-between gap-3 bg-card border border-border hover:bg-muted text-foreground text-sm rounded-lg h-9 px-3 outline-none focus:ring-1 focus:ring-primary transition-colors min-w-[120px]"
                   >
-                      <option value="7">آخر 7 أيام</option>
-                      <option value="30">آخر 30 يوم</option>
-                      <option value="0">الكل</option>
-                  </select>
-                  <ChevronDown className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                      <span>{rangeLabel}</span>
+                      <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${isRangeOpen ? "rotate-180" : ""}`} />
+                  </button>
+                  
+                  {isRangeOpen && (
+                      <div className="absolute top-full right-0 mt-1.5 w-full bg-card border border-border rounded-lg shadow-lg z-50 overflow-hidden flex flex-col p-1 animate-in fade-in zoom-in-95 duration-100">
+                          {[
+                              { value: '7', label: 'آخر 7 أيام' },
+                              { value: '30', label: 'آخر 30 يوم' },
+                              { value: '0', label: 'الكل' },
+                          ].map((opt) => (
+                              <button
+                                  key={opt.value}
+                                  onClick={() => {
+                                      setRange(opt.value)
+                                      setIsRangeOpen(false)
+                                  }}
+                                  className={`text-right px-3 py-2 text-sm rounded-md transition-colors ${range === opt.value ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted text-foreground'}`}
+                              >
+                                  {opt.label}
+                              </button>
+                          ))}
+                      </div>
+                  )}
               </div>
 
-              <button className="flex items-center justify-center text-muted-foreground bg-card border border-border hover:bg-muted rounded-md h-9 w-9 transition-colors">
+              <button className="flex items-center justify-center text-muted-foreground bg-card border border-border hover:bg-muted rounded-lg h-9 w-9 transition-colors">
                   <Download className="h-4 w-4" />
               </button>
           </div>
