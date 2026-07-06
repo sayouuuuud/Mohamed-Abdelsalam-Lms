@@ -104,7 +104,7 @@ export function ViewsChart({
         </div>
       </div>
 
-      <ChartContainer config={config} className="h-full min-h-[260px] w-full" dir="ltr">
+      <ChartContainer config={config} className="h-full min-h-[260px] w-full">
         <AreaChart data={chartData} margin={{ left: 0, right: 0, top: 10, bottom: 0 }}>
           <defs>
             <linearGradient id="fillViews" x1="0" y1="0" x2="0" y2="1">
@@ -123,8 +123,8 @@ export function ViewsChart({
             </filter>
           </defs>
           <CartesianGrid vertical={false} strokeDasharray="4 4" stroke="hsl(var(--muted-foreground) / 0.2)" />
-          <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={12} minTickGap={20} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} reversed={true} />
-          <YAxis orientation="right" tickLine={false} axisLine={false} width={45} allowDecimals={false} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
+          <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={12} minTickGap={20} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
+          <YAxis tickLine={false} axisLine={false} width={45} allowDecimals={false} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
           <ChartTooltip 
             cursor={{ stroke: 'hsl(var(--muted-foreground) / 0.4)', strokeWidth: 1, strokeDasharray: '4 4' }} 
             content={

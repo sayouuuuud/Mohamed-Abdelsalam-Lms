@@ -52,7 +52,7 @@ export function lastDays(count: number): DayBucket[] {
     const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i)
     arr.push({
       key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
-      day: AR_DAYS[d.getDay()],
+      day: `${d.getDate()} ${AR_MONTHS[d.getMonth()]}`,
       start: d,
     })
   }
