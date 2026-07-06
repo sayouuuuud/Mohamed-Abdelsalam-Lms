@@ -47,7 +47,7 @@ export function ScoreDistributionChart({
               dataKey="count"
               fill="var(--color-count)"
               radius={[6, 6, 0, 0]}
-              isAnimationActive={false}
+              isAnimationActive animationDuration={700} animationEasing="ease-out"
             />
           </BarChart>
         </ChartContainer>

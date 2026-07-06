@@ -33,7 +33,7 @@ export function PanelCard({
   children: ReactNode
 }) {
   return (
-    <Card className="flex h-full flex-col gap-0 p-5">
+    <Card className="ns-card flex h-full flex-col gap-0 p-5">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-base font-bold text-foreground">{title}</h3>
         {filterOptions && filterOptions.length > 0 ? (

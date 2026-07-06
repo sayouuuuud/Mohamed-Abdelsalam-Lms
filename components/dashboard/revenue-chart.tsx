@@ -55,7 +55,7 @@ export function RevenueChart({ data = [] }: { data?: any[] }) {
             strokeWidth={2.5}
             dot={{ r: 4, fill: 'var(--color-revenue)' }}
             activeDot={{ r: 6 }}
-            isAnimationActive={false}
+            isAnimationActive animationDuration={700} animationEasing="ease-out"
           />
         </LineChart>
       </ChartContainer>

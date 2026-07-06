@@ -51,7 +51,7 @@ export function StudentsGrowthChart({ data: inputData }: { data?: any[] }) {
             stroke="var(--color-students)"
             strokeWidth={2.5}
             fill="url(#fillReportStudents)"
-            isAnimationActive={false}
+            isAnimationActive animationDuration={700} animationEasing="ease-out"
           />
         </AreaChart>
       </ChartContainer>

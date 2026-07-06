@@ -163,7 +163,7 @@ export function Sidebar({
 
         {/* Nav */}
         <nav className="flex flex-1 flex-col px-2 py-2">
-          <div className="flex flex-1 flex-col justify-around">
+          <div className="ns-stagger flex flex-1 flex-col justify-around">
           {visibleNavItems.map((item) => {
             const active =
               item.href === '/'
@@ -177,14 +177,14 @@ export function Sidebar({
                   onClick={onClose}
                   aria-current={active ? 'page' : undefined}
                   className={cn(
-                    'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
+                    'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200',
                     collapsed ? 'justify-center' : '',
                     active
                       ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-lg shadow-sidebar-primary/30'
-                      : 'text-sidebar-foreground/75 hover:bg-white/5 hover:text-white',
+                      : 'text-sidebar-foreground/75 hover:bg-white/5 hover:text-white hover:-translate-x-0.5',
                   )}
                 >
-                  <item.icon className="size-5 shrink-0" />
+                  <item.icon className="size-5 shrink-0 transition-transform duration-200 group-hover:scale-110" />
                   {collapsed && item.badge && (
                     <NavBadge count={badges[item.badge]} collapsed />
                   )}

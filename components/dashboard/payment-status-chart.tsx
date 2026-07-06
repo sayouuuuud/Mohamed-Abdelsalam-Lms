@@ -50,7 +50,7 @@ export function PaymentStatusChart({
               cursor={false}
               content={<ChartTooltipContent formatter={(value) => [`${value} عملية`, '']} />}
             />
-            <Bar dataKey="value" radius={[6, 6, 0, 0]} isAnimationActive={false}>
+            <Bar dataKey="value" radius={[6, 6, 0, 0]} isAnimationActive animationDuration={700} animationEasing="ease-out">
               {rows.map((r) => (
                 <Cell key={r.name} fill={STATUS_COLORS[r.name] || 'var(--chart-1)'} />
               ))}

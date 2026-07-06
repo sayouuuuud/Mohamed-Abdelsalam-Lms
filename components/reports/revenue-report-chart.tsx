@@ -49,8 +49,8 @@ export function RevenueReportChart({ data: inputData }: { data?: any[] }) {
             }
           />
           <ChartLegend content={<ChartLegendContent />} />
-          <Bar dataKey="revenue" fill="var(--color-revenue)" radius={[6, 6, 0, 0]} isAnimationActive={false} />
-          <Bar dataKey="target" fill="var(--color-target)" radius={[6, 6, 0, 0]} isAnimationActive={false} />
+          <Bar dataKey="revenue" fill="var(--color-revenue)" radius={[6, 6, 0, 0]} isAnimationActive animationDuration={700} animationEasing="ease-out" />
+          <Bar dataKey="target" fill="var(--color-target)" radius={[6, 6, 0, 0]} isAnimationActive animationDuration={700} animationEasing="ease-out" />
         </BarChart>
       </ChartContainer>
     </PanelCard>

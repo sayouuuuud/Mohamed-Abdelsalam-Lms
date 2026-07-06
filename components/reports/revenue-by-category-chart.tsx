@@ -53,7 +53,7 @@ export function RevenueByCategoryChart({
                 />
               }
             />
-            <Bar dataKey="revenue" radius={[0, 6, 6, 0]} isAnimationActive={false}>
+            <Bar dataKey="revenue" radius={[0, 6, 6, 0]} isAnimationActive animationDuration={700} animationEasing="ease-out">
               {data.map((entry) => (
                 <Cell key={entry.name} fill={entry.fill} />
               ))}
