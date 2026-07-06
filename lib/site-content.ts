@@ -12,6 +12,7 @@ import {
   type FooterContent,
   type NavbarContent,
   type SeoContent,
+  type LoginPanelContent,
 } from '@/lib/site-content-defaults'
 
 // Re-export for server-side consumers (app/page.tsx, app/layout.tsx, actions).
@@ -27,6 +28,8 @@ export type {
   FooterContent,
   NavbarContent,
   SeoContent,
+  LoginPanelContent,
+  LoginPanelStat,
   FeatureItem,
   StatItem,
   TestimonialItem,
@@ -67,6 +70,7 @@ export async function getSiteContent(): Promise<SiteContent> {
       footer:       deepMerge(DEFAULT_SITE_CONTENT.footer,       (dbMap.footer       ?? {}) as Partial<FooterContent>),
       navbar:       deepMerge(DEFAULT_SITE_CONTENT.navbar,       (dbMap.navbar       ?? {}) as Partial<NavbarContent>),
       seo:          deepMerge(DEFAULT_SITE_CONTENT.seo,          (dbMap.seo          ?? {}) as Partial<SeoContent>),
+      login_panel:  deepMerge(DEFAULT_SITE_CONTENT.login_panel,  (dbMap.login_panel  ?? {}) as Partial<LoginPanelContent>),
     }
   } catch (err) {
     console.log('[v0] getSiteContent unexpected error:', err)
