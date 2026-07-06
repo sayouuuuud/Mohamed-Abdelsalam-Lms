@@ -9,15 +9,25 @@ import {
   type ChartConfig,
 } from '@/components/ui/chart'
 import { PanelCard } from './panel-card'
+import { RANGE_OPTIONS } from '@/lib/time-series'
+
 const config = {
   revenue: { label: 'الإيرادات', color: 'var(--chart-1)' },
 } satisfies ChartConfig
 
 export function RevenueChart({ data = [] }: { data?: any[] }) {
+  const [range, setRange] = useState('6')
+  const chartData = data.slice(-Number(range))
+
   return (
-    <PanelCard title="الإيرادات">
+    <PanelCard
+      title="الإيرادات الشهرية"
+      filterOptions={RANGE_OPTIONS}
+      filterValue={range}
+      onFilterChange={setRange}
+    >
       <ChartContainer config={config} className="h-full min-h-[240px] w-full">
-        <LineChart data={data} margin={{ left: 4, right: 8, top: 8 }}>
+        <LineChart data={chartData} margin={{ left: 4, right: 8, top: 8 }}>
           <CartesianGrid vertical={false} strokeDasharray="3 3" />
           <XAxis
             dataKey="month"

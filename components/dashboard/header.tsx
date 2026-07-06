@@ -426,11 +426,9 @@ export function Header({
           className="mr-auto hidden text-muted-foreground hover:text-foreground md:flex"
           aria-label="عرض الموقع"
           title="عرض الموقع"
-          asChild
+          render={<Link href="/" target="_blank" />}
         >
-          <Link href="/" target="_blank">
-            <Globe className="size-5" />
-          </Link>
+          <Globe className="size-5" />
         </Button>
 
         {/* Menu toggle - only visible on mobile */}

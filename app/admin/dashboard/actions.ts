@@ -4,27 +4,22 @@ import { createClient } from '@/lib/supabase/server'
 import { hasResourceAccess } from '@/lib/auth-guard'
 import { lastMonths, monthKeyOf, percentChange, getRangeStartDate, lastDays, dayKeyOf } from '@/lib/time-series'
 
-export async function getDashboardData(range: string = '30d') {
+export async function getDashboardData() {
   const supabase = await createClient()
 
   if (!(await hasResourceAccess(supabase, 'dashboard'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
-  const startDate = getRangeStartDate(range)
-  const startDateStr = startDate.toISOString()
-
   // Fetch basic stats
   const { data: payments } = await supabase
     .from('payments')
     .select('amount, status, created_at, method, student_name, course')
-    .gte('created_at', startDateStr)
     .order('created_at', { ascending: false })
 
   const { count: studentsCount, data: latestStudentsData } = await supabase
     .from('students')
     .select('id, name, email, created_at', { count: 'exact' })
-    .gte('created_at', startDateStr)
     .order('created_at', { ascending: false })
 
   const { count: coursesCount, data: latestCoursesData } = await supabase
@@ -50,66 +45,61 @@ export async function getDashboardData(range: string = '30d') {
   const approvedPayments = payments?.filter((p) => p.status === 'مقبول') || []
   const totalRevenue = approvedPayments.reduce((sum, p) => sum + Number(p.amount), 0)
 
-  // Real rolling series based on range.
-  const isDaily = range === '7d' || range === '30d'
-  const windowCount = range === '7d' ? 7 : range === '30d' ? 30 : range === '3m' ? 3 : range === '6m' ? 6 : 12
-  const window = isDaily ? lastDays(windowCount) : lastMonths(windowCount)
-  const windowStart = window[0].start
+  // Real rolling series for 12 months.
+  const monthlyWindow = lastMonths(12)
+  const monthlyWindowStart = monthlyWindow[0].start
 
   // Revenue per period.
   const revenueBucket: Record<string, number> = {}
   approvedPayments.forEach((p) => {
-    const k = isDaily ? dayKeyOf(p.created_at) : monthKeyOf(p.created_at)
+    const k = monthKeyOf(p.created_at)
     revenueBucket[k] = (revenueBucket[k] || 0) + Number(p.amount)
   })
-  const revenueData = window.map((b) => ({
-    // @ts-ignore
-    month: isDaily ? b.day : b.month,
+  const revenueData = monthlyWindow.map((b) => ({
+    month: b.month,
     revenue: revenueBucket[b.key] || 0,
   }))
 
-  // Cumulative students.
+  // Cumulative students (monthly)
   const signupsBucket: Record<string, number> = {}
   let baseStudents = 0
   latestStudentsData?.forEach((s) => {
     const date = new Date(s.created_at)
-    if (date < windowStart) {
+    if (date < monthlyWindowStart) {
       baseStudents += 1
       return
     }
-    const k = isDaily ? dayKeyOf(date) : monthKeyOf(date)
+    const k = monthKeyOf(date)
     signupsBucket[k] = (signupsBucket[k] || 0) + 1
   })
   let cumulativeStudents = baseStudents
-  const studentsData = window.map((b) => {
+  const studentsData = monthlyWindow.map((b) => {
     cumulativeStudents += signupsBucket[b.key] || 0
     return { 
-      // @ts-ignore
-      month: isDaily ? b.day : b.month, 
+      month: b.month, 
       students: cumulativeStudents 
     }
   })
 
-  // Activity per period (payments + signups)
+  // Activity per period (daily, 30 days)
+  const dailyWindow = lastDays(30)
   const activityBucket: Record<string, number> = {}
   approvedPayments.forEach((p) => {
-    const k = isDaily ? dayKeyOf(p.created_at) : monthKeyOf(p.created_at)
+    const k = dayKeyOf(p.created_at)
     activityBucket[k] = (activityBucket[k] || 0) + 1
   })
   latestStudentsData?.forEach((s) => {
-    const k = isDaily ? dayKeyOf(s.created_at) : monthKeyOf(s.created_at)
+    const k = dayKeyOf(s.created_at)
     activityBucket[k] = (activityBucket[k] || 0) + 1
   })
-  const activityData = window.map((b) => ({
-    // @ts-ignore
-    day: isDaily ? b.day : b.month,
+  const activityData = dailyWindow.map((b) => ({
+    day: b.day,
     value: activityBucket[b.key] || 0,
   }))
 
-  // Real period-over-period changes (this month vs last month) for the stat
-  // cards, plus today-vs-yesterday for daily sales.
-  const thisKey = window[window.length - 1].key
-  const prevKey = window[window.length - 2].key
+  // Real period-over-period changes (this month vs last month) for the stat cards
+  const thisKey = monthlyWindow[monthlyWindow.length - 1].key
+  const prevKey = monthlyWindow[monthlyWindow.length - 2].key
   const revThisMonth = revenueBucket[thisKey] || 0
   const revPrevMonth = revenueBucket[prevKey] || 0
   const stuThisMonth = signupsBucket[thisKey] || 0

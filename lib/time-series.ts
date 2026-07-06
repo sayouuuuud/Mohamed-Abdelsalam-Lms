@@ -27,6 +27,12 @@ export const RANGE_OPTIONS = [
   { label: 'آخر 12 شهر', value: '12' },
 ]
 
+export const DAILY_RANGE_OPTIONS = [
+  { label: 'آخر 7 أيام', value: '7' },
+  { label: 'آخر 14 يوم', value: '14' },
+  { label: 'آخر 30 يوم', value: '30' },
+]
+
 export const AR_DAYS = [
   'الأحد',
   'الإثنين',

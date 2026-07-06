@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { BookOpen, UploadCloud, Tag, UserPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { DashboardFilter } from './dashboard-filter'
 
 const actions = [
   { label: 'إضافة كورس', icon: BookOpen, href: '/admin/courses', primary: true },
@@ -21,7 +20,6 @@ export function PageHeader() {
       </div>
 
       <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4">
-        <DashboardFilter />
         <div className="flex flex-wrap gap-2">
           {actions.map((action) => (
             <Button

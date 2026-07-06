@@ -9,15 +9,25 @@ import {
   type ChartConfig,
 } from '@/components/ui/chart'
 import { PanelCard } from './panel-card'
+import { RANGE_OPTIONS } from '@/lib/time-series'
+
 const config = {
   students: { label: 'الطلاب', color: 'var(--chart-2)' },
 } satisfies ChartConfig
 
 export function StudentsChart({ data = [] }: { data?: any[] }) {
+  const [range, setRange] = useState('6')
+  const chartData = data.slice(-Number(range))
+
   return (
-    <PanelCard title="نمو الطلاب">
+    <PanelCard
+      title="نمو الطلاب"
+      filterOptions={RANGE_OPTIONS}
+      filterValue={range}
+      onFilterChange={setRange}
+    >
       <ChartContainer config={config} className="h-full min-h-[240px] w-full">
-        <AreaChart data={data} margin={{ left: 4, right: 8, top: 8 }}>
+        <AreaChart data={chartData} margin={{ left: 4, right: 8, top: 8 }}>
           <defs>
             <linearGradient id="fillStudents" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="var(--color-students)" stopOpacity={0.35} />
