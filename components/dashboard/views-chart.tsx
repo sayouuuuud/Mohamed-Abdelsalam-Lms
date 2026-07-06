@@ -26,43 +26,6 @@ export function ViewsChart({
   const [selectedDay, setSelectedDay] = useState<number | null>(null)
   const [hoveredDay, setHoveredDay] = useState<number | null>(null)
 
-  const [viewsTarget, setViewsTarget] = useState<number | null>(() => {
-    if (typeof window !== 'undefined') {
-      const val = localStorage.getItem('views_target')
-      return val ? parseInt(val, 10) : null
-    }
-    return null
-  })
-  const [visitorsTarget, setVisitorsTarget] = useState<number | null>(() => {
-    if (typeof window !== 'undefined') {
-      const val = localStorage.getItem('visitors_target')
-      return val ? parseInt(val, 10) : null
-    }
-    return null
-  })
-
-  const handleTargetClick = () => {
-    const promptMsg = metric === "views"
-      ? "أدخل القيمة المستهدفة للمشاهدات اليومية:"
-      : "أدخل القيمة المستهدفة للزوار اليوميين:"
-    const currentTarget = metric === "views"
-      ? (viewsTarget !== null ? viewsTarget : Math.round(maxValue * 0.7))
-      : (visitorsTarget !== null ? visitorsTarget : Math.round(maxValue * 0.7))
-    const res = window.prompt(promptMsg, String(currentTarget))
-    if (res !== null) {
-      const num = parseInt(res, 10)
-      if (!isNaN(num) && num >= 0) {
-        if (metric === "views") {
-          setViewsTarget(num)
-          localStorage.setItem('views_target', String(num))
-        } else {
-          setVisitorsTarget(num)
-          localStorage.setItem('visitors_target', String(num))
-        }
-      }
-    }
-  }
-
   const { chartData, viewsSum, visitorsSum, totalDays } = useMemo(() => {
     const count = Number(range)
     const sliced = count > 0 ? data.slice(-count) : data
@@ -141,10 +104,6 @@ export function ViewsChart({
       </div>
     )
   }
-
-  const targetValue = metric === "views"
-    ? (viewsTarget !== null ? viewsTarget : Math.round(maxValue * 0.7))
-    : (visitorsTarget !== null ? visitorsTarget : Math.round(maxValue * 0.7))
 
   const rangeLabel = range === '7' ? 'آخر 7 أيام' : range === '30' ? 'آخر 30 يوم' : 'الكل'
 
@@ -244,26 +203,6 @@ export function ViewsChart({
               <span>{Math.round(maxValue * 0.66)}</span>
               <span>{Math.round(maxValue * 0.33)}</span>
               <span>0</span>
-          </div>
-
-          {/* Target line with tooltip */}
-          <div
-              className="absolute right-8 left-0 flex items-center z-20 pointer-events-none"
-              style={{ top: paddingTop + ((maxValue - targetValue) / maxValue) * dotsHeight - 10 }}
-          >
-              <button
-                  type="button"
-                  onClick={handleTargetClick}
-                  title="اضغط لتعديل القيمة المستهدفة"
-                  className="bg-primary text-primary-foreground text-[10px] sm:text-xs px-2 py-0.5 sm:py-1 rounded-full flex items-center gap-1 shadow-sm pointer-events-auto cursor-pointer hover:bg-primary/95 hover:scale-105 active:scale-95 transition-all outline-none"
-              >
-                  <TrendingUp className="h-3 w-3" />
-                  <span className="font-bold">{targetValue}</span>
-              </button>
-              <div
-                  className="flex-1 border-t border-dashed border-primary/20"
-                  style={{ marginRight: 8 }}
-              />
           </div>
 
           {/* Dots Chart */}
