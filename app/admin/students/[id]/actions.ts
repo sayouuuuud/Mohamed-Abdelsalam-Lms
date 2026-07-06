@@ -149,30 +149,41 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
     }
   })
 
-  // 4. Fetch Payments
-  let paymentsQuery = supabase.from('payments').select('*')
-  
-  if (studentRow.email && studentRow.phone) {
-    paymentsQuery = paymentsQuery.or(`student_email.eq.${studentRow.email},student_phone.eq.${studentRow.phone}`)
-  } else if (studentRow.email) {
-    paymentsQuery = paymentsQuery.eq('student_email', studentRow.email)
-  } else if (studentRow.phone) {
-    paymentsQuery = paymentsQuery.eq('student_phone', studentRow.phone)
-  } else {
-    // If no email or phone, match by name as a fallback
-    paymentsQuery = paymentsQuery.eq('student_name', studentRow.name)
-  }
+  // 4. Fetch Payments from orders (matched by student.user_id = orders.student_id)
+  const { data: ordersData } = await supabase
+    .from('orders')
+    .select(`
+      id,
+      code,
+      total,
+      subtotal,
+      discount,
+      method,
+      status,
+      created_at,
+      coupon_code,
+      order_items (
+        lecture_title,
+        branch_title,
+        stage_title,
+        price
+      )
+    `)
+    .eq('student_id', studentRow.user_id)
+    .order('created_at', { ascending: false })
 
-  const { data: paymentsData } = await paymentsQuery
-
-  const payments: PaymentRecord[] = (paymentsData || []).map((p: any) => ({
-    id: p.code || p.id,
-    date: formatJoinedAt(p.created_at),
-    item: p.course,
-    amount: Number(p.amount),
-    method: p.method as PaymentRecord['method'],
-    status: p.status === 'مقبول' ? 'ناجح' : p.status === 'مرفوض' ? 'مسترد' : 'معلّق',
-  }))
+  const payments: PaymentRecord[] = (ordersData || []).map((o: any) => {
+    const items: string[] = (o.order_items || []).map((i: any) => i.lecture_title).filter(Boolean)
+    const itemLabel = items.length > 0 ? items.join('، ') : 'طلب'
+    return {
+      id: o.code || o.id,
+      date: formatJoinedAt(o.created_at),
+      item: itemLabel,
+      amount: Number(o.total),
+      method: o.method as PaymentRecord['method'],
+      status: o.status === 'مقبول' ? 'ناجح' : o.status === 'مرفوض' ? 'مسترد' : 'معلّق',
+    }
+  })
 
   const totalSpent = payments.reduce((acc, p) => p.status === 'ناجح' ? acc + p.amount : acc, 0)
 
@@ -282,8 +293,11 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
       // Student's enrollments joined to each course's branch.
       const { data: branchEnrollments } = await supabase
         .from('enrollments')
-        .select('progress, courses!inner (branch_id)')
+        .select('id, courses!inner (id, branch_id)')
         .eq('student_id', studentId)
+
+      // Build a map: course_id -> progress (already computed from lesson_progress in section 3)
+      const courseProgressMap = new Map(courses.map((c) => [c.id, c.progress]))
 
       skills = branchRows.map((branch: any) => {
         // Average exam percentage for this branch (graded submissions only).
@@ -303,17 +317,17 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
               )
             : 0
 
-        // Average course progress for this branch.
+        // Average course progress for this branch (from already-computed lesson_progress).
         const branchCourses = (branchEnrollments || []).filter(
           (e: any) => e.courses?.branch_id === branch.id,
         )
         const courseProgress =
           branchCourses.length > 0
             ? Math.round(
-                branchCourses.reduce(
-                  (sum: number, e: any) => sum + (e.progress || 0),
-                  0,
-                ) / branchCourses.length,
+                branchCourses.reduce((sum: number, e: any) => {
+                  const pct = courseProgressMap.get(e.courses?.id) ?? 0
+                  return sum + pct
+                }, 0) / branchCourses.length,
               )
             : 0
 
