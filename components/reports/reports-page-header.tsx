@@ -1,6 +1,6 @@
 'use client'
 
-import { Download, Calendar, Loader2 } from 'lucide-react'
+import { Download, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { generateReport } from '@/app/admin/reports/actions'
 import { downloadReportsCsv, type ReportsData } from '@/lib/reports-csv'
@@ -35,10 +35,7 @@ export function ReportsPageHeader({ data }: { data: ReportsData }) {
       </div>
 
       <div className="flex items-center gap-2">
-        <Button variant="outline">
-          <Calendar className="size-4" />
-          آخر 6 أشهر
-        </Button>
+
         <Button onClick={handleExport} disabled={loading}>
           {loading ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
           تصدير التقرير
