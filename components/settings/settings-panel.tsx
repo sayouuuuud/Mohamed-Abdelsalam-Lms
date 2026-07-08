@@ -104,7 +104,6 @@ function applyColorPreset(id: PresetId) {
 
 const baseTabs = [
   { id: 'profile', label: 'الملف الشخصي', icon: User },
-  { id: 'notifications', label: 'الإشعارات', icon: Bell },
   { id: 'security', label: 'الأمان', icon: Shield },
   { id: 'preferences', label: 'التفضيلات', icon: SlidersHorizontal },
   { id: 'content', label: 'محتوى الموقع', icon: LayoutTemplate },
@@ -410,53 +409,6 @@ export function SettingsPanel({
             <div className="flex justify-start gap-3">
               <Button onClick={handleProfileSave} disabled={isPending || uploadingAvatar}>حفظ التغييرات</Button>
               <Button variant="outline">إلغاء</Button>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'notifications' && (
-          <div className="space-y-2">
-            <div className="text-right">
-              <h3 className="text-lg font-bold text-foreground">الإشعارات</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                تحكّم في طريقة استقبالك للتنبيهات
-              </p>
-            </div>
-            <Separator className="my-4" />
-            <div className="divide-y divide-border">
-              <ToggleSwitch
-                checked={emailNotif}
-                onChange={setEmailNotif}
-                label="إشعارات البريد الإلكتروني"
-                description="استقبال التنبيهات عبر البريد الإلكتروني"
-              />
-              <ToggleSwitch
-                checked={pushNotif}
-                onChange={setPushNotif}
-                label="الإشعارات الفورية"
-                description="إشعارات منبثقة على المتصفح والجوال"
-              />
-              <ToggleSwitch
-                checked={smsNotif}
-                onChange={setSmsNotif}
-                label="الرسائل النصية"
-                description="استقبال التنبيهات الهامة عبر SMS"
-              />
-              <ToggleSwitch
-                checked={marketingNotif}
-                onChange={setMarketingNotif}
-                label="رسائل تسويقية"
-                description="عروض وأخبار المنصة والتحديثات"
-              />
-              <ToggleSwitch
-                checked={weeklyReport}
-                onChange={setWeeklyReport}
-                label="التقرير الأسبوعي"
-                description="ملخص أسبوعي لأداء المنصة"
-              />
-            </div>
-            <div className="flex justify-start pt-4">
-              <Button onClick={handleSave} disabled={isPending}>حفظ التفضيلات</Button>
             </div>
           </div>
         )}
