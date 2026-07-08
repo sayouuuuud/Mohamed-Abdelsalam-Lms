@@ -111,27 +111,47 @@ export async function createAssistant(input: {
     return { error: 'كلمة المرور لازم تكون 6 حروف على الأقل.' }
   }
 
-  const admin = createAdminClient()
+  // Build the service-role client (throws with a clear message if env is missing).
+  let admin: ReturnType<typeof createAdminClient>
+  try {
+    admin = createAdminClient()
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    console.log('[v0] createAssistant admin client error:', msg)
+    return { error: `إعداد Supabase ناقص: ${msg}. أضف المفتاح في إعدادات المشروع.` }
+  }
+
   const { data: created, error: authError } = await admin.auth.admin.createUser({
-    email: input.email,
+    email: input.email.trim(),
     password: input.password,
     email_confirm: true,
     user_metadata: { full_name: input.name, role: 'assistant' },
   })
 
-  if (authError || !created.user) {
-    const msg = authError?.message ?? 'no user returned'
-    console.log('[v0] createAssistant auth error:', msg)
-    if (msg.toLowerCase().includes('already registered') || msg.toLowerCase().includes('already')) {
+  if (authError || !created?.user) {
+    // Supabase AuthError props aren't JSON-serializable, so pull them out.
+    const err = authError as unknown as
+      | { message?: string; status?: number; code?: string; name?: string }
+      | null
+    const msg = err?.message ?? 'no user returned'
+    const code = err?.code ?? ''
+    const status = err?.status ?? ''
+    console.log('[v0] createAssistant auth error:', JSON.stringify({ msg, code, status, name: err?.name }))
+
+    const lower = `${msg} ${code}`.toLowerCase()
+    if (lower.includes('already') || lower.includes('registered') || lower.includes('exists')) {
       return { error: 'البريد الإلكتروني مستخدم بالفعل.' }
     }
-    if (msg.toLowerCase().includes('invalid') && msg.toLowerCase().includes('key')) {
+    if (lower.includes('invalid') && lower.includes('key')) {
       return { error: 'مفتاح الخدمة (service role key) غير صحيح. تحقق من إعدادات Supabase.' }
     }
-    if (msg.toLowerCase().includes('not authorized') || msg.toLowerCase().includes('unauthorized')) {
-      return { error: 'غير مصرح. تحقق من SUPABASE_SERVICE_ROLE_KEY في إعدادات المشروع.' }
+    if (status === 401 || status === 403 || lower.includes('not authorized') || lower.includes('unauthorized')) {
+      return { error: 'غير مصرح — مفتاح الخدمة غير صالح للـ live DB. تحقق من SUPABASE_SERVICE_ROLE_KEY.' }
     }
-    return { error: `تعذّر إنشاء الحساب: ${msg}` }
+    if (lower.includes('password')) {
+      return { error: 'كلمة المرور ضعيفة جداً. استخدم كلمة أقوى.' }
+    }
+    return { error: `تعذّر إنشاء الحساب${msg ? `: ${msg}` : '. تأكد من مفتاح الخدمة في إعدادات المشروع.'}` }
   }
 
   const userId = created.user.id
