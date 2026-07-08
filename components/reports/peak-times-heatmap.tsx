@@ -58,8 +58,18 @@ export function PeakTimesHeatmap({
     for (let i = 0; i < allDays.length; i += 7) {
       wks.push(allDays.slice(i, i + 7))
     }
-    return { weeks: wks, startDate: start, endDate: end }
+
+    const weeksWithLabels = wks.map((week, weekIdx) => {
+      const firstDay = week[0]
+      const prevWeek = wks[weekIdx - 1]
+      const isNewMonth = prevWeek ? firstDay.getMonth() !== prevWeek[0].getMonth() : true
+      return { week, isNewMonth }
+    })
+
+    return { weeks: weeksWithLabels, startDate: start, endDate: end }
   }, [])
+
+  const displayWeeks = useMemo(() => [...weeks].reverse(), [weeks])
 
   const getColor = (val: number) => {
     if (val === 0) return 'bg-secondary/40 border-transparent'
@@ -89,16 +99,12 @@ export function PeakTimesHeatmap({
             
             {/* Month Labels (X Axis) */}
             <div className="flex gap-1">
-              {weeks.map((week, weekIdx) => {
-                const firstDay = week[0]
-                const prevWeek = weeks[weekIdx - 1]
-                const isNewMonth = prevWeek ? firstDay.getMonth() !== prevWeek[0].getMonth() : true
-                
+              {displayWeeks.map(({ week, isNewMonth }, idx) => {
                 return (
-                  <div key={weekIdx} className="relative w-3 h-3.5 shrink-0">
+                  <div key={idx} className="relative w-3 h-3.5 shrink-0">
                     {isNewMonth && (
                       <span className="absolute right-0 text-[10px] text-muted-foreground whitespace-nowrap">
-                        {MONTHS_AR[firstDay.getMonth()]}
+                        {MONTHS_AR[week[0].getMonth()]}
                       </span>
                     )}
                   </div>
@@ -108,8 +114,8 @@ export function PeakTimesHeatmap({
 
             {/* Cells */}
             <div className="flex gap-1">
-              {weeks.map((week, weekIdx) => (
-                <div key={weekIdx} className="flex flex-col gap-1 shrink-0">
+              {displayWeeks.map(({ week }, idx) => (
+                <div key={idx} className="flex flex-col gap-1 shrink-0">
                   {week.map((day, dayIdx) => {
                     const dateStr = formatYMD(day)
                     const val = dataMap.map.get(dateStr) || 0

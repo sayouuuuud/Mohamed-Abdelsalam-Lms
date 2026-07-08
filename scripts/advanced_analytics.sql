@@ -68,15 +68,19 @@ begin
     limit 10
   ) t into top_students;
 
-  -- 4. Course Completion (Completed vs Enrolled)
+  -- 4. Course Completion (Average Progress Percentage)
   select coalesce(jsonb_agg(t), '[]'::jsonb) from (
     select c.title as name, 
            count(e.id) as enrolled,
-           sum(case when 
-               (select count(*) from public.lesson_progress lp where lp.enrollment_id = e.id and lp.completed = true) 
-               >= 
-               nullif((select count(*) from public.course_lessons cl join public.course_sections cs on cs.id = cl.section_id where cs.course_id = c.id), 0)
-           then 1 else 0 end) as completed
+           coalesce(
+             round(
+               avg(
+                 cast((select count(*) from public.lesson_progress lp where lp.enrollment_id = e.id and lp.completed = true) as numeric)
+                 / 
+                 nullif((select count(*) from public.course_lessons cl join public.course_sections cs on cs.id = cl.section_id where cs.course_id = c.id), 0)
+               ) * 100
+             )
+           , 0) as completion_rate
     from public.courses c
     left join public.enrollments e on e.course_id = c.id
     group by c.id, c.title

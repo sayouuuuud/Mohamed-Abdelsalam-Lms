@@ -19,13 +19,13 @@ import {
 
 const config = {
   enrolled: { label: 'مسجلين', color: 'var(--chart-4)' },
-  completed: { label: 'أكملوا الكورس', color: 'var(--chart-1)' },
+  completion_rate: { label: 'نسبة الإنجاز (%)', color: 'var(--chart-1)' },
 }
 
 export function CourseCompletionChart({
   data,
 }: {
-  data?: { name: string; enrolled: number; completed: number }[]
+  data?: { name: string; enrolled: number; completion_rate: number }[]
 }) {
   const chartData = data || []
 
@@ -42,7 +42,7 @@ export function CourseCompletionChart({
                 <ChartTooltip content={<ChartTooltipContent />} />
                 <Legend />
                 <Bar dataKey="enrolled" name="مسجلين" fill="var(--chart-4)" radius={[0, 4, 4, 0]} />
-                <Bar dataKey="completed" name="أكملوا الكورس" fill="var(--chart-1)" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="completion_rate" name="نسبة الإنجاز (%)" fill="var(--chart-1)" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </ChartContainer>
