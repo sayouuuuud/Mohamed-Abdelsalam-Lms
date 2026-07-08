@@ -54,7 +54,7 @@ export function PeakTimesHeatmap({
       current.setDate(current.getDate() + 1)
     }
 
-    const wks = []
+    const wks: Date[][] = []
     for (let i = 0; i < allDays.length; i += 7) {
       wks.push(allDays.slice(i, i + 7))
     }
