@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   ArrowRight,
@@ -51,6 +52,7 @@ export function StudentProfileView({ profile, studentDbId }: StudentProfileViewP
   const [statusOpen, setStatusOpen] = useState(false)
   const [messageOpen, setMessageOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const router = useRouter()
 
   const avgGrade =
     profile.exams.length > 0
@@ -114,12 +116,18 @@ export function StudentProfileView({ profile, studentDbId }: StudentProfileViewP
     const prev = status
     setStatus(next) // optimistic update
     startTransition(async () => {
-      const result = await updateStudentStatus(studentDbId, student.id, next)
-      if (result.error) {
-        setStatus(prev) // rollback on error
-        toast.error(`فشل تغيير الحالة: ${result.error}`)
-      } else {
-        toast.success(`تم تغيير حالة الطالب إلى "${next}"`)
+      try {
+        const result = await updateStudentStatus(studentDbId, student.id, next)
+        if (result.error) {
+          setStatus(prev) // rollback on error
+          toast.error(`فشل تغيير الحالة: ${result.error}`)
+        } else {
+          toast.success(`تم تغيير حالة الطالب إلى "${next}"`)
+          router.refresh() // sync server-rendered data with the new status
+        }
+      } catch {
+        setStatus(prev)
+        toast.error('فشل تغيير الحالة: تعذر الاتصال بالخادم.')
       }
     })
   }

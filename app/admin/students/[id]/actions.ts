@@ -13,25 +13,35 @@ export async function updateStudentStatus(
   studentCode: string,         // students.code  (for revalidation)
   newStatus: StudentStatus,
 ): Promise<{ success?: boolean; error?: string }> {
-  const supabase = await createClient()
+  try {
+    const supabase = await createClient()
 
-  if (!(await hasResourceAccess(supabase, 'students', 'manage'))) {
-    return { error: 'غير مسموح.' }
+    if (!(await hasResourceAccess(supabase, 'students', 'manage'))) {
+      return { error: 'غير مسموح.' }
+    }
+
+    const adminDb = createAdminClient()
+
+    // .select() ensures we detect the "0 rows matched" case — without it
+    // Supabase returns success even when nothing was actually updated.
+    const { data: updated, error } = await adminDb
+      .from('students')
+      .update({ status: newStatus })
+      .eq('id', studentId)
+      .select('id')
+
+    if (error) return { error: error.message }
+    if (!updated || updated.length === 0) {
+      return { error: 'لم يتم العثور على الطالب في قاعدة البيانات.' }
+    }
+
+    logActivity({ action: 'update', resource: 'students', targetId: studentCode, targetLabel: `حالة طالب: ${newStatus}` }).catch(() => {})
+    revalidatePath(`/admin/students/${studentCode}`)
+    revalidatePath('/admin/students')
+    return { success: true }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'حدث خطأ غير متوقع أثناء تغيير الحالة.' }
   }
-
-  const adminDb = createAdminClient()
-
-  const { error } = await adminDb
-    .from('students')
-    .update({ status: newStatus })
-    .eq('id', studentId)
-
-  if (error) return { error: error.message }
-
-  logActivity({ action: 'update', resource: 'students', targetId: studentCode, targetLabel: `حالة طالب: ${newStatus}` }).catch(() => {})
-  revalidatePath(`/admin/students/${studentCode}`)
-  revalidatePath('/admin/students')
-  return { success: true }
 }
 
 // ── Send a message / notification to a student ────────────────────────────────
