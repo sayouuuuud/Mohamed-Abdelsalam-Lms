@@ -55,28 +55,37 @@ export async function getStudentExam(code: string): Promise<StudentExam | null> 
   const student = await getCurrentStudent(supabase)
   if (!student) return null
 
+  // Support both UUID id and alphanumeric code in the URL param.
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(code)
   const { data: exam } = await supabase
     .from('exams')
     .select('id, code, title, course, description, duration, pass_mark, status, branch_id')
-    .eq('code', code)
+    .eq(isUuid ? 'id' : 'code', code)
     .single()
 
   if (!exam || exam.status !== 'منشور') return null
 
-  // Enforce branch targeting — same logic as getStudentExams() in actions.ts.
+  // Enforce branch targeting using orders (the real purchase record).
   if (exam.branch_id) {
-    const { data: enrollments } = await supabase
-      .from('enrollments')
-      .select('course_id')
+    const { data: orders } = await supabase
+      .from('orders')
+      .select('order_items(lecture_id)')
       .eq('student_id', student.id)
-    const lectureIds = (enrollments ?? []).map((e: any) => e.course_id)
+      .eq('status', 'approved')
+
+    const purchasedLectureIds: string[] = []
+    for (const o of orders ?? []) {
+      for (const item of (o.order_items as any[]) ?? []) {
+        if (item.lecture_id) purchasedLectureIds.push(item.lecture_id)
+      }
+    }
 
     let enrolled = false
-    if (lectureIds.length > 0) {
+    if (purchasedLectureIds.length > 0) {
       const { data: lectures } = await supabase
         .from('lectures')
         .select('branch_id')
-        .in('id', lectureIds)
+        .in('id', purchasedLectureIds)
         .eq('branch_id', exam.branch_id)
       enrolled = (lectures ?? []).length > 0
     }
@@ -184,19 +193,27 @@ export async function submitExam(code: string, answers: SubmitAnswer[]) {
     return { success: false, error: 'الاختبار غير متاح.' }
   }
 
-  // Enforce branch targeting before accepting any submission.
+  // Enforce branch targeting using orders (the real purchase record).
   if (exam.branch_id) {
-    const { data: enrollments } = await supabase
-      .from('enrollments')
-      .select('course_id')
+    const { data: orders } = await supabase
+      .from('orders')
+      .select('order_items(lecture_id)')
       .eq('student_id', student.id)
-    const lectureIds = (enrollments ?? []).map((e: any) => e.course_id)
+      .eq('status', 'approved')
+
+    const purchasedLectureIds: string[] = []
+    for (const o of orders ?? []) {
+      for (const item of (o.order_items as any[]) ?? []) {
+        if (item.lecture_id) purchasedLectureIds.push(item.lecture_id)
+      }
+    }
+
     let enrolled = false
-    if (lectureIds.length > 0) {
+    if (purchasedLectureIds.length > 0) {
       const { data: lectures } = await supabase
         .from('lectures')
         .select('branch_id')
-        .in('id', lectureIds)
+        .in('id', purchasedLectureIds)
         .eq('branch_id', exam.branch_id)
       enrolled = (lectures ?? []).length > 0
     }

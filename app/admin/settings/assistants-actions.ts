@@ -120,12 +120,18 @@ export async function createAssistant(input: {
   })
 
   if (authError || !created.user) {
-    console.log('[v0] createAssistant auth error:', authError?.message)
-    return {
-      error: authError?.message.toLowerCase().includes('already')
-        ? 'البريد الإلكتروني مستخدم بالفعل.'
-        : 'تعذّر إنشاء حساب المساعد. حاول تاني.',
+    const msg = authError?.message ?? 'no user returned'
+    console.log('[v0] createAssistant auth error:', msg)
+    if (msg.toLowerCase().includes('already registered') || msg.toLowerCase().includes('already')) {
+      return { error: 'البريد الإلكتروني مستخدم بالفعل.' }
     }
+    if (msg.toLowerCase().includes('invalid') && msg.toLowerCase().includes('key')) {
+      return { error: 'مفتاح الخدمة (service role key) غير صحيح. تحقق من إعدادات Supabase.' }
+    }
+    if (msg.toLowerCase().includes('not authorized') || msg.toLowerCase().includes('unauthorized')) {
+      return { error: 'غير مصرح. تحقق من SUPABASE_SERVICE_ROLE_KEY في إعدادات المشروع.' }
+    }
+    return { error: `تعذّر إنشاء الحساب: ${msg}` }
   }
 
   const userId = created.user.id

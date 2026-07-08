@@ -7,7 +7,7 @@ const BUCKET = 'media'
 // Unlike UploadThing, this needs no server callback, so it works in preview/sandbox.
 export async function uploadToStorage(
   file: File,
-  folder: 'images' | 'videos',
+  folder: 'images' | 'videos' | 'attachments',
 ): Promise<string> {
   const supabase = createClient()
 
