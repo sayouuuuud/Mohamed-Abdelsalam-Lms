@@ -121,12 +121,34 @@ export async function createAssistant(input: {
     return { error: `إعداد Supabase ناقص: ${msg}. أضف المفتاح في إعدادات المشروع.` }
   }
 
-  const { data: created, error: authError } = await admin.auth.admin.createUser({
-    email: input.email.trim(),
-    password: input.password,
-    email_confirm: true,
-    user_metadata: { full_name: input.name, role: 'assistant' },
-  })
+  // GoTrue occasionally returns a transient AuthRetryableFetchError (500) in
+  // this runtime. It's flaky, not fatal, so retry a few times with a short
+  // backoff before surfacing an error to the admin.
+  let created: Awaited<ReturnType<typeof admin.auth.admin.createUser>>['data'] | null = null
+  let authError: Awaited<ReturnType<typeof admin.auth.admin.createUser>>['error'] = null
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    const res = await admin.auth.admin.createUser({
+      email: input.email.trim(),
+      password: input.password,
+      email_confirm: true,
+      user_metadata: { full_name: input.name, role: 'assistant' },
+    })
+    created = res.data
+    authError = res.error
+
+    if (!authError && created?.user) break
+
+    const retryable =
+      authError?.name === 'AuthRetryableFetchError' ||
+      authError?.status === 500 ||
+      authError?.status === 502 ||
+      authError?.status === 503 ||
+      authError?.status === 504
+    if (!retryable) break
+
+    console.log(`[v0] createAssistant retryable error on attempt ${attempt}, retrying...`)
+    await new Promise((r) => setTimeout(r, attempt * 400))
+  }
 
   if (authError || !created?.user) {
     // Supabase AuthError props aren't JSON-serializable, so pull them out.
@@ -150,6 +172,9 @@ export async function createAssistant(input: {
     }
     if (lower.includes('password')) {
       return { error: 'كلمة المرور ضعيفة جداً. استخدم كلمة أقوى.' }
+    }
+    if (err?.name === 'AuthRetryableFetchError' || status === 500) {
+      return { error: 'تعذّر الاتصال بخدمة المصادقة مؤقتاً. حاول تاني بعد لحظات.' }
     }
     return { error: `تعذّر إنشاء الحساب${msg ? `: ${msg}` : '. تأكد من مفتاح الخدمة في إعدادات المشروع.'}` }
   }
