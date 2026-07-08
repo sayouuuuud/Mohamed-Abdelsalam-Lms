@@ -190,6 +190,7 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
   if (studentError || !studentRow) return null
 
   const studentId = studentRow.id
+  // `courses` and `progress` will be overwritten below with real computed values.
   const student = {
     id: studentRow.code,
     name: studentRow.name,
@@ -197,8 +198,8 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
     phone: studentRow.phone || '',
     gender: studentRow.gender,
     avatar: studentRow.avatar || undefined,
-    courses: studentRow.courses,
-    progress: studentRow.progress,
+    courses: 0,        // overwritten after courses fetch
+    progress: 0,       // overwritten after progress fetch
     spent: studentRow.spent,
     status: studentRow.status,
     joinedAt: formatJoinedAt(studentRow.joined_at),
@@ -233,60 +234,114 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
         sessions: 0,
       }
 
-  // 3. Fetch Courses & Enrollments
-  const { data: enrollments } = await supabase
-    .from('enrollments')
+  // 3. Fetch Courses & Progress via orders + order_items
+  // The system uses lectures (not the legacy `courses` table) as the product
+  // unit. Enrollments are NOT written on purchase — ownership lives in
+  // approved orders. We fetch each purchased lecture, then its lesson progress
+  // via student_content_progress (keyed by user_id + lesson_id).
+  const { data: orderedItems } = await supabase
+    .from('orders')
     .select(`
-      id,
-      enrolled_at,
-      courses (
-        id,
-        title,
-        category,
-        course_sections (
-          course_lessons (id)
+      created_at,
+      status,
+      order_items (
+        lecture_id,
+        lecture_title,
+        branch_title,
+        stage_title,
+        lectures:lecture_id (
+          id,
+          title,
+          lessons ( id )
         )
-      ),
-      lesson_progress (
-        completed,
-        completed_at
       )
     `)
-    .eq('student_id', studentId)
+    .eq('student_id', studentRow.user_id)
+    .eq('status', 'approved')
+    .order('created_at', { ascending: false })
 
-  const courses: EnrolledCourse[] = (enrollments || []).map((enrollment: any) => {
-    const course = enrollment.courses
-    const category = course?.category || 'عام'
-    
-    // Count total lessons
-    let lessonsTotal = 0
-    course?.course_sections?.forEach((section: any) => {
-      lessonsTotal += section.course_lessons?.length || 0
-    })
+  // Flatten to one row per lecture (deduplicate in case of duplicate orders).
+  // Also collect lesson ids per lecture for accurate per-lecture progress.
+  const seenLectureIds = new Set<string>()
+  const lectureRows: Array<{
+    lectureId: string
+    title: string
+    category: string
+    purchasedAt: string
+    lessonIds: string[]
+  }> = []
 
-    // Count completed lessons
-    const lessonsDone = enrollment.lesson_progress?.filter((lp: any) => lp.completed).length || 0
-    const progress = lessonsTotal > 0 ? Math.round((lessonsDone / lessonsTotal) * 100) : 0
+  for (const order of orderedItems ?? []) {
+    for (const item of (order.order_items as any[]) ?? []) {
+      const lectureId: string = item.lecture_id
+      if (!lectureId || seenLectureIds.has(lectureId)) continue
+      seenLectureIds.add(lectureId)
 
-    // Find last accessed
-    let lastAccessedDate = enrollment.enrolled_at
-    enrollment.lesson_progress?.forEach((lp: any) => {
-      if (lp.completed_at && new Date(lp.completed_at) > new Date(lastAccessedDate)) {
-        lastAccessedDate = lp.completed_at
+      const lec = item.lectures as any
+      const lessonIds: string[] = (lec?.lessons ?? []).map((l: any) => l.id).filter(Boolean)
+
+      lectureRows.push({
+        lectureId,
+        title: item.lecture_title || lec?.title || 'محاضرة',
+        category: item.branch_title || 'عام',
+        purchasedAt: order.created_at,
+        lessonIds,
+      })
+    }
+  }
+
+  // Fetch all completed lesson/content progress for this student at once.
+  const { data: progressRows } = await supabase
+    .from('student_content_progress')
+    .select('content_id, completed_at')
+    .eq('student_id', studentRow.user_id)
+    .eq('completed', true)
+
+  const { data: legacyProgress } = await supabase
+    .from('lesson_progress')
+    .select('lesson_id, completed_at')
+    .eq('student_id', studentRow.user_id)
+    .eq('completed', true)
+
+  // Build a set of completed lesson/content ids for fast lookup.
+  const completedIds = new Set<string>([
+    ...((progressRows ?? []).map((r: any) => r.content_id as string)),
+    ...((legacyProgress ?? []).map((r: any) => r.lesson_id as string)),
+  ])
+
+  const courses: EnrolledCourse[] = lectureRows.map((lec) => {
+    const totalLessons = lec.lessonIds.length
+    const lessonsDone = lec.lessonIds.filter((id) => completedIds.has(id)).length
+    const progress = totalLessons > 0 ? Math.round((lessonsDone / totalLessons) * 100) : 0
+
+    // Last accessed = latest completed_at for a lesson in this lecture.
+    let lastAccessedDate = lec.purchasedAt
+    for (const row of [...(progressRows ?? []), ...(legacyProgress ?? [])] as any[]) {
+      const id = row.content_id ?? row.lesson_id
+      if (lec.lessonIds.includes(id) && row.completed_at) {
+        if (new Date(row.completed_at) > new Date(lastAccessedDate)) {
+          lastAccessedDate = row.completed_at
+        }
       }
-    })
+    }
 
     return {
-      id: course.id,
-      name: course.title,
-      category,
+      id: lec.lectureId,
+      name: lec.title,
+      category: lec.category,
       progress,
       lessonsDone,
-      lessonsTotal,
+      lessonsTotal: totalLessons,
       lastAccessed: formatRelativeTime(lastAccessedDate),
       status: progress >= 100 ? 'مكتمل' : progress === 0 ? 'متوقف' : 'قيد التقدم',
     }
   })
+
+  // Back-fill the summary stats with real computed values.
+  student.courses = courses.length
+  student.progress = courses.length > 0
+    ? Math.round(courses.reduce((sum, c) => sum + c.progress, 0) / courses.length)
+    : 0
 
   // 4. Fetch Payments from orders (matched by student.user_id = orders.student_id)
   const { data: ordersData } = await supabase
@@ -400,13 +455,11 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
   // Total lessons across all enrolled courses (for progress %).
   const totalLessonsAll = courses.reduce((sum, c) => sum + c.lessonsTotal, 0)
 
-  // Flatten all completed lesson_progress entries with a completion date.
-  const completedLessons: Date[] = []
-  ;(enrollments || []).forEach((e: any) => {
-    ;(e.lesson_progress || []).forEach((lp: any) => {
-      if (lp.completed && lp.completed_at) completedLessons.push(new Date(lp.completed_at))
-    })
-  })
+  // Flatten all completed lesson/content progress entries with a completion date.
+  const completedLessons: Date[] = [
+    ...((progressRows ?? []).filter((r: any) => r.completed_at).map((r: any) => new Date(r.completed_at))),
+    ...((legacyProgress ?? []).filter((r: any) => r.completed_at).map((r: any) => new Date(r.completed_at))),
+  ]
 
   // Cumulative progress % at the end of each month bucket.
   const progressTrend = monthBuckets.map((b) => {
