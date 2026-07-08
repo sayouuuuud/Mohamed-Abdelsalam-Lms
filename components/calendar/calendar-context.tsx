@@ -22,6 +22,9 @@ export type EventFormValues = {
   type: CalendarEventType
   course?: string
   description?: string
+  stageId?: string | null
+  branchId?: string | null
+  lectureId?: string | null
 }
 
 export type TargetingOptions = {

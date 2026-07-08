@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Search, Trash2, Mail, Phone } from 'lucide-react'
@@ -15,6 +15,9 @@ import {
   type StudentStatus,
 } from '@/lib/students-data'
 import { useStudents } from './students-context'
+import { Pagination } from '@/components/ui/pagination'
+
+const ITEMS_PER_PAGE = 10
 
 const statusStyles: Record<StudentStatus, string> = {
   نشط: 'bg-success/10 text-success',
@@ -27,6 +30,11 @@ export function StudentsTable() {
   const router = useRouter()
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<StudentStatus | 'الكل'>('الكل')
+  const [page, setPage] = useState(1)
+
+  useEffect(() => {
+    setPage(1)
+  }, [query, filter])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -40,6 +48,11 @@ export function StudentsTable() {
       return matchesStatus && matchesQuery
     })
   }, [query, filter, students])
+
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE)
+  const paginated = useMemo(() => {
+    return filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
+  }, [filtered, page])
 
   return (
     <Card className="gap-0 p-5">
@@ -91,7 +104,7 @@ export function StudentsTable() {
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {filtered.map((student) => (
+            {paginated.map((student) => (
               <tr
                 key={student.id}
                 onClick={() => router.push(`/admin/students/${student.id}`)}
@@ -171,7 +184,7 @@ export function StudentsTable() {
 
       {/* Mobile cards */}
       <ul className="mt-5 space-y-3 md:hidden">
-        {filtered.map((student) => (
+        {paginated.map((student) => (
           <li
             key={student.id}
             className="rounded-xl border border-border bg-secondary/30 p-4"
@@ -240,30 +253,13 @@ export function StudentsTable() {
       )}
 
       {/* Footer */}
-      <div className="mt-5 flex items-center justify-between border-t border-border pt-4 text-xs text-muted-foreground">
-        <span>
-          عرض <strong className="text-foreground">{filtered.length}</strong> من أصل{' '}
-          <strong className="text-foreground">{students.length}</strong> طالب
-        </span>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="border-border bg-card text-foreground"
-            onClick={() => toast.info('أنت في الصفحة الأولى')}
-          >
-            السابق
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="border-border bg-card text-foreground"
-            onClick={() => toast.info('لا توجد صفحات إضافية')}
-          >
-            التالي
-          </Button>
-        </div>
-      </div>
+      {filtered.length > 0 && (
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+        />
+      )}
     </Card>
   )
 }

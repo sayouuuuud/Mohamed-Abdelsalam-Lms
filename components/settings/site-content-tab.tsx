@@ -681,6 +681,14 @@ function SeoEditor({ value, onChange }: { value: SeoContent; onChange: (v: SeoCo
       <Field label="وصف الصفحة (description)" hint="يظهر في نتائج البحث، يُفضّل 120-160 حرف">
         <Textarea value={value.description} onChange={(v) => set('description', v)} rows={3} />
       </Field>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="نص شاشة التحميل (Loader Text)" hint="النص الذي يظهر أسفل المعادلة الرياضية">
+          <Input value={value.loaderText || ''} onChange={(e) => set('loaderText', e.target.value)} className="text-right" placeholder="جاري تجهيز المنصة..." />
+        </Field>
+        <Field label="معادلة شاشة التحميل" hint="مثال: f(x) = ∫ e^x dx (سيتم قسمها عند علامة = إذا وُجدت)">
+          <Input value={value.loaderEquation || ''} onChange={(e) => set('loaderEquation', e.target.value)} dir="ltr" className="text-left font-mono" placeholder="f(x) = ∫ e^x dx" />
+        </Field>
+      </div>
     </div>
   )
 }

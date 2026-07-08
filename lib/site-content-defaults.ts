@@ -115,6 +115,8 @@ export type NavbarContent = {
 export type SeoContent = {
   title: string
   description: string
+  loaderText: string
+  loaderEquation: string
 }
 
 export type LoginPanelStat = {
@@ -336,9 +338,11 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
   },
 
   seo: {
-    title: 'منصة الأستاذ عبد السلام | تعلّم الرياضيات بسهولة',
+    title: 'الأستاذ عبد السلام | منصة الرياضيات للثانوية العامة',
     description:
-      'منصة الأستاذ عبد السلام التعليمية للرياضيات لجميع المراحل الدراسية — شرح مبسّط، بنك أسئلة، وامتحانات تفاعلية. اختر مرحلتك وابدأ رحلة التفوق.',
+      'منصة تعليمية متكاملة لشرح مادة الرياضيات للمرحلة الثانوية. ابدأ الآن واضمن تفوقك.',
+    loaderText: 'جاري تجهيز المنصة...',
+    loaderEquation: 'f(x) = ∫ e^x dx'
   },
 
   login_panel: {

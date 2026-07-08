@@ -123,7 +123,7 @@ export function ExamCharts({ submissions }: { submissions: ExamSubmissionDetail[
                   ))}
                 </Pie>
                 <Tooltip 
-                  formatter={(value: number) => [`${value} ${value === 1 ? 'طالب' : 'طلاب'}`, 'العدد']}
+                  formatter={(value: any) => [`${value} ${value === 1 ? 'طالب' : 'طلاب'}`, 'العدد']}
                   contentStyle={{ borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--background)', fontFamily: 'inherit' }}
                 />
                 <Legend 

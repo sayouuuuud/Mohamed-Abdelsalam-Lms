@@ -53,7 +53,7 @@ export function PaymentMethodsTrends({
   }
 
   return (
-    <PanelCard>
+    <PanelCard title="اتجاهات طرق الدفع">
       <div className="flex flex-col gap-6 p-2">
         <div className="flex items-center justify-between">
           <span className="text-muted-foreground font-medium text-lg">إجمالي المدفوعات</span>

@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
   const { data, error } = await supabase.auth.admin.generateLink({
     type: 'signup',
     email,
-  })
+  } as any)
 
   const code = data?.properties?.email_otp
   if (error || !code) {

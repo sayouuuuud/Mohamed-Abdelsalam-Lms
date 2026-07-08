@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -8,6 +8,9 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Search, Inbox, ClipboardCheck, Hourglass } from 'lucide-react'
 import type { ExamSubmissionDetail } from '@/app/admin/exams/[id]/actions'
+import { Pagination } from '@/components/ui/pagination'
+
+const ITEMS_PER_PAGE = 10
 
 export function ExamSubmissionsTable({
   submissions,
@@ -17,6 +20,11 @@ export function ExamSubmissionsTable({
   examCode: string
 }) {
   const [query, setQuery] = useState('')
+  const [page, setPage] = useState(1)
+
+  useEffect(() => {
+    setPage(1)
+  }, [query])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -27,6 +35,11 @@ export function ExamSubmissionsTable({
         s.studentCode.toLowerCase().includes(q)
     )
   }, [query, submissions])
+
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE)
+  const paginated = useMemo(() => {
+    return filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
+  }, [filtered, page])
 
   if (submissions.length === 0) {
     return (
@@ -69,7 +82,7 @@ export function ExamSubmissionsTable({
               </tr>
             </thead>
             <tbody className="divide-y">
-              {filtered.map((sub) => {
+              {paginated.map((sub) => {
                 const pending = sub.gradingStatus === 'pending'
                 const percentage = sub.total > 0 ? (sub.score / sub.total) * 100 : 0
                 const isPassed = percentage >= 50
@@ -141,6 +154,13 @@ export function ExamSubmissionsTable({
           </table>
         </div>
       </CardContent>
+      {filtered.length > 0 && (
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+        />
+      )}
     </Card>
   )
 }

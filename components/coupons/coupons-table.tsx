@@ -1,12 +1,15 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Search, Copy, Check, Pencil, Trash2 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { type CouponStatus } from '@/lib/coupons-data'
 import { useCoupons } from './coupons-context'
+import { Pagination } from '@/components/ui/pagination'
+
+const ITEMS_PER_PAGE = 10
 
 const statusStyles: Record<CouponStatus, string> = {
   نشط: 'bg-success/10 text-success',
@@ -34,6 +37,11 @@ export function CouponsTable() {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<CouponStatus | 'الكل'>('الكل')
   const [copied, setCopied] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+
+  useEffect(() => {
+    setPage(1)
+  }, [query, filter])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -46,6 +54,11 @@ export function CouponsTable() {
       return matchesStatus && matchesQuery
     })
   }, [query, filter, coupons])
+
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE)
+  const paginated = useMemo(() => {
+    return filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
+  }, [filtered, page])
 
   const handleCopy = (code: string) => {
     navigator.clipboard?.writeText(code)
@@ -102,7 +115,7 @@ export function CouponsTable() {
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {filtered.map((coupon) => {
+            {paginated.map((coupon) => {
               const pct = Math.min(100, Math.round((coupon.used / coupon.limit) * 100))
               return (
                 <tr key={coupon.id} className="transition-colors hover:bg-secondary/40">
@@ -184,7 +197,7 @@ export function CouponsTable() {
 
       {/* Mobile cards */}
       <ul className="mt-5 space-y-3 md:hidden">
-        {filtered.map((coupon) => {
+        {paginated.map((coupon) => {
           const pct = Math.min(100, Math.round((coupon.used / coupon.limit) * 100))
           return (
             <li
@@ -260,12 +273,13 @@ export function CouponsTable() {
       )}
 
       {/* Footer */}
-      <div className="mt-5 flex items-center justify-between border-t border-border pt-4 text-xs text-muted-foreground">
-        <span>
-          عرض <strong className="text-foreground">{filtered.length}</strong> من أصل{' '}
-          <strong className="text-foreground">{coupons.length}</strong> كوبون
-        </span>
-      </div>
+      {filtered.length > 0 && (
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+        />
+      )}
     </Card>
   )
 }

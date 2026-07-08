@@ -61,8 +61,13 @@ export default async function RootLayout({
   // أو حساب يقراه، فيفضل ثابت عبر كل الأجهزة وحتى قبل تسجيل الدخول.
   let savedColor = 'navy'
   let savedNeon = 'teal-violet'
+  let seoContent: any = null
   try {
-    ;[savedColor, savedNeon] = await Promise.all([getSiteColor(), getSiteNeon()])
+    ;[savedColor, savedNeon, { seo: seoContent }] = await Promise.all([
+      getSiteColor(),
+      getSiteNeon(),
+      getSiteContent(),
+    ])
   } catch {
     // لو فشل الجلب نكمّل بالقيم الافتراضية
   }
@@ -120,7 +125,7 @@ export default async function RootLayout({
       <body className={`${cairo.className} font-sans antialiased`}>
         <ThemeProvider>
           <CartProvider>
-            <MathLoader />
+            <MathLoader text={seoContent?.loaderText} equation={seoContent?.loaderEquation} />
             {children}
             <CartModal />
             <PageViewTracker />

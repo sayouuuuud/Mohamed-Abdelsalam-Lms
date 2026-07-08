@@ -1,6 +1,7 @@
 'use client'
 
 import { DonutChart } from '@/components/ui/donut-chart'
+import type { ChartConfig } from '@/components/ui/chart'
 import { PanelCard } from './panel-card'
 
 const config = {

@@ -59,7 +59,7 @@ export type AuthFilters = {
   page?: number
 }
 
-const PAGE_SIZE = 50
+const PAGE_SIZE = 10
 
 export async function getActivityLogs(filters: ActivityFilters = {}): Promise<{
   logs: ActivityLog[]

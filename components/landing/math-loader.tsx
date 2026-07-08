@@ -4,7 +4,13 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 
-export function MathLoader() {
+export function MathLoader({ 
+  text = 'جاري تجهيز المنصة...',
+  equation = 'f(x) = ∫ e^x dx'
+}: { 
+  text?: string
+  equation?: string
+}) {
   const pathname = usePathname()
   // The intro splash is a marketing flourish for the public landing/stages
   // pages only — it should never delay the student or admin portals.
@@ -32,6 +38,11 @@ export function MathLoader() {
     return () => clearTimeout(timer)
   }, [isMarketing])
 
+  const parts = equation.split('=')
+  const left = parts[0]?.trim() || ''
+  const right = parts.length > 1 ? parts.slice(1).join('=').trim() : ''
+  const hasEqual = parts.length > 1
+
   return (
     <AnimatePresence>
       {loading && (
@@ -52,24 +63,28 @@ export function MathLoader() {
                 transition={{ duration: 0.6, delay: 0.2 }}
                 className="font-bold italic"
               >
-                f(x)
+                {left}
               </motion.span>
-              <motion.span
-                initial={{ opacity: 0, scale: 0.5 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.4, delay: 0.8 }}
-                className="text-emerald-deep dark:text-white/50"
-              >
-                =
-              </motion.span>
-              <motion.span
-                initial={{ clipPath: 'inset(0 100% 0 0)' }}
-                animate={{ clipPath: 'inset(0 0% 0 0)' }}
-                transition={{ duration: 1.2, ease: 'easeInOut', delay: 1.2 }}
-                className="inline-block italic text-gold-deep dark:text-gold"
-              >
-                ∫ e^x dx
-              </motion.span>
+              {hasEqual && (
+                <motion.span
+                  initial={{ opacity: 0, scale: 0.5 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.4, delay: 0.8 }}
+                  className="text-emerald-deep dark:text-white/50"
+                >
+                  =
+                </motion.span>
+              )}
+              {right && (
+                <motion.span
+                  initial={{ clipPath: 'inset(0 100% 0 0)' }}
+                  animate={{ clipPath: 'inset(0 0% 0 0)' }}
+                  transition={{ duration: 1.2, ease: 'easeInOut', delay: 1.2 }}
+                  className="inline-block italic text-gold-deep dark:text-gold"
+                >
+                  {right}
+                </motion.span>
+              )}
             </motion.div>
             
             <motion.div 
@@ -79,7 +94,7 @@ export function MathLoader() {
               className="mt-8 font-mono text-sm md:text-base tracking-widest text-ink-muted dark:text-ink-dim"
               dir="rtl"
             >
-              جاري تجهيز المنصة...
+              {text}
             </motion.div>
           </div>
         </motion.div>

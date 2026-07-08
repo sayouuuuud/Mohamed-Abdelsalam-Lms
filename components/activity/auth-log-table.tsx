@@ -9,6 +9,7 @@ import { ChevronRight, ChevronLeft, LogIn, LogOut } from 'lucide-react'
 import type { AuthLog, AuthFilters, ActorOption } from '@/app/admin/activity/actions'
 import { getAuthLogs } from '@/app/admin/activity/actions'
 import { ActivityFiltersBar } from './activity-filters-bar'
+import { Pagination } from '@/components/ui/pagination'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -59,7 +60,7 @@ export function AuthLogTable({
   const [filters, setFilters] = useState<Omit<AuthFilters, 'page'>>({})
   const [isPending, startTransition] = useTransition()
 
-  const PAGE_SIZE = 50
+  const PAGE_SIZE = 10
   const totalPages = Math.ceil(total / PAGE_SIZE)
 
   function load(newFilters: Omit<AuthFilters, 'page'>, newPage: number) {
@@ -151,30 +152,15 @@ export function AuthLogTable({
         </div>
 
         {totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-border px-4 py-3">
-            <span className="text-sm text-muted-foreground">
-              صفحة {page} من {totalPages} ({total.toLocaleString('ar-EG')} سجل)
-            </span>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page <= 1 || isPending}
-                onClick={() => load(filters, page - 1)}
-              >
-                <ChevronRight className="size-4" />
-                السابق
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= totalPages || isPending}
-                onClick={() => load(filters, page + 1)}
-              >
-                التالي
-                <ChevronLeft className="size-4" />
-              </Button>
+          <div className="flex flex-col gap-2 p-2">
+            <div className="px-4 py-2 text-sm text-muted-foreground text-center sm:text-right">
+              إجمالي السجلات: {total.toLocaleString('ar-EG')}
             </div>
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              onPageChange={(p) => load(filters, p)}
+            />
           </div>
         )}
       </Card>

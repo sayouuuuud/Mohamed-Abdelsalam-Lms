@@ -2,12 +2,6 @@
 
 import { useMemo, useState } from 'react'
 import { Eye, Users, TrendingUp, ChevronDown, Download } from 'lucide-react'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
 
 type ViewsPoint = { label: string; views: number; visitors: number }

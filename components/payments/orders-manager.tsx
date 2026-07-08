@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
@@ -36,6 +36,9 @@ import {
   type AdminOrder,
   type OrderStatus,
 } from '@/app/admin/payments/orders-actions'
+import { Pagination } from '@/components/ui/pagination'
+
+const ITEMS_PER_PAGE = 10
 
 const STATUS_LABEL: Record<OrderStatus, string> = {
   pending: 'قيد المراجعة',
@@ -99,6 +102,11 @@ export function OrdersManager({ initialOrders }: { initialOrders: AdminOrder[] }
   const [status, setStatus] = useState<OrderStatus | 'all'>('all')
   const [preview, setPreview] = useState<AdminOrder | null>(null)
   const [messaging, setMessaging] = useState(false)
+  const [page, setPage] = useState(1)
+
+  useEffect(() => {
+    setPage(1)
+  }, [query, status])
 
   const stats = useMemo(() => {
     const pending = orders.filter((o) => o.status === 'pending').length
@@ -129,6 +137,11 @@ export function OrdersManager({ initialOrders }: { initialOrders: AdminOrder[] }
       return matchesStatus && matchesQuery
     })
   }, [orders, query, status])
+
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE)
+  const paginated = useMemo(() => {
+    return filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
+  }, [filtered, page])
 
   async function changeStatus(id: string, next: OrderStatus) {
     const original = [...orders]
@@ -230,7 +243,7 @@ export function OrdersManager({ initialOrders }: { initialOrders: AdminOrder[] }
               </tr>
             </thead>
             <tbody>
-              {filtered.map((o) => (
+              {paginated.map((o) => (
                 <tr key={o.id} className="border-b border-border last:border-0 hover:bg-secondary/50">
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
@@ -268,7 +281,7 @@ export function OrdersManager({ initialOrders }: { initialOrders: AdminOrder[] }
 
         {/* Mobile cards */}
         <div className="divide-y divide-border lg:hidden">
-          {filtered.map((o) => (
+          {paginated.map((o) => (
             <div key={o.id} className="space-y-3 p-5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -315,6 +328,14 @@ export function OrdersManager({ initialOrders }: { initialOrders: AdminOrder[] }
             <Inbox className="size-8 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">لا توجد طلبات مطابقة</p>
           </div>
+        )}
+
+        {filtered.length > 0 && (
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+          />
         )}
       </Card>
 
