@@ -5,15 +5,19 @@ import { FilePlus2, Download } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { exportToCsv } from '@/lib/export-csv'
-import { examRecords } from '@/lib/exams-data'
+import type { ExamRecord } from '@/lib/exams-data'
 import { useCanManage } from '@/components/dashboard/permissions-context'
 
-export function ExamsPageHeader() {
+export function ExamsPageHeader({ exams }: { exams: ExamRecord[] }) {
   const canManage = useCanManage('exams')
   const exportData = () => {
+    if (exams.length === 0) {
+      toast.error('لا توجد بيانات اختبارات للتصدير')
+      return
+    }
     exportToCsv(
       'exams.csv',
-      examRecords.map((exam) => ({
+      exams.map((exam) => ({
         'رقم الاختبار': exam.id,
         'عنوان الاختبار': exam.title,
         الكورس: exam.course,
