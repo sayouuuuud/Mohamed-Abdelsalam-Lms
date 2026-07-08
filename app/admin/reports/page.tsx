@@ -36,7 +36,7 @@ export default async function ReportsPage() {
   const adv = advancedData.data
 
   return (
-    <div className="space-y-6">
+    <div id="reports-content" className="space-y-6">
       <ReportsPageHeader data={data} />
       <ReportsStats stats={data.reportStats} />
       
