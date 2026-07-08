@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { hasResourceAccess } from '@/lib/auth-guard'
 import { logActivity } from '@/lib/audit-log'
@@ -18,7 +19,9 @@ export async function updateStudentStatus(
     return { error: 'غير مسموح.' }
   }
 
-  const { error } = await supabase
+  const adminDb = createAdminClient()
+
+  const { error } = await adminDb
     .from('students')
     .update({ status: newStatus })
     .eq('id', studentId)
@@ -46,6 +49,8 @@ export async function sendMessageToStudent(
     return { error: 'غير مسموح.' }
   }
 
+  const adminDb = createAdminClient()
+
   const timeLabel = new Date().toLocaleString('ar-EG', {
     day: 'numeric',
     month: 'long',
@@ -56,7 +61,7 @@ export async function sendMessageToStudent(
   if (channel === 'إشعار') {
     // Insert into notifications table
     const code = `NOTIF-${Date.now()}`
-    const { error } = await supabase.from('notifications').insert({
+    const { error } = await adminDb.from('notifications').insert({
       code,
       student_id: studentId,
       type: 'رسالة إدارية',
@@ -66,12 +71,24 @@ export async function sendMessageToStudent(
     })
     if (error) return { error: error.message }
   } else {
+    // We need the student's user_id for the messages table!
+    const { data: studentRow } = await adminDb
+      .from('students')
+      .select('user_id')
+      .eq('id', studentId)
+      .single()
+
+    if (!studentRow?.user_id) {
+      return { error: 'الطالب غير مرتبط بحساب مستخدم.' }
+    }
+    const studentUserId = studentRow.user_id
+
     // Insert or append into messages table
     // Check if an existing open thread exists for this student
-    const { data: existing } = await supabase
+    const { data: existing } = await adminDb
       .from('messages')
       .select('id, code, chat_history, student_unread')
-      .eq('student_id', studentId)
+      .eq('student_id', studentUserId)
       .eq('status', 'open')
       .order('created_at', { ascending: false })
       .limit(1)
@@ -87,7 +104,7 @@ export async function sendMessageToStudent(
     if (existing) {
       // Append to existing thread
       const history = (existing.chat_history as any[]) ?? []
-      const { error } = await supabase
+      const { error } = await adminDb
         .from('messages')
         .update({
           chat_history: [...history, newMsg],
@@ -100,9 +117,9 @@ export async function sendMessageToStudent(
     } else {
       // Create a new thread
       const code = `MSG-ADMIN-${Date.now()}`
-      const { error } = await supabase.from('messages').insert({
+      const { error } = await adminDb.from('messages').insert({
         code,
-        student_id: studentId,
+        student_id: studentUserId,
         sender_name: studentName,
         subject: subject || 'رسالة من الإدارة',
         content: body,
