@@ -73,6 +73,19 @@ export async function getSiteContent(): Promise<SiteContent> {
       login_panel:  deepMerge(DEFAULT_SITE_CONTENT.login_panel,  (dbMap.login_panel  ?? {}) as Partial<LoginPanelContent>),
     }
   } catch (err) {
+    // Re-throw Next.js control-flow signals (e.g. DYNAMIC_SERVER_USAGE raised by
+    // cookies() during static generation). Swallowing them logs false errors and
+    // prevents Next from correctly switching the route to dynamic rendering.
+    if (
+      err &&
+      typeof err === 'object' &&
+      'digest' in err &&
+      typeof (err as { digest?: unknown }).digest === 'string' &&
+      ((err as { digest: string }).digest === 'DYNAMIC_SERVER_USAGE' ||
+        (err as { digest: string }).digest.startsWith('NEXT_'))
+    ) {
+      throw err
+    }
     console.log('[v0] getSiteContent unexpected error:', err)
     return DEFAULT_SITE_CONTENT
   }
