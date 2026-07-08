@@ -325,6 +325,47 @@ function HeroEditor({ value, onChange }: { value: HeroContent; onChange: (v: Her
       <Field label="النص البديل للصورة (alt)">
         <Input value={value.teacherImageAlt} onChange={(e) => set('teacherImageAlt', e.target.value)} className="text-right" />
       </Field>
+      <Separator />
+      <div>
+        <p className="mb-2 text-sm font-medium text-foreground text-right">الأرقام الصغيرة (mini stats على صورة الهيرو)</p>
+        <div className="space-y-3">
+          {(value.miniStats ?? []).map((stat, i) => (
+            <div key={i} className="rounded-lg border border-border p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <Button
+                  type="button" variant="ghost" size="icon"
+                  className="size-7 text-destructive hover:text-destructive"
+                  onClick={() => set('miniStats', value.miniStats.filter((_, idx) => idx !== i))}
+                >
+                  <Trash2 className="size-3.5" />
+                </Button>
+                <p className="text-xs font-semibold text-muted-foreground">{stat.prefix}{stat.value}{stat.suffix} — {stat.label}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <Field label="البادئة (prefix)">
+                  <Input value={stat.prefix} onChange={(e) => { const n = [...value.miniStats]; n[i] = { ...stat, prefix: e.target.value }; set('miniStats', n) }} dir="ltr" />
+                </Field>
+                <Field label="الرقم">
+                  <Input type="number" value={stat.value} onChange={(e) => { const n = [...value.miniStats]; n[i] = { ...stat, value: Number(e.target.value) }; set('miniStats', n) }} dir="ltr" />
+                </Field>
+                <Field label="اللاحقة (suffix)">
+                  <Input value={stat.suffix} onChange={(e) => { const n = [...value.miniStats]; n[i] = { ...stat, suffix: e.target.value }; set('miniStats', n) }} dir="ltr" />
+                </Field>
+                <Field label="التسمية">
+                  <Input value={stat.label} onChange={(e) => { const n = [...value.miniStats]; n[i] = { ...stat, label: e.target.value }; set('miniStats', n) }} className="text-right" />
+                </Field>
+              </div>
+            </div>
+          ))}
+          <Button
+            type="button" variant="outline" size="sm"
+            onClick={() => set('miniStats', [...(value.miniStats ?? []), { prefix: '', value: 0, suffix: '+', label: '' }])}
+            className="gap-2"
+          >
+            <Plus className="size-3.5" />إضافة رقم
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }

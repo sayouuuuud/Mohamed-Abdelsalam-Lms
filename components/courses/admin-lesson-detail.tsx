@@ -24,6 +24,7 @@ import { Modal, Field } from '@/components/ui/modal'
 import { VideoUploadField } from '@/components/ui/video-upload-field'
 import { VideoPlayer } from '@/components/student/courses/video-player'
 import { cn } from '@/lib/utils'
+import { uploadToStorage } from '@/lib/storage-upload'
 import { type AdminLesson, type LessonAttachment, updateLesson } from '@/app/admin/courses/actions'
 
 const textareaClass =
@@ -72,8 +73,6 @@ export function AdminLessonDetail({
     if (!files.length) return
     setUploading(true)
     try {
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       const added: LessonAttachment[] = []
       for (const file of files) {
         const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
@@ -82,27 +81,12 @@ export function AdminLessonDetail({
           : ['doc', 'docx'].includes(ext) ? 'doc'
           : ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext) ? 'image'
           : 'other'
-        // Use the existing public `media` bucket under lesson-attachments/
-        const safeName = file.name.replace(/\s+/g, '_')
-        const path = `lesson-attachments/${Date.now()}-${safeName}`
-        const res = await fetch(
-          `${supabaseUrl}/storage/v1/object/media/${path}`,
-          {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${supabaseKey}`,
-              'Content-Type': file.type,
-              'x-upsert': 'true',
-            },
-            body: file,
-          },
-        )
-        if (!res.ok) {
+        try {
+          const url = await uploadToStorage(file, 'attachments')
+          added.push({ name: file.name, url, type: fileType })
+        } catch {
           toast.error(`فشل رفع ${file.name}`)
-          continue
         }
-        const url = `${supabaseUrl}/storage/v1/object/public/media/${path}`
-        added.push({ name: file.name, url, type: fileType })
       }
       setAttachments((prev) => [...prev, ...added])
       if (added.length) toast.success(`تم رفع ${added.length} ملف`)
