@@ -377,13 +377,14 @@ export async function getPurchasedAssignment(
   } = await supabase.auth.getUser()
   if (!user) return undefined
 
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(assignmentId)
   const { data: a, error } = await supabase
     .from('assignments')
     .select(
       `id, code, type, title, description, instructions, points, sort_order, lecture_id,
        assignment_questions ( id, kind, question, options, correct_index, position )`,
     )
-    .eq('id', assignmentId)
+    .eq(isUuid ? 'id' : 'code', assignmentId)
     .maybeSingle()
 
   if (error || !a || !a.lecture_id) return undefined
@@ -399,7 +400,9 @@ export async function getPurchasedAssignment(
   for (const c of courses) {
     for (const s of c.sections) {
       const match = (s.items ?? []).find(
-        (it) => it.kind === 'assignment' && it.assignment.id === assignmentId,
+        (it) =>
+          it.kind === 'assignment' &&
+          (it.assignment.id === a.id || it.assignment.id === assignmentId),
       )
       if (match && match.kind === 'assignment') {
         course = c

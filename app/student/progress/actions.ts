@@ -152,11 +152,12 @@ export async function submitAssignmentProgress(
     .single()
   if (!studentRow) return { error: 'لم يتم العثور على بيانات الطالب.' }
 
-  // Resolve assignment UUID from its code.
+  // Resolve assignment UUID from its code or ID.
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(assignmentCode)
   const { data: asgRow } = await supabase
     .from('assignments')
     .select('id')
-    .eq('code', assignmentCode)
+    .eq(isUuid ? 'id' : 'code', assignmentCode)
     .single()
   if (!asgRow) return { error: 'الواجب غير موجود.' }
 
@@ -176,6 +177,21 @@ export async function submitAssignmentProgress(
   if (error) {
     return { error: 'تعذّر حفظ التسليم.' }
   }
+
+  // Record it in the unified curriculum progress table so the next item unlocks
+  await supabase
+    .from('student_content_progress')
+    .upsert(
+      {
+        user_id: user.id,
+        item_type: 'assignment',
+        item_id: asgRow.id,
+        status: payload.status,
+        score: payload.score ?? null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id,item_type,item_id' },
+    )
 
   if (payload.courseSlug) revalidatePath(`/student/courses/${payload.courseSlug}`)
   revalidatePath('/student/assignments')

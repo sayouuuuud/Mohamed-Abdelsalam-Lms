@@ -35,8 +35,10 @@ export function getStudentAvatar(student: {
   id?: string
   gender?: StudentGender
   avatar?: string
+  avatarUrl?: string | null
 }): string {
   if (student?.avatar) return student.avatar
+  if (student?.avatarUrl) return student.avatarUrl
   const pool = student?.gender === 'أنثى' ? femaleAvatars : maleAvatars
   // Fall back to a stable seed when the student has no id yet (e.g. a freshly
   // registered user that doesn't have a `students` row).
