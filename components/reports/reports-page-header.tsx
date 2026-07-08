@@ -1,13 +1,7 @@
 'use client'
 
-import { Download, FileText, Loader2, Table2 } from 'lucide-react'
+import { FileText, Loader2, Table2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { generateReport } from '@/app/admin/reports/actions'
 import { downloadReportsCsv, type ReportsData } from '@/lib/reports-csv'
 import { exportReportsPdf } from '@/lib/reports-pdf'
@@ -52,29 +46,19 @@ export function ReportsPageHeader({ data }: { data: ReportsData }) {
         </p>
       </div>
 
-      <div className="flex items-center gap-2" data-export-exclude>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button disabled={loading}>
-              {loading ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Download className="size-4" />
-              )}
-              تصدير التقرير
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={handleExportPdf} disabled={loading}>
-              <FileText className="size-4" />
-              <span>PDF كامل بالرسوم البيانية</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleExportCsv} disabled={loading}>
-              <Table2 className="size-4" />
-              <span>CSV (البيانات فقط)</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+      <div className="flex flex-wrap items-center gap-2" data-export-exclude>
+        <Button onClick={handleExportPdf} disabled={loading}>
+          {loading ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <FileText className="size-4" />
+          )}
+          تصدير PDF بالرسوم البيانية
+        </Button>
+        <Button variant="outline" onClick={handleExportCsv} disabled={loading}>
+          <Table2 className="size-4" />
+          تصدير CSV
+        </Button>
       </div>
     </div>
   )
