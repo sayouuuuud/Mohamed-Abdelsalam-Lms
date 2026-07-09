@@ -17,6 +17,13 @@ export const ourFileRouter = {
     .onUploadComplete(async ({ file }) => {
       return { url: file.url };
     }),
+  // Lesson attachments (PDF, Word, images, etc.) uploaded from admin lesson editor.
+  // UploadThing only allows power-of-two sizes, so the endpoint cap is 128MB while
+  // the client enforces the intended 100MB per-file limit.
+  lessonAttachment: f({ blob: { maxFileSize: "128MB", maxFileCount: 10 } })
+    .onUploadComplete(async ({ file }) => {
+      return { url: file.url, name: file.name };
+    }),
 } satisfies FileRouter
 
 export type OurFileRouter = typeof ourFileRouter
