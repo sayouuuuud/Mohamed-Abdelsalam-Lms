@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ArrowLeft, Check } from 'lucide-react'
@@ -82,10 +83,10 @@ export default async function AuthPage({
 
           <div className="flex items-center gap-6 text-cream/70">
             {panel.stats.map((s, i) => (
-              <>
-                {i > 0 && <span key={`sep-${i}`} className="h-8 w-px bg-cream/15" />}
-                <Stat key={s.label} value={s.value} label={s.label} />
-              </>
+              <Fragment key={s.label}>
+                {i > 0 && <span className="h-8 w-px bg-cream/15" />}
+                <Stat value={s.value} label={s.label} />
+              </Fragment>
             ))}
           </div>
         </div>
