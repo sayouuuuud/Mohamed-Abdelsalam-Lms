@@ -212,6 +212,7 @@ export function LessonPlayer({
                 size="sm"
                 disabled={!nextEnabled}
                 className="shrink-0"
+                nativeButton={!nextEnabled}
                 render={
                   nextEnabled ? (
                     <Link href={`/student/assignments/${nextItem.assignment.id}`} />
@@ -230,6 +231,7 @@ export function LessonPlayer({
               variant="outline"
               disabled={!prevHref}
               className="gap-1"
+              nativeButton={!prevHref}
               render={prevHref ? <Link href={prevHref} /> : undefined}
             >
               <ChevronRight className="size-4" />
@@ -238,6 +240,7 @@ export function LessonPlayer({
             <Button
               disabled={!nextEnabled || nextItem?.kind === 'assignment'}
               className="gap-1"
+              nativeButton={!(nextEnabled && nextItem?.kind === 'lesson' && nextHref)}
               render={
                 nextEnabled && nextItem?.kind === 'lesson' && nextHref ? (
                   <Link href={nextHref} />

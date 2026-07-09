@@ -453,8 +453,9 @@ export async function createLesson(lectureId: string, input: LessonInput) {
     return { error: 'تعذّر إضافة الدرس.' }
   }
   logActivity({ action: 'create', resource: 'courses', targetLabel: `درس: ${input.title}` }).catch(() => {})
-  revalidatePath('/courses')
-  revalidatePath('/')
+  revalidatePath('/courses', 'layout')
+  revalidatePath('/', 'layout')
+  revalidatePath('/student', 'layout')
   return { success: true }
 }
 
@@ -479,8 +480,9 @@ export async function updateLesson(id: string, input: LessonInput) {
     return { error: 'تعذّر تحديث الدرس.' }
   }
   logActivity({ action: 'update', resource: 'courses', targetId: id, targetLabel: `درس: ${input.title}` }).catch(() => {})
-  revalidatePath('/courses')
-  revalidatePath('/')
+  revalidatePath('/courses', 'layout')
+  revalidatePath('/', 'layout')
+  revalidatePath('/student', 'layout')
   return { success: true }
 }
 
@@ -494,8 +496,9 @@ export async function deleteLesson(id: string) {
     return { error: 'تعذّر حذف الدرس.' }
   }
   logActivity({ action: 'delete', resource: 'courses', targetId: id, targetLabel: `درس ID: ${id}` }).catch(() => {})
-  revalidatePath('/courses')
-  revalidatePath('/')
+  revalidatePath('/courses', 'layout')
+  revalidatePath('/', 'layout')
+  revalidatePath('/student', 'layout')
   return { success: true }
 }
 
@@ -524,7 +527,7 @@ export async function getLectureDetailAdmin(
       .single(),
     supabase
       .from('lessons')
-      .select('id, slug, title, duration, is_free, sort_order, video_url, description, content_type')
+      .select('id, slug, title, duration, is_free, sort_order, video_url, description, content_type, attachments')
       .eq('lecture_id', id)
       .order('sort_order', { ascending: true }),
   ])
@@ -785,8 +788,8 @@ export async function createAssignment(lectureId: string, input: AssignmentInput
 
   logActivity({ action: 'create', resource: 'courses', targetLabel: `واجب: ${input.title}` }).catch(() => {})
   revalidatePath(`/admin/courses/${lectureId}`)
-  revalidatePath('/courses')
-  revalidatePath('/student')
+  revalidatePath('/courses', 'layout')
+  revalidatePath('/student', 'layout')
   return { success: true }
 }
 
@@ -818,8 +821,8 @@ export async function updateAssignment(id: string, input: AssignmentInput) {
 
   logActivity({ action: 'update', resource: 'courses', targetId: id, targetLabel: `واجب: ${input.title}` }).catch(() => {})
   revalidatePath('/admin/courses')
-  revalidatePath('/courses')
-  revalidatePath('/student')
+  revalidatePath('/courses', 'layout')
+  revalidatePath('/student', 'layout')
   return { success: true }
 }
 
@@ -834,8 +837,8 @@ export async function deleteAssignment(id: string) {
     return { error: 'تعذّر حذف الواجب.' }
   }
   logActivity({ action: 'delete', resource: 'courses', targetId: id, targetLabel: `واجب ID: ${id}` }).catch(() => {})
-  revalidatePath('/courses')
-  revalidatePath('/student')
+  revalidatePath('/courses', 'layout')
+  revalidatePath('/student', 'layout')
   return { success: true }
 }
 

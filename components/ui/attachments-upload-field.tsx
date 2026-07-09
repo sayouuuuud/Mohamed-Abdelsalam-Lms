@@ -23,11 +23,13 @@ const iconFor = (type: LessonAttachment['type']) =>
   type === 'image' ? FileImage : type === 'other' ? FileIcon : FileText
 
 // Multi-file attachment picker used by the lesson editor. Uploads each file to
-// Supabase Storage and keeps a list of {name, url, type} entries.
+// UploadThing storage and keeps a list of {name, url, type} entries.
+// Note: lessonAttachment route uses awaitServerData: false so startUpload resolves
+// immediately after the S3 upload, without waiting for UploadThing's external webhook.
 export function AttachmentsUploadField({
   value,
   onChange,
-  label = 'مرفقات الدرس',
+  label = '',
   hint,
 }: {
   value: LessonAttachment[]
@@ -37,7 +39,7 @@ export function AttachmentsUploadField({
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [isUploading, setIsUploading] = useState(false)
-  const pendingRef = useRef<LessonAttachment[]>([])
+  const pendingRef = useRef<{ name: string; type: LessonAttachment['type'] }[]>([])
 
   const { startUpload } = useUploadThing('lessonAttachment', {
     onClientUploadComplete: (res) => {
@@ -66,14 +68,14 @@ export function AttachmentsUploadField({
     if (!files || files.length === 0) return
 
     const valid: File[] = []
-    const pending: LessonAttachment[] = []
+    const pending: { name: string; type: LessonAttachment['type'] }[] = []
     for (const file of Array.from(files)) {
       if (file.size > MAX_FILE_SIZE) {
         toast.error(`"${file.name}" أكبر من 100 ميجابايت`)
         continue
       }
       valid.push(file)
-      pending.push({ name: file.name, url: '', type: attachmentType(file) })
+      pending.push({ name: file.name, type: attachmentType(file) })
     }
     if (valid.length === 0) {
       if (inputRef.current) inputRef.current.value = ''
@@ -84,7 +86,8 @@ export function AttachmentsUploadField({
     setIsUploading(true)
     try {
       await startUpload(valid)
-      // الإكمال يتم في onClientUploadComplete
+      // Completion handled in onClientUploadComplete.
+      // With awaitServerData: false, this resolves as soon as files reach S3.
     } catch (e) {
       toast.error(`فشل الرفع: ${e instanceof Error ? e.message : 'خطأ غير معروف'}`)
       pendingRef.current = []
@@ -158,15 +161,10 @@ export function AttachmentsUploadField({
             <span className="text-sm font-medium text-foreground">
               اختر ملفًا لإرفاقه
             </span>
-            <span className="text-xs text-muted-foreground">
-              PDF أو Word أو صور (أقل من 100 MB لكل ملف)
-            </span>
+            {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
           </>
         )}
       </button>
-      {hint && (
-        <p className="text-right text-xs text-muted-foreground">{hint}</p>
-      )}
     </div>
   )
 }

@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   User,
-  Bell,
   Shield,
   SlidersHorizontal,
   Camera,
@@ -29,7 +28,6 @@ import { colorPresets, applyColorPreset, type PresetId } from '@/lib/color-prese
 
 const tabs = [
   { id: 'profile', label: 'الملف الشخصي', icon: User },
-  { id: 'notifications', label: 'الإشعارات', icon: Bell },
   { id: 'security', label: 'الأمان', icon: Shield },
   { id: 'preferences', label: 'التفضيلات', icon: SlidersHorizontal },
 ] as const
@@ -140,15 +138,6 @@ export function StudentSettingsPanel({ profile: initProfile }: { profile?: any }
     })
   }
 
-  // notification preferences
-  const initialNotifs = studentProfile.profile?.notif_prefs || {}
-  const [emailNotif, setEmailNotif] = useState(initialNotifs.emailNotif ?? true)
-  const [pushNotif, setPushNotif] = useState(initialNotifs.pushNotif ?? true)
-  const [smsNotif, setSmsNotif] = useState(initialNotifs.smsNotif ?? false)
-  const [lessonReminders, setLessonReminders] = useState(initialNotifs.lessonReminders ?? true)
-  const [gradeAlerts, setGradeAlerts] = useState(initialNotifs.gradeAlerts ?? true)
-  const [marketingNotif, setMarketingNotif] = useState(initialNotifs.marketingNotif ?? false)
-
   // preferences — dark mode is driven by the shared theme provider so toggling
   // it here actually flips the whole UI (and persists across reloads).
   const { isDark, toggleTheme } = useTheme()
@@ -168,9 +157,8 @@ export function StudentSettingsPanel({ profile: initProfile }: { profile?: any }
 
   // Save preferences to DB and fallback to localStorage
   function handlePrefsSave() {
-    const notifs = { emailNotif, pushNotif, lessonReminders, gradeAlerts, smsNotif, marketingNotif }
     startTransition(async () => {
-      const res = await updateStudentPreferences(activeColor, notifs)
+      const res = await updateStudentPreferences(activeColor, {})
 
       if (res?.error) {
         toast.error('حدث خطأ أثناء حفظ التفضيلات')
@@ -180,7 +168,6 @@ export function StudentSettingsPanel({ profile: initProfile }: { profile?: any }
       }
 
       try {
-        localStorage.setItem('student-notif-prefs', JSON.stringify(notifs))
         localStorage.setItem('student-dark-mode', String(darkMode))
       } catch { }
     })
@@ -314,59 +301,6 @@ export function StudentSettingsPanel({ profile: initProfile }: { profile?: any }
                 {isPending && <Loader2 className="size-4 animate-spin" />}
                 حفظ التغييرات
               </Button>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'notifications' && (
-          <div className="space-y-2">
-            <div className="text-right">
-              <h3 className="text-lg font-bold text-foreground">الإشعارات</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                تحكّم في طريقة استقبالك للتنبيهات
-              </p>
-            </div>
-            <Separator className="my-4" />
-            <div className="divide-y divide-border">
-              <ToggleSwitch
-                checked={emailNotif}
-                onChange={setEmailNotif}
-                label="إشعارات البريد الإلكتروني"
-                description="استقبال التنبيهات عبر البريد الإلكتروني"
-              />
-              <ToggleSwitch
-                checked={pushNotif}
-                onChange={setPushNotif}
-                label="الإشعارات الفورية"
-                description="إشعارات منبثقة على المتصفح والجوال"
-              />
-              <ToggleSwitch
-                checked={lessonReminders}
-                onChange={setLessonReminders}
-                label="تذكير المحاضرات والمواعيد"
-                description="تنبيهات قبل بدء المحاضرات ومواعيد التسليم"
-              />
-              <ToggleSwitch
-                checked={gradeAlerts}
-                onChange={setGradeAlerts}
-                label="تنبيهات الدرجات"
-                description="إشعار فور رصد درجات الاختبارات والواجبات"
-              />
-              <ToggleSwitch
-                checked={smsNotif}
-                onChange={setSmsNotif}
-                label="الرسائل النصية"
-                description="استقبال التنبيهات الهامة عبر SMS"
-              />
-              <ToggleSwitch
-                checked={marketingNotif}
-                onChange={setMarketingNotif}
-                label="رسائل تسويقية"
-                description="عروض المحاضرات الجديدة وأخبار المنصة"
-              />
-            </div>
-            <div className="flex justify-start pt-4">
-              <Button onClick={handlePrefsSave} disabled={isPending}>حفظ التفضيلات</Button>
             </div>
           </div>
         )}

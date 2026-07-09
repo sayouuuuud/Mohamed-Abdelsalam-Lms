@@ -15,6 +15,7 @@ import {
   Play,
   PlayCircle,
   Users,
+  Paperclip,
 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -102,7 +103,18 @@ function CurriculumSection({
                     <p className="truncate text-sm font-medium text-foreground">
                       {lesson.title}
                     </p>
-                    <span className="text-xs text-muted-foreground">درس · {lesson.type}</span>
+                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                      <span>درس · {lesson.type}</span>
+                      {lesson.attachments && lesson.attachments.length > 0 && (
+                        <>
+                          <span className="text-muted-foreground/50">•</span>
+                          <span className="flex items-center gap-1 text-primary">
+                            <Paperclip className="size-3" />
+                            {lesson.attachments.length} مرفقات
+                          </span>
+                        </>
+                      )}
+                    </span>
                   </div>
                   <span className="shrink-0 text-xs text-muted-foreground">
                     {lesson.duration}

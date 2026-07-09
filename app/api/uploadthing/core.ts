@@ -20,7 +20,12 @@ export const ourFileRouter = {
   // Lesson attachments (PDF, Word, images, etc.) uploaded from admin lesson editor.
   // UploadThing only allows power-of-two sizes, so the endpoint cap is 128MB while
   // the client enforces the intended 100MB per-file limit.
-  lessonAttachment: f({ blob: { maxFileSize: "128MB", maxFileCount: 10 } })
+  // awaitServerData: false — startUpload resolves immediately after S3 upload without
+  // waiting for UploadThing's external webhook callback (which hangs in localhost).
+  lessonAttachment: f(
+    { blob: { maxFileSize: "128MB", maxFileCount: 10 } },
+    { awaitServerData: false }
+  )
     .onUploadComplete(async ({ file }) => {
       return { url: file.url, name: file.name };
     }),
