@@ -8,7 +8,7 @@ export default async function ExamsPage() {
 
   return (
     <>
-      <ExamsPageHeader />
+      <ExamsPageHeader exams={exams} />
       <ExamsStats stats={stats} />
       <ExamsTable initialExams={exams} />
     </>

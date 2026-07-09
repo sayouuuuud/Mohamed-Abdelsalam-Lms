@@ -70,6 +70,10 @@ export function StudentsProvider({
       openCreate: () => setFormOpen(true),
       requestDelete: (student) => setDeleting(student),
       exportData: () => {
+        if (students.length === 0) {
+          toast.error('لا توجد بيانات طلاب للتصدير')
+          return
+        }
         exportToCsv(
           'students.csv',
           students.map((s) => ({

@@ -12,6 +12,10 @@ export function CalendarPageHeader() {
   const canManage = useCanManage('calendar')
 
   const exportData = () => {
+    if (events.length === 0) {
+      toast.error('لا توجد أحداث للتصدير')
+      return
+    }
     exportToCsv(
       'calendar-events.csv',
       [...events]
