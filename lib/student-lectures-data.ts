@@ -242,12 +242,7 @@ function toCourseDetail(row: LectureRow, progress: Progress = EMPTY_PROGRESS): C
     sections,
     whatYouLearn: row.what_you_learn && row.what_you_learn.length > 0 
       ? row.what_you_learn 
-      : [
-          'فهم المفاهيم الأساسية للموضوع',
-          'حل المسائل خطوة بخطوة',
-          'تطبيقات على نماذج الامتحانات',
-          'مراجعة شاملة قبل الاختبار',
-        ],
+      : [],
   }
 }
 

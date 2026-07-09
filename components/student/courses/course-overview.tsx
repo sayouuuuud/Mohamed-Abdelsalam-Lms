@@ -270,17 +270,19 @@ export function CourseOverview({ course }: { course: CourseDetail }) {
         {/* Main column */}
         <div className="flex flex-col gap-6 lg:col-span-2">
           {/* What you learn */}
-          <Card className="p-6">
-            <h2 className="mb-4 text-lg font-bold text-foreground">ماذا ستتعلّم</h2>
-            <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {course.whatYouLearn.map((item) => (
-                <li key={item} className="flex items-start gap-2.5 text-sm text-foreground">
-                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </Card>
+          {course.whatYouLearn.length > 0 && (
+            <Card className="p-6">
+              <h2 className="mb-4 text-lg font-bold text-foreground">ماذا ستتعلّم</h2>
+              <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {course.whatYouLearn.map((item) => (
+                  <li key={item} className="flex items-start gap-2.5 text-sm text-foreground">
+                    <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
 
           {/* Curriculum */}
           <Card className="p-6">
@@ -319,10 +321,6 @@ export function CourseOverview({ course }: { course: CourseDetail }) {
               <div className="flex items-center justify-between">
                 <dt className="text-muted-foreground">المدة</dt>
                 <dd className="font-medium text-foreground">{course.durationHours}</dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt className="text-muted-foreground">آخر تحديث</dt>
-                <dd className="font-medium text-foreground">{course.lastUpdated}</dd>
               </div>
             </dl>
           </Card>
