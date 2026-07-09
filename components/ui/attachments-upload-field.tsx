@@ -3,9 +3,11 @@
 import { useRef, useState } from 'react'
 import { FileText, FileImage, File as FileIcon, X, Upload, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { uploadToStorage } from '@/lib/storage-upload'
+import { useUploadThing } from '@/lib/uploadthing'
 import { cn } from '@/lib/utils'
 import type { LessonAttachment } from '@/app/admin/courses/actions'
+
+const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100 MB
 
 // Infers the LessonAttachment `type` bucket from a file's name/mime so the
 // student player can pick the right icon.
@@ -33,30 +35,47 @@ export function AttachmentsUploadField({
   label?: string
   hint?: string
 }) {
-  const [uploading, setUploading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  const { startUpload, isUploading } = useUploadThing('lessonAttachment', {
+    onUploadError: (e) => {
+      toast.error(`فشل الرفع: ${e.message}`)
+    },
+  })
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return
-    setUploading(true)
-    try {
-      const uploaded: LessonAttachment[] = []
-      for (const file of Array.from(files)) {
-        if (file.size > 25 * 1024 * 1024) {
-          toast.error(`"${file.name}" أكبر من 25 ميجابايت`)
-          continue
-        }
-        const url = await uploadToStorage(file, 'attachments')
-        uploaded.push({ name: file.name, url, type: attachmentType(file) })
+
+    // Validate size (100 MB) and keep type info keyed by name for the result mapping.
+    const valid: File[] = []
+    const typeByName = new Map<string, LessonAttachment['type']>()
+    for (const file of Array.from(files)) {
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error(`"${file.name}" أكبر من 100 ميجابايت`)
+        continue
       }
-      if (uploaded.length > 0) {
+      valid.push(file)
+      typeByName.set(file.name, attachmentType(file))
+    }
+    if (valid.length === 0) {
+      if (inputRef.current) inputRef.current.value = ''
+      return
+    }
+
+    try {
+      const res = await startUpload(valid)
+      if (res && res.length > 0) {
+        const uploaded: LessonAttachment[] = res.map((r) => ({
+          name: r.name,
+          url: r.url,
+          type: typeByName.get(r.name) ?? 'other',
+        }))
         onChange([...value, ...uploaded])
         toast.success(uploaded.length === 1 ? 'تم رفع الملف' : `تم رفع ${uploaded.length} ملفات`)
       }
     } catch (e) {
       toast.error(`فشل الرفع: ${e instanceof Error ? e.message : 'خطأ غير معروف'}`)
     } finally {
-      setUploading(false)
       if (inputRef.current) inputRef.current.value = ''
     }
   }
@@ -108,14 +127,14 @@ export function AttachmentsUploadField({
       />
       <button
         type="button"
-        disabled={uploading}
+        disabled={isUploading}
         onClick={() => inputRef.current?.click()}
         className={cn(
           'flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-secondary/30 px-4 py-6 text-center transition-colors hover:bg-secondary/60',
-          uploading && 'cursor-not-allowed opacity-70',
+          isUploading && 'cursor-not-allowed opacity-70',
         )}
       >
-        {uploading ? (
+        {isUploading ? (
           <>
             <Loader2 className="size-7 animate-spin text-primary" />
             <span className="text-sm text-muted-foreground">جاري الرفع...</span>
@@ -127,7 +146,7 @@ export function AttachmentsUploadField({
               اختر ملفًا لإرفاقه
             </span>
             <span className="text-xs text-muted-foreground">
-              PDF أو Word أو صور (أقل من 25 MB لكل ملف)
+              PDF أو Word أو صور (أقل من 100 MB لكل ملف)
             </span>
           </>
         )}
