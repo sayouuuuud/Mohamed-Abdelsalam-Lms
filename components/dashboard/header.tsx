@@ -412,11 +412,8 @@ export function Header({
           <input
             type="search"
             placeholder="ابحث عن طالب، كورس، درس، دفعة..."
-            className="h-11 w-full rounded-xl border border-border bg-secondary/60 pr-10 pl-16 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:bg-card"
+            className="h-11 w-full rounded-xl border border-border bg-secondary/60 pr-10 pl-4 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:bg-card"
           />
-          <kbd className="absolute left-3 top-1/2 -translate-y-1/2 rounded-md border border-border bg-card px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-            Ctrl K
-          </kbd>
         </div>
 
         {/* View site - visible on desktop */}

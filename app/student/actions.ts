@@ -702,13 +702,13 @@ export async function setStudentGrade(grade: string) {
 
 
 
-// Returns the last 7 days of learning activity for the current student.
+// Returns learning activity for the current student over the specified number of days.
 // Days with no recorded activity are filled in with 0 hours so the chart
-// always shows a complete 7-day window.
-export async function getStudentLearningActivity() {
+// always shows a complete window.
+export async function getStudentLearningActivity(days: number = 7) {
   const supabase = await createClient()
   const student = await getCurrentStudent(supabase)
-  if (!student) return buildEmptyWeek()
+  if (!student) return buildEmptyDays(days)
 
   const { data: rows } = await supabase
     .from('learning_activity')
@@ -716,7 +716,7 @@ export async function getStudentLearningActivity() {
     .eq('student_id', student.id)
     .gte(
       'activity_date',
-      new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      new Date(Date.now() - (days - 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     )
     .order('activity_date', { ascending: true })
 
@@ -725,7 +725,7 @@ export async function getStudentLearningActivity() {
     (rows ?? []).map((r: any) => [r.activity_date as string, r.minutes as number]),
   )
 
-  return buildEmptyWeek().map((day) => ({
+  return buildEmptyDays(days).map((day) => ({
     ...day,
     hours: parseFloat(
       ((minutesByDate.get(day.isoDate) ?? 0) / 60).toFixed(1),
@@ -733,11 +733,11 @@ export async function getStudentLearningActivity() {
   }))
 }
 
-/** Generates an array of the last 7 days in {day, isoDate, hours} format. */
-function buildEmptyWeek() {
+/** Generates an array of the last N days in {day, isoDate, hours} format. */
+function buildEmptyDays(days: number) {
   const dayNames = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(Date.now() - (6 - i) * 24 * 60 * 60 * 1000)
+  return Array.from({ length: days }, (_, i) => {
+    const d = new Date(Date.now() - ((days - 1) - i) * 24 * 60 * 60 * 1000)
     return {
       day: dayNames[d.getDay()],
       isoDate: d.toISOString().split('T')[0],

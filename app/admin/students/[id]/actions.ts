@@ -277,12 +277,12 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
       if (!lectureId || seenLectureIds.has(lectureId)) continue
       seenLectureIds.add(lectureId)
 
-      const lec = item.lectures as any
-      const lessonIds: string[] = (lec?.lessons ?? []).map((l: any) => l.id).filter(Boolean)
+      const lecObj = Array.isArray(item.lectures) ? item.lectures[0] : item.lectures
+      const lessonIds: string[] = (lecObj?.lessons ?? []).map((l: any) => l.id).filter(Boolean)
 
       lectureRows.push({
         lectureId,
-        title: item.lecture_title || lec?.title || 'محاضرة',
+        title: item.lecture_title || lecObj?.title || 'محاضرة',
         category: item.branch_title || 'عام',
         purchasedAt: order.created_at,
         lessonIds,
@@ -293,9 +293,10 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
   // Fetch all completed lesson/content progress for this student at once.
   const { data: progressRows } = await supabase
     .from('student_content_progress')
-    .select('content_id, completed_at')
-    .eq('student_id', studentRow.user_id)
-    .eq('completed', true)
+    .select('item_id, updated_at')
+    .eq('user_id', studentRow.user_id)
+    .eq('item_type', 'lesson')
+    .eq('status', 'completed')
 
   const { data: legacyProgress } = await supabase
     .from('lesson_progress')
@@ -305,7 +306,7 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
 
   // Build a set of completed lesson/content ids for fast lookup.
   const completedIds = new Set<string>([
-    ...((progressRows ?? []).map((r: any) => r.content_id as string)),
+    ...((progressRows ?? []).map((r: any) => r.item_id as string)),
     ...((legacyProgress ?? []).map((r: any) => r.lesson_id as string)),
   ])
 
@@ -316,8 +317,8 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
 
     // Last accessed = latest completed_at for a lesson in this lecture.
     let lastAccessedDate = lec.purchasedAt
-    for (const row of [...(progressRows ?? []), ...(legacyProgress ?? [])] as any[]) {
-      const id = row.content_id ?? row.lesson_id
+    for (const row of [...(progressRows ?? []).map((r: any) => ({ ...r, completed_at: r.updated_at })), ...(legacyProgress ?? [])] as any[]) {
+      const id = row.item_id ?? row.lesson_id
       if (lec.lessonIds.includes(id) && row.completed_at) {
         if (new Date(row.completed_at) > new Date(lastAccessedDate)) {
           lastAccessedDate = row.completed_at
@@ -457,7 +458,7 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
 
   // Flatten all completed lesson/content progress entries with a completion date.
   const completedLessons: Date[] = [
-    ...((progressRows ?? []).filter((r: any) => r.completed_at).map((r: any) => new Date(r.completed_at))),
+    ...((progressRows ?? []).filter((r: any) => r.updated_at).map((r: any) => new Date(r.updated_at))),
     ...((legacyProgress ?? []).filter((r: any) => r.completed_at).map((r: any) => new Date(r.completed_at))),
   ]
 
