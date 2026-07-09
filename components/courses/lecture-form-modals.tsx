@@ -6,8 +6,10 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ImageUploadField } from '@/components/ui/image-upload-field'
+import { AttachmentsUploadField } from '@/components/ui/attachments-upload-field'
 import { cn } from '@/lib/utils'
 import { useLectures } from './lectures-context'
+import type { LessonAttachment } from '@/app/admin/courses/actions'
 
 const textareaClass =
   'w-full resize-none rounded-xl border border-border bg-secondary/60 px-4 py-2.5 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:bg-card'
@@ -117,12 +119,14 @@ export function LectureFormModals() {
   const [lTitle, setLTitle] = useState('')
   const [lDuration, setLDuration] = useState('')
   const [lIsFree, setLIsFree] = useState(false)
+  const [lAttachments, setLAttachments] = useState<LessonAttachment[]>([])
 
   useEffect(() => {
     if (lessonFormOpen) {
       setLTitle(editingLesson?.title ?? '')
       setLDuration(editingLesson?.duration ?? '')
       setLIsFree(editingLesson?.isFree ?? false)
+      setLAttachments(editingLesson?.attachments ?? [])
     }
   }, [lessonFormOpen, editingLesson])
 
@@ -133,6 +137,9 @@ export function LectureFormModals() {
       title: lTitle.trim(),
       duration: lDuration.trim(),
       isFree: lIsFree,
+      // نوع محتوى الدرس مثبّت على "فيديو"
+      contentType: 'فيديو',
+      attachments: lAttachments,
     })
   }
 
@@ -298,6 +305,12 @@ export function LectureFormModals() {
             />
             <span className="text-sm text-foreground">درس مجاني (متاح للمعاينة)</span>
           </label>
+
+          <AttachmentsUploadField
+            value={lAttachments}
+            onChange={setLAttachments}
+            hint="ملفات إضافية (PDF، Word، صور...) يقدر الطالب يحمّلها مع الدرس."
+          />
           <div className="flex justify-start gap-2 pt-2">
             <Button type="submit">
               {editingLesson ? 'حفظ التغييرات' : 'إضافة الدرس'}
