@@ -29,6 +29,7 @@ import { Modal, Field } from '@/components/ui/modal'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { ImageUploadField } from '@/components/ui/image-upload-field'
 import { VideoUploadField } from '@/components/ui/video-upload-field'
+import { AttachmentsUploadField } from '@/components/ui/attachments-upload-field'
 import { AssignmentEditorModal } from '@/components/courses/assignment-editor-modal'
 import { cn } from '@/lib/utils'
 import {
@@ -36,6 +37,7 @@ import {
   type AdminLesson,
   type AdminAssignment,
   type AdminContentItem,
+  type LessonAttachment,
   updateLecture,
   createLesson,
   updateLesson,
@@ -106,18 +108,18 @@ export function AdminLectureDetail({
   const [lTitle, setLTitle] = useState('')
   const [lDuration, setLDuration] = useState('')
   const [lIsFree, setLIsFree] = useState(false)
-  const [lContentType, setLContentType] = useState<'فيديو' | 'مقال' | 'تمرين'>('فيديو')
   const [lVideo, setLVideo] = useState('')
   const [lDesc, setLDesc] = useState('')
+  const [lAttachments, setLAttachments] = useState<LessonAttachment[]>([])
 
   const openCreateLesson = () => {
     setEditingLesson(null)
     setLTitle('')
     setLDuration('')
     setLIsFree(false)
-    setLContentType('فيديو')
     setLVideo('')
     setLDesc('')
+    setLAttachments([])
     setLessonOpen(true)
   }
 
@@ -126,9 +128,9 @@ export function AdminLectureDetail({
     setLTitle(lesson.title)
     setLDuration(lesson.duration)
     setLIsFree(lesson.isFree)
-    setLContentType(lesson.contentType ?? 'فيديو')
     setLVideo(lesson.videoUrl ?? '')
     setLDesc(lesson.description ?? '')
+    setLAttachments(lesson.attachments ?? [])
     setLessonOpen(true)
   }
 
@@ -139,9 +141,11 @@ export function AdminLectureDetail({
       title: lTitle.trim(),
       duration: lDuration.trim(),
       isFree: lIsFree,
-      contentType: lContentType,
+      // نوع محتوى الدرس مثبّت على "فيديو"
+      contentType: 'فيديو' as const,
       videoUrl: lVideo || null,
       description: lDesc.trim() || null,
+      attachments: lAttachments,
     }
     const res = editingLesson
       ? await updateLesson(editingLesson.id, input)
@@ -413,15 +417,10 @@ export function AdminLectureDetail({
               />
             </Field>
             <Field label="نوع المحتوى">
-              <select
-                value={lContentType}
-                onChange={(e) => setLContentType(e.target.value as typeof lContentType)}
-                className="w-full rounded-xl border border-border bg-secondary/60 px-3 py-2.5 text-sm text-foreground outline-none transition-colors focus:border-primary focus:bg-card"
-              >
-                <option value="فيديو">فيديو</option>
-                <option value="مقال">مقال</option>
-                <option value="تمرين">تمرين</option>
-              </select>
+              <div className="flex w-full items-center gap-2 rounded-xl border border-border bg-secondary/40 px-3 py-2.5 text-sm text-muted-foreground">
+                <Film className="size-4" />
+                فيديو
+              </div>
             </Field>
           </div>
           <VideoUploadField
@@ -447,6 +446,14 @@ export function AdminLectureDetail({
             />
             <span className="text-sm text-foreground">درس مجاني (متاح للمعاينة)</span>
           </label>
+          <div className="space-y-1.5">
+            <span className="block text-sm font-medium text-foreground">مرفقات الدرس</span>
+            <AttachmentsUploadField
+              value={lAttachments}
+              onChange={setLAttachments}
+              hint="ملفات إضافية (PDF، Word، صور...) يقدر الطالب يحمّلها مع الدرس. الحد الأقصى 100 MB لكل ملف."
+            />
+          </div>
           <div className="flex justify-start gap-2 pt-2">
             <Button type="submit">
               {editingLesson ? 'حفظ التغييرات' : 'إضافة الدرس'}
