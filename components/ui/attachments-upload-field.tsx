@@ -36,46 +36,59 @@ export function AttachmentsUploadField({
   hint?: string
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const pendingRef = useRef<LessonAttachment[]>([])
 
-  const { startUpload, isUploading } = useUploadThing('lessonAttachment', {
+  const { startUpload } = useUploadThing('lessonAttachment', {
+    onClientUploadComplete: (res) => {
+      if (res && res.length > 0) {
+        const uploaded: LessonAttachment[] = res.map((r) => ({
+          name: r.name,
+          url: r.url,
+          type: pendingRef.current.find((p) => p.name === r.name)?.type ?? 'other',
+        }))
+        onChange([...value, ...uploaded])
+        toast.success(uploaded.length === 1 ? 'تم رفع الملف' : `تم رفع ${uploaded.length} ملفات`)
+      }
+      pendingRef.current = []
+      setIsUploading(false)
+      if (inputRef.current) inputRef.current.value = ''
+    },
     onUploadError: (e) => {
       toast.error(`فشل الرفع: ${e.message}`)
+      pendingRef.current = []
+      setIsUploading(false)
+      if (inputRef.current) inputRef.current.value = ''
     },
   })
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return
 
-    // Validate size (100 MB) and keep type info keyed by name for the result mapping.
     const valid: File[] = []
-    const typeByName = new Map<string, LessonAttachment['type']>()
+    const pending: LessonAttachment[] = []
     for (const file of Array.from(files)) {
       if (file.size > MAX_FILE_SIZE) {
         toast.error(`"${file.name}" أكبر من 100 ميجابايت`)
         continue
       }
       valid.push(file)
-      typeByName.set(file.name, attachmentType(file))
+      pending.push({ name: file.name, url: '', type: attachmentType(file) })
     }
     if (valid.length === 0) {
       if (inputRef.current) inputRef.current.value = ''
       return
     }
 
+    pendingRef.current = pending
+    setIsUploading(true)
     try {
-      const res = await startUpload(valid)
-      if (res && res.length > 0) {
-        const uploaded: LessonAttachment[] = res.map((r) => ({
-          name: r.name,
-          url: r.url,
-          type: typeByName.get(r.name) ?? 'other',
-        }))
-        onChange([...value, ...uploaded])
-        toast.success(uploaded.length === 1 ? 'تم رفع الملف' : `تم رفع ${uploaded.length} ملفات`)
-      }
+      await startUpload(valid)
+      // الإكمال يتم في onClientUploadComplete
     } catch (e) {
       toast.error(`فشل الرفع: ${e instanceof Error ? e.message : 'خطأ غير معروف'}`)
-    } finally {
+      pendingRef.current = []
+      setIsUploading(false)
       if (inputRef.current) inputRef.current.value = ''
     }
   }
