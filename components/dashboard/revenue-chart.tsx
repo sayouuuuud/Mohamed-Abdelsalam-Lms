@@ -27,18 +27,20 @@ export function RevenueChart({ data = [] }: { data?: any[] }) {
       onFilterChange={setRange}
     >
       <ChartContainer config={config} className="h-full min-h-[240px] w-full">
-        <LineChart data={chartData} margin={{ left: 4, right: 8, top: 8 }}>
+        <LineChart data={chartData} margin={{ left: -24, right: 12, top: 8 }}>
           <CartesianGrid vertical={false} strokeDasharray="3 3" />
           <XAxis
             dataKey="month"
             tickLine={false}
             axisLine={false}
             tickMargin={8}
+            reversed
           />
           <YAxis
             tickLine={false}
             axisLine={false}
             width={44}
+            orientation="right"
             tickFormatter={(v) => (v >= 1000 ? `${v / 1000}K` : v)}
           />
           <ChartTooltip

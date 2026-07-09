@@ -61,6 +61,10 @@ export type StudentProfile = {
   assignments: AssignmentRecord[]
   progressTrend: Array<{ month: string; progress: number }>
   monthlySpend: Array<{ month: string; amount: number }>
+  // Raw data for client-side filtering
+  completedLessonDates: string[]   // ISO date strings of each completed lesson
+  rawOrders: Array<{ date: string; amount: number }> // each approved order
+  totalLessonsAll: number
   // Per-branch comparison for the student's academic year.
   skills: Array<{
     subject: string

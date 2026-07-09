@@ -16,6 +16,7 @@ import {
   User,
   ArrowLeft,
   ArrowRight,
+  Globe,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -321,17 +322,15 @@ export function StudentHeader({
           />
         </div>
 
-        {/* Back - visible on desktop */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => router.back()}
-          className="mr-auto hidden text-muted-foreground hover:text-foreground md:flex"
-          aria-label="رجوع"
-          title="رجوع"
+        {/* Link to public website - visible on desktop */}
+        <Link
+          href="/"
+          className="mr-auto hidden items-center justify-center rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground md:flex"
+          aria-label="الموقع العام"
+          title="الموقع العام"
         >
-          <ArrowLeft className="size-5" />
-        </Button>
+          <Globe className="size-5" />
+        </Link>
 
         <Button
           variant="ghost"

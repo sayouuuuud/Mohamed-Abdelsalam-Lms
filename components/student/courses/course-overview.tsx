@@ -14,11 +14,10 @@ import {
   Lock,
   Play,
   PlayCircle,
-  Star,
   Users,
 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import {
   getCourseLessons,
@@ -170,7 +169,7 @@ function CurriculumSection({
 }
 
 export function CourseOverview({ course }: { course: CourseDetail }) {
-  const percent = Math.round((course.completedLessons / course.totalLessons) * 100)
+  const percent = course.totalLessons > 0 ? Math.round((course.completedLessons / course.totalLessons) * 100) : 0
   const allLessons = getCourseLessons(course)
   const nextLesson =
     allLessons.find((l) => !l.completed && !l.locked) ?? allLessons[0]
@@ -179,9 +178,9 @@ export function CourseOverview({ course }: { course: CourseDetail }) {
     .map((it) => (it as Extract<typeof it, { kind: 'assignment' }>).assignment)
 
   const meta = [
-    { icon: Star, label: `${course.rating} تقييم` },
+
     { icon: Users, label: `${course.studentsCount.toLocaleString('ar-EG')} طالب` },
-    { icon: Clock, label: `${course.durationHours} ساعة` },
+    { icon: Clock, label: course.durationHours },
     { icon: BookOpen, label: `${course.totalLessons} درس` },
   ]
 
@@ -228,7 +227,7 @@ export function CourseOverview({ course }: { course: CourseDetail }) {
                 <m.icon
                   className={cn(
                     'size-4',
-                    m.icon === Star && 'fill-amber-400 text-amber-400',
+
                   )}
                 />
                 {m.label}
@@ -249,17 +248,19 @@ export function CourseOverview({ course }: { course: CourseDetail }) {
                 style={{ width: `${percent}%` }}
               />
             </div>
-            <Button
-              className="mt-4 w-fit"
-              render={
-                <Link
-                  href={`/student/courses/${course.id}/lessons/${nextLesson.id}`}
-                />
-              }
-            >
-              <Play className="size-4" />
-              {percent === 0 ? 'ابدأ الكورس' : 'متابعة الدرس'}
-            </Button>
+            {nextLesson ? (
+              <Link
+                href={`/student/courses/${course.id}/lessons/${nextLesson.id}`}
+                className={cn(buttonVariants(), "mt-4 w-fit")}
+              >
+                <Play className="size-4" />
+                {percent === 0 ? 'ابدأ الكورس' : 'متابعة الدرس'}
+              </Link>
+            ) : (
+              <Button disabled className="mt-4 w-fit opacity-50">
+                لا يوجد محتوى بعد
+              </Button>
+            )}
           </div>
         </div>
       </Card>
@@ -308,7 +309,7 @@ export function CourseOverview({ course }: { course: CourseDetail }) {
             <h2 className="mb-4 text-lg font-bold text-foreground">معلومات الكورس</h2>
             <dl className="flex flex-col gap-3 text-sm">
               <div className="flex items-center justify-between">
-                <dt className="text-muted-foreground">المدرّب</dt>
+                <dt className="text-muted-foreground">المدرّس</dt>
                 <dd className="font-medium text-foreground">{course.instructor}</dd>
               </div>
               <div className="flex items-center justify-between">
@@ -317,7 +318,7 @@ export function CourseOverview({ course }: { course: CourseDetail }) {
               </div>
               <div className="flex items-center justify-between">
                 <dt className="text-muted-foreground">المدة</dt>
-                <dd className="font-medium text-foreground">{course.durationHours} ساعة</dd>
+                <dd className="font-medium text-foreground">{course.durationHours}</dd>
               </div>
               <div className="flex items-center justify-between">
                 <dt className="text-muted-foreground">آخر تحديث</dt>

@@ -13,6 +13,8 @@ import {
 import { ForceGradeSelection } from '@/components/student/force-grade-selection'
 import { PresenceHeartbeat } from '@/components/student/presence-heartbeat'
 
+import { BlockedUser } from '@/components/student/blocked-user'
+
 export default async function StudentLayout({ children }: { children: ReactNode }) {
   // Fetch the portal data in parallel instead of a slow sequential waterfall.
   const [profile, enrolledCourses, schedule, grades, announcements, activity, stages] =
@@ -39,6 +41,10 @@ export default async function StudentLayout({ children }: { children: ReactNode 
   }
 
   const resolvedProfile = profile ?? defaultProfile
+
+  if (resolvedProfile.status === 'موقوف') {
+    return <BlockedUser />
+  }
 
   return (
     <StudentProvider data={{

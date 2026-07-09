@@ -40,7 +40,7 @@ export function LearningActivityChart({ activity: initialActivity = [] }: { acti
       onFilterChange={setDays}
     >
       <ChartContainer config={config} className="aspect-auto h-[260px] w-full">
-        <AreaChart data={chartData} margin={{ left: 4, right: 8, top: 8 }}>
+        <AreaChart data={chartData} margin={{ left: -24, right: 12, top: 8 }}>
           <defs>
             <linearGradient id="fillHours" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="var(--color-hours)" stopOpacity={0.4} />
@@ -48,8 +48,8 @@ export function LearningActivityChart({ activity: initialActivity = [] }: { acti
             </linearGradient>
           </defs>
           <CartesianGrid vertical={false} strokeDasharray="3 3" />
-          <XAxis dataKey="day" tickLine={false} axisLine={false} tickMargin={8} />
-          <YAxis tickLine={false} axisLine={false} width={28} />
+          <XAxis dataKey="day" tickLine={false} axisLine={false} tickMargin={8} reversed />
+          <YAxis tickLine={false} axisLine={false} width={28} orientation="right" />
           <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
           <Area
             dataKey="hours"

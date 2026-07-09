@@ -77,10 +77,24 @@ export function AuthForm({ initialTab = 'login' }: { initialTab?: Tab }) {
             .select('role')
             .eq('id', user.id)
             .single()
-          destination =
-            profile?.role === 'admin' || profile?.role === 'assistant'
-              ? '/admin/dashboard'
-              : '/student'
+            
+          if (profile?.role === 'admin' || profile?.role === 'assistant') {
+            destination = '/admin/dashboard'
+          } else {
+            // Student login check
+            const { data: studentRow } = await supabase
+              .from('students')
+              .select('status')
+              .eq('user_id', user.id)
+              .single()
+              
+            if (studentRow && studentRow.status === 'موقوف') {
+              await supabase.auth.signOut()
+              setError('تم إيقاف حسابك. يرجى التواصل مع الإدارة.')
+              return
+            }
+            destination = '/student'
+          }
         }
         // Fire-and-forget — must not block navigation.
         if (destination === '/admin/dashboard') {

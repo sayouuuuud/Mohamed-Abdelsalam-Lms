@@ -43,6 +43,7 @@ export type AdminLecture = {
   stageId: string
   stageTitle: string
   lessons: AdminLesson[]
+  whatYouLearn: string[] | null
 }
 
 export type BranchOption = {
@@ -62,6 +63,7 @@ export type LectureInput = {
   badge: string | null
   image?: string | null
   releaseDate?: string | null
+  whatYouLearn?: string[] | null
 }
 
 export type LessonInput = {
@@ -186,6 +188,7 @@ export async function getLecturesAdmin(): Promise<AdminLecture[]> {
       stageId: branch?.stageId ?? '',
       stageTitle: branch?.stageTitle ?? '',
       lessons: lessonsByLecture.get(row.id) ?? [],
+      whatYouLearn: (row as any).what_you_learn ?? null,
     }
   })
 }
@@ -237,6 +240,7 @@ export async function createLecture(input: LectureInput) {
     badge: input.badge,
     sort_order: (count ?? 0) + 1,
     release_date: input.releaseDate || null,
+    what_you_learn: input.whatYouLearn || null,
   }
   if (input.image) row.image = input.image
 
@@ -341,6 +345,7 @@ export async function updateLecture(id: string, input: LectureInput) {
     old_price: input.oldPrice,
     badge: input.badge,
     release_date: input.releaseDate || null,
+    what_you_learn: input.whatYouLearn || null,
   }
   if (input.image !== undefined) patch.image = input.image
 
@@ -541,6 +546,7 @@ export async function getLectureDetailAdmin(
     branchTitle: branch?.title ?? '',
     stageId: branch?.stage_id ?? '',
     stageTitle: branch?.stages?.title ?? '',
+    whatYouLearn: (row as any).what_you_learn ?? null,
     lessons: (lessonsRes.data ?? []).map((l) => {
       const ct = (l as any).content_type
       return {

@@ -300,15 +300,17 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
     }
   }
 
+  const adminDb = createAdminClient()
+
   // Fetch all completed lesson/content progress for this student at once.
-  const { data: progressRows } = await supabase
+  const { data: progressRows } = await adminDb
     .from('student_content_progress')
     .select('item_id, updated_at')
     .eq('user_id', studentRow.user_id)
     .eq('item_type', 'lesson')
     .eq('status', 'completed')
 
-  const { data: legacyProgress } = await supabase
+  const { data: legacyProgress } = await adminDb
     .from('lesson_progress')
     .select('lesson_id, completed_at')
     .eq('student_id', studentRow.user_id)
@@ -529,7 +531,7 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
       // Build a map: course_id -> progress (already computed from lesson_progress in section 3)
       const courseProgressMap = new Map(courses.map((c) => [c.id, c.progress]))
 
-      skills = branchRows.map((branch: any) => {
+      const allBranchSkills = branchRows.map((branch: any) => {
         // Average exam percentage for this branch (graded submissions only).
         const branchSubs = (branchExams || []).filter(
           (s: any) =>
@@ -579,6 +581,7 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
           courseCount: branchCourses.length,
         }
       })
+      skills = allBranchSkills
     }
   }
 
@@ -615,6 +618,11 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
     assignments,
     progressTrend,
     monthlySpend,
+    completedLessonDates: completedLessons.map((d) => d.toISOString()),
+    rawOrders: (ordersData || [])
+      .filter((o: any) => o.status === 'approved' && o.created_at)
+      .map((o: any) => ({ date: o.created_at as string, amount: Number(o.total) })),
+    totalLessonsAll,
     skills,
     stageTitle,
     assignmentBreakdown,

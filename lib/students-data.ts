@@ -1,4 +1,4 @@
-export type StudentStatus = 'نشط' | 'غير نشط' | 'موقوف'
+export type StudentStatus = 'نشط' | 'موقوف'
 
 export type StudentGender = 'ذكر' | 'أنثى'
 
@@ -82,7 +82,7 @@ export const studentRecords: StudentRecord[] = [
     courses: 2,
     progress: 38,
     spent: '900 ج.م',
-    status: 'غير نشط',
+    status: 'موقوف',
     joinedAt: '9 يونيو 2024',
   },
   {
@@ -130,7 +130,7 @@ export const studentRecords: StudentRecord[] = [
     courses: 2,
     progress: 45,
     spent: '750 ج.م',
-    status: 'غير نشط',
+    status: 'موقوف',
     joinedAt: '28 مايو 2024',
   },
   {
@@ -174,6 +174,5 @@ export const studentRecords: StudentRecord[] = [
 export const statusFilters: Array<{ label: string; value: StudentStatus | 'الكل' }> = [
   { label: 'الكل', value: 'الكل' },
   { label: 'نشط', value: 'نشط' },
-  { label: 'غير نشط', value: 'غير نشط' },
   { label: 'موقوف', value: 'موقوف' },
 ]

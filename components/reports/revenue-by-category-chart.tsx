@@ -32,18 +32,22 @@ export function RevenueByCategoryChart({
             margin={{ left: 8, right: 16, top: 8, bottom: 8 }}
           >
             <CartesianGrid horizontal={false} strokeDasharray="3 3" />
+            {/* In vertical layout, X is the value axis → move to top orientation keeps numbers readable */}
             <XAxis
               type="number"
               tickLine={false}
               axisLine={false}
               tickFormatter={(v) => (v >= 1000 ? `${v / 1000}K` : v)}
+              orientation="top"
             />
+            {/* Y is the category axis → keep on right so Arabic labels are on the right */}
             <YAxis
               type="category"
               dataKey="name"
               tickLine={false}
               axisLine={false}
               width={70}
+              orientation="right"
             />
             <ChartTooltip
               content={
@@ -53,7 +57,7 @@ export function RevenueByCategoryChart({
                 />
               }
             />
-            <Bar dataKey="revenue" radius={[0, 6, 6, 0]} isAnimationActive animationDuration={700} animationEasing="ease-out">
+            <Bar dataKey="revenue" radius={[6, 0, 0, 6]} isAnimationActive animationDuration={700} animationEasing="ease-out">
               {data.map((entry) => (
                 <Cell key={entry.name} fill={entry.fill} />
               ))}

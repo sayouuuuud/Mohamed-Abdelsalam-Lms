@@ -3,11 +3,14 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { BookOpen, CheckCircle2, Clock, Play, Star } from 'lucide-react'
+import { BookOpen, CheckCircle2, Clock, Play, Trash2 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useStudent } from '@/components/student/student-context'
+import { unenrollCourse } from '@/app/student/actions'
+import { toast } from 'sonner'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 
 type Filter = 'all' | 'in-progress' | 'completed'
 
@@ -19,6 +22,7 @@ const filters: { key: Filter; label: string }[] = [
 
 export function StudentCoursesPage() {
   const [filter, setFilter] = useState<Filter>('all')
+  const [courseToDelete, setCourseToDelete] = useState<string | null>(null)
   const { enrolledCourses = [] } = useStudent()
 
   const withPercent = enrolledCourses.map((c: any) => ({
@@ -127,10 +131,7 @@ export function StudentCoursesPage() {
                 </p>
 
                 <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <Star className="size-3.5 fill-amber-400 text-amber-400" />
-                    {course.rating}
-                  </span>
+
                   <span className="flex items-center gap-1">
                     <Clock className="size-3.5" />
                     {course.durationHours} ساعة
@@ -157,20 +158,45 @@ export function StudentCoursesPage() {
                     />
                   </div>
 
-                  <Button
-                    className="mt-4 w-full"
-                    nativeButton={false}
-                    render={<Link href={`/student/courses/${course.id}`} />}
-                  >
-                    <Play className="size-4" />
-                    {course.percent === 100 ? 'مراجعة الكورس' : 'متابعة التعلّم'}
-                  </Button>
+                  <div className="mt-4 flex gap-2">
+                    <Button
+                      className="flex-1"
+                      nativeButton={false}
+                      render={<Link href={`/student/courses/${course.id}`} />}
+                    >
+                      <Play className="size-4" />
+                      {course.percent === 100 ? 'مراجعة الكورس' : 'متابعة التعلّم'}
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      onClick={() => setCourseToDelete(course.id)}
+                      title="إلغاء الاشتراك"
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             </Card>
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!courseToDelete}
+        onClose={() => setCourseToDelete(null)}
+        onConfirm={async () => {
+          if (!courseToDelete) return
+          const res = await unenrollCourse(courseToDelete)
+          if (res.error) toast.error(res.error)
+          else toast.success('تم إلغاء الاشتراك بنجاح')
+        }}
+        title="إلغاء الاشتراك"
+        description="هل أنت متأكد من إلغاء الاشتراك في هذا الكورس؟ (لا يمكن التراجع عن هذا الإجراء)"
+        confirmLabel="إلغاء الاشتراك"
+        cancelLabel="تراجع"
+      />
     </div>
   )
 }

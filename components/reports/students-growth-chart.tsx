@@ -28,7 +28,7 @@ export function StudentsGrowthChart({ data: inputData }: { data?: any[] }) {
       onFilterChange={setRange}
     >
       <ChartContainer config={config} className="h-[260px] w-full">
-        <AreaChart data={studentsGrowth} margin={{ left: 4, right: 8, top: 8 }}>
+        <AreaChart data={studentsGrowth} margin={{ left: -24, right: 12, top: 8 }}>
           <defs>
             <linearGradient id="fillReportStudents" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="var(--color-students)" stopOpacity={0.35} />
@@ -36,8 +36,8 @@ export function StudentsGrowthChart({ data: inputData }: { data?: any[] }) {
             </linearGradient>
           </defs>
           <CartesianGrid vertical={false} strokeDasharray="3 3" />
-          <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
-          <YAxis tickLine={false} axisLine={false} width={44} tickFormatter={(v) => (v >= 1000 ? `${v / 1000}K` : v)} />
+          <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} reversed />
+          <YAxis tickLine={false} axisLine={false} width={44} orientation="right" tickFormatter={(v) => (v >= 1000 ? `${v / 1000}K` : v)} />
           <ChartTooltip
             content={
               <ChartTooltipContent
