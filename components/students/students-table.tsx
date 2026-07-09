@@ -21,7 +21,6 @@ const ITEMS_PER_PAGE = 10
 
 const statusStyles: Record<StudentStatus, string> = {
   نشط: 'bg-success/10 text-success',
-  'غير نشط': 'bg-secondary text-muted-foreground',
   موقوف: 'bg-destructive/10 text-destructive',
 }
 

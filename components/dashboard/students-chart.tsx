@@ -27,7 +27,7 @@ export function StudentsChart({ data = [] }: { data?: any[] }) {
       onFilterChange={setRange}
     >
       <ChartContainer config={config} className="h-full min-h-[240px] w-full">
-        <AreaChart data={chartData} margin={{ left: 4, right: 8, top: 8 }}>
+        <AreaChart data={chartData} margin={{ left: -24, right: 12, top: 8 }}>
           <defs>
             <linearGradient id="fillStudents" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="var(--color-students)" stopOpacity={0.35} />
@@ -40,11 +40,13 @@ export function StudentsChart({ data = [] }: { data?: any[] }) {
             tickLine={false}
             axisLine={false}
             tickMargin={8}
+            reversed
           />
           <YAxis
             tickLine={false}
             axisLine={false}
             width={44}
+            orientation="right"
             tickFormatter={(v) => (v >= 1000 ? `${v / 1000}K` : v)}
           />
           <ChartTooltip

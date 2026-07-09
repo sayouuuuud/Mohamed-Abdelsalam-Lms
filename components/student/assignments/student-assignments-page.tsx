@@ -209,7 +209,7 @@ export function StudentAssignmentsPage({ assignments = [] }: { assignments?: Ass
         a.type.toLowerCase().includes(q)
       return matchesStatus && matchesQuery
     })
-  }, [filter, query])
+  }, [filter, query, assignments])
 
   const pending = assignments.filter(
     (a) => a.status === 'لم يبدأ' || a.status === 'قيد التنفيذ',

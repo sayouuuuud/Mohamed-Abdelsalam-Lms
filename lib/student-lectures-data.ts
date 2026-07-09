@@ -46,6 +46,7 @@ type LectureRow = {
   image?: string | null
   instructor?: string | null
   studentsCount?: number
+  what_you_learn?: string[] | null
   branches: {
     title: string | null
     image: string | null
@@ -196,6 +197,23 @@ function toCourseDetail(row: LectureRow, progress: Progress = EMPTY_PROGRESS): C
 
   const completedLessons = lessons.filter((l) => l.completed).length
 
+  const allMinutes = lessons.reduce((sum, l) => {
+    if (!l.duration) return sum
+    const parts = String(l.duration).split(':').map(Number)
+    if (parts.length === 2) return sum + (parts[0] ?? 0) + (parts[1] ?? 0) / 60
+    if (parts.length === 3) return sum + (parts[0] ?? 0) * 60 + (parts[1] ?? 0) + (parts[2] ?? 0) / 60
+    return sum
+  }, 0)
+
+  const hoursRaw = allMinutes / 60
+  let durationFormatted = '1 ساعة'
+  if (hoursRaw > 0 && hoursRaw < 1) {
+    durationFormatted = `${Math.round(allMinutes)} دقيقة`
+  } else if (hoursRaw >= 1) {
+    const rounded = Number(hoursRaw.toFixed(1))
+    durationFormatted = rounded === 1 ? '1 ساعة' : rounded === 2 ? 'ساعتين' : `${rounded} ساعة`
+  }
+
   const sections: Section[] = [
     {
       id: sectionId,
@@ -207,7 +225,7 @@ function toCourseDetail(row: LectureRow, progress: Progress = EMPTY_PROGRESS): C
   return {
     id: row.slug,
     title: row.title,
-    instructor: row.instructor?.trim() || 'أ. عبد السلام',
+    instructor: row.instructor?.trim() || 'أ. محمد أحمد',
     image: row.image || lectureImage(row.slug),
     category: row.branches?.title ?? 'رياضيات',
     completedLessons,
@@ -218,16 +236,13 @@ function toCourseDetail(row: LectureRow, progress: Progress = EMPTY_PROGRESS): C
       'محاضرة متكاملة تشرح الموضوع من الأساس مع تمارين وحلول نموذجية.',
     rating: 4.9,
     studentsCount: row.studentsCount ?? 0,
-    durationHours: Math.max(1, Math.round(lessons.length * 0.4)),
+    durationHours: durationFormatted,
     level: row.branches?.stages?.title ?? 'الثانوية العامة',
     lastUpdated: '',
     sections,
-    whatYouLearn: [
-      'فهم المفاهيم الأساسية للموضوع',
-      'حل المسائل خطوة بخطوة',
-      'تطبيقات على نماذج الامتحانات',
-      'مراجعة شاملة قبل الاختبار',
-    ],
+    whatYouLearn: row.what_you_learn && row.what_you_learn.length > 0 
+      ? row.what_you_learn 
+      : [],
   }
 }
 
@@ -237,7 +252,7 @@ const ASSIGNMENT_SELECT = `
 `
 
 const LECTURE_SELECT = `
-  id, slug, title, description, image, instructor,
+  id, slug, title, description, image, instructor, what_you_learn,
   branches:branch_id ( title, image, stages:stage_id ( title ) ),
   lessons ( id, slug, title, duration, is_free, sort_order, video_url, description, content_type, attachments ),
   ${ASSIGNMENT_SELECT}
@@ -245,7 +260,7 @@ const LECTURE_SELECT = `
 
 // Same projection without the optional `image` column (pre-migration fallback).
 const LECTURE_SELECT_NO_IMAGE = `
-  id, slug, title, description, instructor,
+  id, slug, title, description, instructor, what_you_learn,
   branches:branch_id ( title, image, stages:stage_id ( title ) ),
   lessons ( id, slug, title, duration, is_free, sort_order, video_url, description, content_type, attachments ),
   ${ASSIGNMENT_SELECT}

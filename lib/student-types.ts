@@ -32,6 +32,7 @@ export type StudentProfileInfo = {
 
 export type ActivityDay = {
   day: string
+  isoDate: string
   hours: number
 }
 
@@ -86,7 +87,7 @@ export type CourseDetail = CourseProgress & {
   description: string
   rating: number
   studentsCount: number
-  durationHours: number
+  durationHours: string
   level: string
   lastUpdated: string
   sections: Section[]

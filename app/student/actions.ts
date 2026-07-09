@@ -152,6 +152,38 @@ export async function getStudentEnrolledCourses() {
   }))
 }
 
+export async function unenrollCourse(courseSlug: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'غير مسجّل الدخول.' }
+
+  const { data: student } = await supabase.from('students').select('id').eq('user_id', user.id).single()
+  if (!student) return { error: 'حساب الطالب غير موجود.' }
+
+  const { data: lecture } = await supabase.from('lectures').select('id').eq('slug', courseSlug).single()
+  if (!lecture) return { error: 'الكورس غير موجود.' }
+
+  const { data: orders } = await supabase.from('orders').select('id').eq('student_id', user.id)
+  const orderIds = orders?.map((o: any) => o.id) || []
+
+  if (orderIds.length > 0) {
+    const { error } = await supabase
+      .from('order_items')
+      .delete()
+      .eq('lecture_id', lecture.id)
+      .in('order_id', orderIds)
+
+    if (error) {
+      console.error('[v0] unenrollCourse error:', error.message)
+      return { error: 'حدث خطأ أثناء إلغاء الاشتراك. حاول مرة أخرى.' }
+    }
+  }
+
+  revalidatePath('/student/courses')
+  revalidatePath('/student')
+  return { success: true }
+}
+
 // Helper to build targeted calendar query filters for a student
 async function getStudentCalendarFilters(supabase: any, student: any) {
   // 1. Get student profile for grade
@@ -644,12 +676,15 @@ export async function getStudentAssignments() {
         })
       : '—'
 
+    const rawStatus = sub?.status
     const status: import('@/lib/student-types').AssignmentStatus =
-      sub?.status === 'مصحّح'
+      rawStatus === 'مصحّح' || rawStatus === 'graded' || rawStatus === 'مصحح'
         ? 'مصحّح'
-        : sub?.status === 'تم التسليم'
+        : rawStatus === 'تم التسليم' || rawStatus === 'submitted'
           ? 'تم التسليم'
-          : 'لم يبدأ'
+          : rawStatus === 'قيد التنفيذ' || rawStatus === 'pending'
+            ? 'قيد التنفيذ'
+            : 'لم يبدأ'
 
     return {
       id: a.code ?? a.id,
@@ -702,13 +737,13 @@ export async function setStudentGrade(grade: string) {
 
 
 
-// Returns the last 7 days of learning activity for the current student.
+// Returns learning activity for the current student over the specified number of days.
 // Days with no recorded activity are filled in with 0 hours so the chart
-// always shows a complete 7-day window.
-export async function getStudentLearningActivity() {
+// always shows a complete window.
+export async function getStudentLearningActivity(days: number = 7) {
   const supabase = await createClient()
   const student = await getCurrentStudent(supabase)
-  if (!student) return buildEmptyWeek()
+  if (!student) return buildEmptyDays(days)
 
   const { data: rows } = await supabase
     .from('learning_activity')
@@ -716,7 +751,7 @@ export async function getStudentLearningActivity() {
     .eq('student_id', student.id)
     .gte(
       'activity_date',
-      new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      new Date(Date.now() - (days - 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     )
     .order('activity_date', { ascending: true })
 
@@ -725,7 +760,7 @@ export async function getStudentLearningActivity() {
     (rows ?? []).map((r: any) => [r.activity_date as string, r.minutes as number]),
   )
 
-  return buildEmptyWeek().map((day) => ({
+  return buildEmptyDays(days).map((day) => ({
     ...day,
     hours: parseFloat(
       ((minutesByDate.get(day.isoDate) ?? 0) / 60).toFixed(1),
@@ -733,11 +768,11 @@ export async function getStudentLearningActivity() {
   }))
 }
 
-/** Generates an array of the last 7 days in {day, isoDate, hours} format. */
-function buildEmptyWeek() {
+/** Generates an array of the last N days in {day, isoDate, hours} format. */
+function buildEmptyDays(days: number) {
   const dayNames = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(Date.now() - (6 - i) * 24 * 60 * 60 * 1000)
+  return Array.from({ length: days }, (_, i) => {
+    const d = new Date(Date.now() - ((days - 1) - i) * 24 * 60 * 60 * 1000)
     return {
       day: dayNames[d.getDay()],
       isoDate: d.toISOString().split('T')[0],
@@ -914,6 +949,23 @@ export async function trackStudentDevice() {
     last_active: new Date().toISOString(),
     sessions
   }, { onConflict: 'student_id' });
+
+  // Also record this login day as an active learning day (0 minutes initially if not already set).
+  const today = new Date().toISOString().split('T')[0];
+  const { data: existingActivity } = await supabase
+    .from('learning_activity')
+    .select('minutes')
+    .eq('student_id', student.id)
+    .eq('activity_date', today)
+    .single();
+
+  if (!existingActivity) {
+    await supabase.from('learning_activity').upsert({
+      student_id: student.id,
+      activity_date: today,
+      minutes: 0
+    }, { onConflict: 'student_id,activity_date' });
+  }
 }
 
 // ── Monthly Progress ────────────────────────────────────────────────────────
@@ -930,6 +982,10 @@ export type MonthlyStat = {
 export async function getStudentMonthlyProgress(): Promise<MonthlyStat[]> {
   const supabase = await createClient()
   const student = await getCurrentStudent(supabase)
+  
+  // Use admin client for fetching stats to avoid any RLS issues
+  const { createAdminClient } = await import('@/lib/supabase/admin')
+  const adminDb = createAdminClient()
 
   const empty: MonthlyStat[] = [
     { label: 'درس مكتمل', value: 0, change: 'ابدأ التعلّم الآن', positive: null },
@@ -940,21 +996,37 @@ export async function getStudentMonthlyProgress(): Promise<MonthlyStat[]> {
   if (!student) return empty
 
   const now = new Date()
+  const formatYMD = (d: Date) => {
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+  
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  const monthStartDate = formatYMD(monthStart)
   const monthStartISO = monthStart.toISOString()
-  const monthStartDate = monthStartISO.split('T')[0]
 
   // 1) Completed lessons this month (content progress uses user_id).
-  const { count: lessonsCount } = await supabase
+  const { count: lessonsCount1 } = await adminDb
     .from('student_content_progress')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', student.user_id)
     .eq('item_type', 'lesson')
     .eq('status', 'completed')
     .gte('updated_at', monthStartISO)
+    
+  const { count: lessonsCount2 } = await adminDb
+    .from('lesson_progress')
+    .select('id', { count: 'exact', head: true })
+    .eq('student_id', student.user_id)
+    .eq('completed', true)
+    .gte('completed_at', monthStartISO)
+    
+  const lessonsCount = (lessonsCount1 || 0) + (lessonsCount2 || 0)
 
   // 2) Learning hours this month.
-  const { data: monthActivity } = await supabase
+  const { data: monthActivity } = await adminDb
     .from('learning_activity')
     .select('activity_date, minutes')
     .eq('student_id', student.id)
@@ -963,43 +1035,43 @@ export async function getStudentMonthlyProgress(): Promise<MonthlyStat[]> {
     (sum, r: any) => sum + (r.minutes ?? 0),
     0,
   )
-  const hours = Math.round(totalMinutes / 60)
+  const hoursRaw = totalMinutes / 60
+  const hours = hoursRaw > 0 && hoursRaw < 1 ? Number(hoursRaw.toFixed(1)) : Math.round(hoursRaw)
 
   // 3) Current consecutive-day streak (based on all activity days).
-  const { data: allActivity } = await supabase
+  const { data: allActivity } = await adminDb
     .from('learning_activity')
     .select('activity_date')
     .eq('student_id', student.id)
-    .gt('minutes', 0)
     .order('activity_date', { ascending: false })
   const activeDays = new Set(
     (allActivity ?? []).map((r: any) => r.activity_date as string),
   )
   let streak = 0
   const cursor = new Date()
-  cursor.setHours(0, 0, 0, 0)
+  
   // If there's no activity today, start counting from yesterday so an
   // in-progress day doesn't reset the streak.
-  if (!activeDays.has(cursor.toISOString().split('T')[0])) {
+  if (!activeDays.has(formatYMD(cursor))) {
     cursor.setDate(cursor.getDate() - 1)
   }
-  while (activeDays.has(cursor.toISOString().split('T')[0])) {
+  while (activeDays.has(formatYMD(cursor))) {
     streak++
     cursor.setDate(cursor.getDate() - 1)
   }
 
   // 4) Average grade this month (assignments + exams, normalised to %).
-  const { data: asgSubs } = await supabase
+  const { data: asgSubs } = await adminDb
     .from('assignment_submissions')
     .select('score, submitted_at, assignments(points)')
     .eq('student_id', student.id)
-    .eq('status', 'مصحّح')
+    .not('score', 'is', null)
     .gte('submitted_at', monthStartISO)
-  const { data: examSubs } = await supabase
+  const { data: examSubs } = await adminDb
     .from('exam_submissions')
     .select('score, total, submitted_at')
     .eq('student_id', student.id)
-    .eq('grading_status', 'graded')
+    .not('score', 'is', null)
     .gte('submitted_at', monthStartISO)
 
   const percentages: number[] = []

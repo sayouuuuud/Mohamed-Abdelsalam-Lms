@@ -24,7 +24,7 @@ INSERT INTO public.students (id, code, name, email, phone, gender, courses, prog
 ('b2345678-1234-5678-1234-567812345671', 'STD-901', 'محمد إبراهيم', 'mohamed@example.com', '01012345678', 'ذكر', 2, 45, '1200', 'نشط', current_date, now() - interval '5 days'),
 ('b2345678-1234-5678-1234-567812345672', 'STD-902', 'فاطمة الزهراء', 'fatma@example.com', '01012345679', 'أنثى', 1, 20, '450', 'نشط', current_date, now() - interval '15 days'),
 ('b2345678-1234-5678-1234-567812345673', 'STD-903', 'يوسف محمد', 'youssef@example.com', '01012345680', 'ذكر', 3, 80, '2500', 'نشط', current_date, now() - interval '1 month'),
-('b2345678-1234-5678-1234-567812345674', 'STD-904', 'سارة أحمد', 'sara@example.com', '01012345681', 'أنثى', 1, 10, '350', 'غير نشط', current_date, now() - interval '3 months')
+('b2345678-1234-5678-1234-567812345674', 'STD-904', 'سارة أحمد', 'sara@example.com', '01012345681', 'أنثى', 1, 10, '350', 'موقوف', current_date, now() - interval '3 months')
 ON CONFLICT (id) DO NOTHING;
 
 -- 4. Insert Payments (mix of statuses and dates)

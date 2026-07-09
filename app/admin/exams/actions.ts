@@ -135,21 +135,29 @@ export async function getExams(): Promise<ExamRecord[]> {
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('exams')
-    .select('*')
+    .select('*, exam_submissions(score, total)')
     .order('created_at', { ascending: false })
 
   if (error || !data) return []
 
   return data.map((row) => {
     const d = new Date(row.created_at)
+    const submissions = row.exam_submissions || []
+    const participants = submissions.length
+    let avgScore = 0
+    if (participants > 0) {
+      const sum = submissions.reduce((acc: number, sub: any) => acc + (sub.total > 0 ? (sub.score / sub.total) * 100 : 0), 0)
+      avgScore = Math.round(sum / participants)
+    }
+
     return {
       id: row.code,
       title: row.title,
       course: row.course,
       questions: row.questions,
       duration: row.duration,
-      participants: row.participants,
-      avgScore: row.avg_score,
+      participants,
+      avgScore,
       status: row.status as ExamStatus,
       createdAt: `${d.getDate()} ${d.toLocaleString('ar-EG', { month: 'long' })} ${d.getFullYear()}`
     }
@@ -162,11 +170,28 @@ export async function getExamsStats() {
     return null
   }
 
-  const { data: examsRaw } = await supabase
+  const { data: raw } = await supabase
     .from('exams')
-    .select('id, status, participants, avg_score, created_at')
+    .select('id, status, created_at, exam_submissions(score, total)')
 
-  if (!examsRaw) return null
+  if (!raw) return null
+
+  const examsRaw = raw.map(e => {
+    const submissions = e.exam_submissions || []
+    const participants = submissions.length
+    let avg_score = 0
+    if (participants > 0) {
+      const sum = submissions.reduce((acc: number, sub: any) => acc + (sub.total > 0 ? (sub.score / sub.total) * 100 : 0), 0)
+      avg_score = Math.round(sum / participants)
+    }
+    return {
+      id: e.id,
+      status: e.status,
+      created_at: e.created_at,
+      participants,
+      avg_score
+    }
+  })
 
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
 

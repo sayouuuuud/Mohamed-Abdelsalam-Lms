@@ -73,6 +73,7 @@ export function LectureFormModals() {
       setOldPrice(editingLecture?.oldPrice != null ? String(editingLecture.oldPrice) : '')
       setBadge(editingLecture?.badge ?? '')
       setImage(editingLecture?.image ?? '')
+      setWhatYouLearn(editingLecture?.whatYouLearn?.join('\n') ?? '')
       
       if (editingLecture?.releaseDate) {
         // convert ISO to YYYY-MM-DDTHH:mm
@@ -107,10 +108,12 @@ export function LectureFormModals() {
       badge: badge.trim() || null,
       image: image || null,
       releaseDate: releaseDate || null,
+      whatYouLearn: whatYouLearn.split('\n').map(s => s.trim()).filter(Boolean),
     })
   }
 
   // ── Lesson form state ──
+  const [whatYouLearn, setWhatYouLearn] = useState('')
   const [lTitle, setLTitle] = useState('')
   const [lDuration, setLDuration] = useState('')
   const [lIsFree, setLIsFree] = useState(false)
@@ -240,6 +243,16 @@ export function LectureFormModals() {
             <p className="mt-1 text-xs text-muted-foreground">
               إذا حددت موعداً، سيظهر في التقويم وتصبح المحاضرة متاحة في هذا الموعد.
             </p>
+          </Field>
+
+          <Field label="ماذا ستتعلم (كل نقطة في سطر منفصل)">
+            <textarea
+              value={whatYouLearn}
+              onChange={(e) => setWhatYouLearn(e.target.value)}
+              placeholder="مثال:&#10;فهم المفاهيم الأساسية للموضوع&#10;تطبيقات على نماذج الامتحانات"
+              rows={4}
+              className={textareaClass}
+            />
           </Field>
 
           <div className="flex justify-start gap-2 pt-2">

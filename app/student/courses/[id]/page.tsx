@@ -7,7 +7,7 @@ export default async function Page({
 }: {
   params: Promise<{ id: string }>
 }) {
-  const { id } = await params
+  const id = decodeURIComponent((await params).id)
   const course = await getPurchasedCourseDetail(id)
   if (!course) notFound()
 

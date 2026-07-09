@@ -95,15 +95,15 @@ async function recordLearningActivityFromLesson(
     .select('duration')
     .eq('id', lessonId)
     .single()
-  if (!lesson?.duration) return
+  let minutes = 15 // Default to 15 minutes if no duration is set
+  if (lesson?.duration) {
+    // Parse "MM:SS" or "HH:MM:SS" format into minutes.
+    const parts = String(lesson.duration).split(':').map(Number)
+    if (parts.length === 2) minutes = (parts[0] ?? 0) + (parts[1] ?? 0) / 60
+    else if (parts.length === 3) minutes = (parts[0] ?? 0) * 60 + (parts[1] ?? 0) + (parts[2] ?? 0) / 60
+  }
 
-  // Parse "MM:SS" or "HH:MM:SS" format into minutes.
-  const parts = String(lesson.duration).split(':').map(Number)
-  let minutes = 0
-  if (parts.length === 2) minutes = (parts[0] ?? 0) + (parts[1] ?? 0) / 60
-  else if (parts.length === 3) minutes = (parts[0] ?? 0) * 60 + (parts[1] ?? 0) + (parts[2] ?? 0) / 60
-
-  if (minutes <= 0) return
+  if (minutes <= 0) minutes = 15
 
   const { data: studentRow } = await supabase
     .from('students')

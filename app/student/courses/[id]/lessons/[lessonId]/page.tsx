@@ -7,7 +7,9 @@ export default async function Page({
 }: {
   params: Promise<{ id: string; lessonId: string }>
 }) {
-  const { id, lessonId } = await params
+  const { id: rawId, lessonId: rawLessonId } = await params
+  const id = decodeURIComponent(rawId)
+  const lessonId = decodeURIComponent(rawLessonId)
   const data = await getPurchasedLesson(id, lessonId)
   if (!data) notFound()
 

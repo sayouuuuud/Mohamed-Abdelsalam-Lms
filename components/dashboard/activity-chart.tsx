@@ -27,18 +27,20 @@ export function ActivityChart({ data = [] }: { data?: any[] }) {
       onFilterChange={setRange}
     >
       <ChartContainer config={config} className="h-full min-h-[240px] w-full">
-        <BarChart data={chartData} margin={{ left: 4, right: 8, top: 8 }}>
+        <BarChart data={chartData} margin={{ left: -24, right: 12, top: 8 }}>
           <CartesianGrid vertical={false} strokeDasharray="3 3" />
           <XAxis
             dataKey="day"
             tickLine={false}
             axisLine={false}
             tickMargin={8}
+            reversed
           />
           <YAxis
             tickLine={false}
             axisLine={false}
             width={36}
+            orientation="right"
           />
           <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
           <Bar

@@ -6,7 +6,6 @@ import {
   BarChart,
   CartesianGrid,
   ResponsiveContainer,
-  Tooltip,
   XAxis,
   YAxis,
 } from 'recharts'
@@ -48,25 +47,26 @@ export function TopPagesChart({
         {chartData.length > 0 ? (
           <ChartContainer config={config} className="h-full w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <BarChart data={chartData} margin={{ top: 10, right: 12, left: -24, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis 
-                  dataKey="name" 
-                  tick={{ fontSize: 12 }} 
-                  axisLine={false} 
-                  tickLine={false} 
+                <XAxis
+                  dataKey="name"
+                  tick={{ fontSize: 12 }}
+                  axisLine={false}
+                  tickLine={false}
                 />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 12 }} 
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 12 }}
+                  orientation="right"
                 />
                 <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar 
-                  dataKey="views" 
-                  fill="var(--chart-2)" 
-                  radius={[4, 4, 0, 0]} 
-                  name="عدد الزيارات" 
+                <Bar
+                  dataKey="views"
+                  fill="var(--chart-2)"
+                  radius={[4, 4, 0, 0]}
+                  name="عدد الزيارات"
                 />
               </BarChart>
             </ResponsiveContainer>

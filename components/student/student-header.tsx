@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Bell,
   Moon,
@@ -16,6 +16,7 @@ import {
   User,
   ArrowLeft,
   ArrowRight,
+  Globe,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -281,6 +282,7 @@ export function StudentHeader({
   onToggleTheme: () => void
 }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-card/80 backdrop-blur">
       <div className="flex items-center gap-3 px-4 py-3 sm:px-6">
@@ -304,22 +306,31 @@ export function StudentHeader({
           <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <input
             type="search"
+            defaultValue={searchParams.get('q') || ''}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                const q = e.currentTarget.value.trim()
+                if (q) {
+                  router.push(`/student/browse?q=${encodeURIComponent(q)}`)
+                } else {
+                  router.push('/student/browse')
+                }
+              }
+            }}
             placeholder="ابحث عن كورس، درس، اختبار..."
             className="h-11 w-full rounded-xl border border-border bg-secondary/60 pr-10 pl-4 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:bg-card"
           />
         </div>
 
-        {/* Back - visible on desktop */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => router.back()}
-          className="mr-auto hidden text-muted-foreground hover:text-foreground md:flex"
-          aria-label="رجوع"
-          title="رجوع"
+        {/* Link to public website - visible on desktop */}
+        <Link
+          href="/"
+          className="mr-auto hidden items-center justify-center rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground md:flex"
+          aria-label="الموقع العام"
+          title="الموقع العام"
         >
-          <ArrowLeft className="size-5" />
-        </Button>
+          <Globe className="size-5" />
+        </Link>
 
         <Button
           variant="ghost"

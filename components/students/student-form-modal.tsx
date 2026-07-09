@@ -10,7 +10,7 @@ import { useStudents } from './students-context'
 import type { StudentGender, StudentStatus } from '@/lib/students-data'
 import { UserPlus, Mail } from 'lucide-react'
 
-const statuses: StudentStatus[] = ['نشط', 'غير نشط', 'موقوف']
+const statuses: StudentStatus[] = ['نشط', 'موقوف']
 const genders: StudentGender[] = ['ذكر', 'أنثى']
 
 type Tab = 'direct' | 'invite'
@@ -76,7 +76,7 @@ export function StudentFormModal() {
       email: inviteEmail.trim(),
       phone: '',
       gender: 'ذكر',
-      status: 'غير نشط',
+      status: 'موقوف',
     })
   }
 

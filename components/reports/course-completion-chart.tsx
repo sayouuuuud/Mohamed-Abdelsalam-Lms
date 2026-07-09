@@ -7,7 +7,6 @@ import {
   CartesianGrid,
   Legend,
   ResponsiveContainer,
-  Tooltip,
   XAxis,
   YAxis,
 } from 'recharts'
@@ -35,14 +34,14 @@ export function CourseCompletionChart({
         {chartData.length > 0 ? (
           <ChartContainer config={config} className="h-full w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+              <BarChart data={chartData} layout="vertical" margin={{ top: 5, right: 110, left: 10, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                <XAxis type="number" />
-                <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12 }} />
+                <XAxis type="number" orientation="top" tickLine={false} axisLine={false} />
+                <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12 }} orientation="right" />
                 <ChartTooltip content={<ChartTooltipContent />} />
                 <Legend />
-                <Bar dataKey="enrolled" name="مسجلين" fill="var(--chart-4)" radius={[0, 4, 4, 0]} />
-                <Bar dataKey="completion_rate" name="نسبة الإنجاز (%)" fill="var(--chart-1)" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="enrolled" name="مسجلين" fill="var(--chart-4)" radius={[6, 0, 0, 6]} />
+                <Bar dataKey="completion_rate" name="نسبة الإنجاز (%)" fill="var(--chart-1)" radius={[6, 0, 0, 6]} />
               </BarChart>
             </ResponsiveContainer>
           </ChartContainer>

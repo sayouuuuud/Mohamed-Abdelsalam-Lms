@@ -5,6 +5,7 @@ import {
   useContext,
   useMemo,
   useState,
+  useEffect,
   type ReactNode,
 } from 'react'
 import { useRouter } from 'next/navigation'
@@ -62,6 +63,10 @@ export function StudentsProvider({
   const [students, setStudents] = useState<StudentRecord[]>(initialStudents)
   const [formOpen, setFormOpen] = useState(false)
   const [deleting, setDeleting] = useState<StudentRecord | null>(null)
+
+  useEffect(() => {
+    setStudents(initialStudents)
+  }, [initialStudents])
 
   const value = useMemo<StudentsContextValue>(
     () => ({

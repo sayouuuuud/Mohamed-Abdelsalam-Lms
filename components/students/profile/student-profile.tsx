@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useEffect, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -33,11 +33,10 @@ import { MessageModal } from './message-modal'
 import { ProfileCharts } from './profile-charts'
 import { ProfileTables } from './profile-tables'
 
-const statusOptions: StudentStatus[] = ['نشط', 'غير نشط', 'موقوف']
+const statusOptions: StudentStatus[] = ['نشط', 'موقوف']
 
 const statusStyles: Record<StudentStatus, string> = {
   نشط: 'bg-success/10 text-success',
-  'غير نشط': 'bg-secondary text-muted-foreground',
   موقوف: 'bg-destructive/10 text-destructive',
 }
 
@@ -50,6 +49,10 @@ export function StudentProfileView({ profile, studentDbId }: StudentProfileViewP
   const { student, device, presence } = profile
   const [status, setStatus] = useState<StudentStatus>(student.status)
   const [statusOpen, setStatusOpen] = useState(false)
+
+  useEffect(() => {
+    setStatus(student.status)
+  }, [student.status])
   const [messageOpen, setMessageOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()

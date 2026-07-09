@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import { useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import {
   BookOpen,
   Check,
@@ -43,8 +44,9 @@ export function StudentBrowsePage({
   stages?: Stage[]
   gradeLocked?: boolean
 }) {
+  const searchParams = useSearchParams()
   const { add, inCart, setOpen, count } = useCart()
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(searchParams.get('q') || '')
   const [stageFilter, setStageFilter] = useState<string>('all')
   const [details, setDetails] = useState<FlatLecture | null>(null)
 
