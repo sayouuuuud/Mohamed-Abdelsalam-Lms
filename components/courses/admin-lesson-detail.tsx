@@ -228,6 +228,7 @@ export function AdminLessonDetail({
         onClose={() => setEditOpen(false)}
         title="تعديل الدرس"
         description="عدّل محتوى الدرس والفيديو الخاص به"
+        className="max-w-xl"
       >
         <form onSubmit={handleSave} className="space-y-4">
           <Field label="عنوان الدرس">
@@ -265,11 +266,14 @@ export function AdminLessonDetail({
             <span className="text-sm text-foreground">درس مجاني (متاح للمعاينة)</span>
           </label>
 
-          <AttachmentsUploadField
-            value={attachments}
-            onChange={setAttachments}
-            hint="ملفات إضافية (PDF، Word، صور...) يقدر الطالب يحمّلها مع الدرس. الحد الأقصى 100 MB لكل ملف."
-          />
+          <div className="space-y-1.5">
+            <span className="block text-sm font-medium text-foreground">مرفقات الدرس</span>
+            <AttachmentsUploadField
+              value={attachments}
+              onChange={setAttachments}
+              hint="ملفات إضافية (PDF، Word، صور...) يقدر الطالب يحمّلها مع الدرس. الحد الأقصى 100 MB لكل ملف."
+            />
+          </div>
 
           <div className="flex justify-start gap-2 pt-2">
             <Button type="submit">حفظ التغييرات</Button>
