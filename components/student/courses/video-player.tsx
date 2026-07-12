@@ -13,6 +13,63 @@ import { cn } from '@/lib/utils'
 
 const SPEEDS = [0.5, 1, 1.5, 2] as const
 
+// ---------------------------------------------------------------
+// Hook: يُحمّل hls.js ويوصّله بعنصر <video> لو src هو HLS manifest
+// بيرجع null للـ MP4 القديم (يعمل بـ <source> عادي)
+// ---------------------------------------------------------------
+function useHls(src: string | undefined, videoEl: React.RefObject<HTMLVideoElement | null>) {
+  const hlsRef = useRef<import('hls.js').default | null>(null)
+  const isHls  = !!src && (src.includes('/api/hls/') || src.endsWith('.m3u8'))
+
+  useEffect(() => {
+    const video = videoEl.current
+    if (!video || !src) return
+
+    // تنظيف instance قديم
+    if (hlsRef.current) {
+      hlsRef.current.destroy()
+      hlsRef.current = null
+    }
+
+    if (!isHls) return   // MP4: <source> في JSX بيكفي
+
+    // Safari يدعم HLS بشكل native
+    if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = src
+      return
+    }
+
+    // باقي المتصفحات: hls.js
+    let cancelled = false
+    import('hls.js').then(({ default: Hls }) => {
+      if (cancelled || !videoEl.current) return
+      if (!Hls.isSupported()) return   // fallback: المتصفح سيعرض رسالة عدم الدعم
+
+      const hls = new Hls({
+        enableWorker:      true,
+        lowLatencyMode:    false,
+        maxBufferLength:   30,
+        maxMaxBufferLength:60,
+        startLevel:        -1,   // ABR تلقائي
+      })
+      hlsRef.current = hls
+      hls.loadSource(src)
+      hls.attachMedia(videoEl.current)
+    })
+
+    return () => {
+      cancelled = true
+      if (hlsRef.current) {
+        hlsRef.current.destroy()
+        hlsRef.current = null
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [src])
+
+  return { isHls }
+}
+
 function formatTime(seconds: number) {
   if (!Number.isFinite(seconds)) return '0:00'
   const m = Math.floor(seconds / 60)
@@ -31,6 +88,8 @@ export function VideoPlayer({
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
+
+  const { isHls } = useHls(src, videoRef)
 
   const [playing, setPlaying] = useState(false)
   const [muted, setMuted] = useState(false)
@@ -103,7 +162,8 @@ export function VideoPlayer({
         onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
         onVolumeChange={(e) => setMuted(e.currentTarget.muted)}
       >
-        {src ? <source src={src} type="video/mp4" /> : null}
+        {/* HLS: src يُعيَّن بواسطة useHls hook — لا نضع <source> هنا */}
+        {src && !isHls ? <source src={src} type="video/mp4" /> : null}
         متصفحك لا يدعم تشغيل الفيديو.
       </video>
 

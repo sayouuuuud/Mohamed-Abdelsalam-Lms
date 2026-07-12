@@ -32,12 +32,14 @@ export function AdminLessonDetail({
   lectureTitle,
   lectureImage,
   siblings,
+  streamingEnabled = false,
 }: {
   lesson: AdminLesson
   lectureId: string
   lectureTitle: string
   lectureImage: string | null
   siblings: AdminLesson[]
+  streamingEnabled?: boolean
 }) {
   const router = useRouter()
   const [lesson, setLesson] = useState(initialLesson)
@@ -245,7 +247,9 @@ export function AdminLessonDetail({
           <VideoUploadField
             value={video}
             onChange={setVideo}
-            hint="ارفع ملف الفيديو. هذا ما سيشاهده الطالب."
+            hint={streamingEnabled ? 'سيتم تحويل الفيديو تلقائياً إلى HLS بعد الرفع.' : 'ارفع ملف الفيديو. هذا ما سيشاهده الطالب.'}
+            streamingEnabled={streamingEnabled}
+            lessonId={lesson.id}
           />
           <Field label="وصف الدرس">
             <textarea
