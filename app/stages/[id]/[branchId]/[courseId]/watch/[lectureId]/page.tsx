@@ -11,14 +11,14 @@ type PageProps = {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id, branchId, courseId, lectureId } = await params
-  const data = await getFreeLectureWatch(id, branchId, courseId, lectureId)
+  const data = await getFreeLectureWatch(id, branchId, decodeURIComponent(courseId), decodeURIComponent(lectureId))
   if (!data) return { title: 'المحاضرة غير متاحة' }
   return { title: `${data.lecture.title} (مجانية) — منصة الأستاذ عبد السلام` }
 }
 
 export default async function FreeLectureWatchPage({ params }: PageProps) {
   const { id, branchId, courseId, lectureId } = await params
-  const data = await getFreeLectureWatch(id, branchId, courseId, lectureId)
+  const data = await getFreeLectureWatch(id, branchId, decodeURIComponent(courseId), decodeURIComponent(lectureId))
   if (!data) notFound()
 
   return (

@@ -11,7 +11,7 @@ export async function generateMetadata({
   params: Promise<{ id: string; branchId: string; courseId: string }>
 }): Promise<Metadata> {
   const { id, branchId, courseId } = await params
-  const result = await getCourseBySlug(id, branchId, courseId)
+  const result = await getCourseBySlug(id, branchId, decodeURIComponent(courseId))
   if (!result) return { title: 'الكورس غير موجود' }
   return {
     title: `${result.course.title} — منصة الأستاذ عبد السلام`,
@@ -25,7 +25,7 @@ export default async function CoursePage({
   params: Promise<{ id: string; branchId: string; courseId: string }>
 }) {
   const { id, branchId, courseId } = await params
-  const result = await getCourseBySlug(id, branchId, courseId)
+  const result = await getCourseBySlug(id, branchId, decodeURIComponent(courseId))
   if (!result) notFound()
 
   return (

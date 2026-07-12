@@ -638,11 +638,12 @@ export async function getLectureDetailAdmin(
     releaseDate: row.release_date ?? null,
     branchId: row.branch_id,
     monthlyCourseId: row.monthly_course_id ?? null,
-    courseSectionId: (row as any).course_section_id ?? null,
+    courseSectionId: (row as any).monthly_course_section_id ?? null,
     branchTitle: branch?.title ?? '',
     stageId: branch?.stage_id ?? '',
     stageTitle: branch?.stages?.title ?? '',
     whatYouLearn: (row as any).what_you_learn ?? null,
+    isFree: (row as any).is_free ?? false,
     lessons: (lessonsRes.data ?? []).map((l) => {
       const ct = (l as any).content_type
       return {
