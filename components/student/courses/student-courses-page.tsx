@@ -237,58 +237,104 @@ function CourseCard({
         </div>
       </div>
 
-      {/* Lectures list */}
+      {/* Lectures list — grouped by section when the course has sections */}
       {open && (
-        <div className="flex flex-col gap-2 border-t border-border bg-secondary/30 p-4">
+        <div className="flex flex-col gap-4 border-t border-border bg-secondary/30 p-4">
           {course.lectures.length === 0 ? (
             <p className="py-4 text-center text-sm text-muted-foreground">
               المدرّس لسه ما نزّلش محاضرات في الكورس ده. تابعنا قريبًا.
             </p>
           ) : (
-            course.lectures.map((lecture, index) => {
-              const done = lecture.totalLessons > 0 && lecture.completedLessons === lecture.totalLessons
-              return (
-                <Link
-                  key={lecture.dbId}
-                  href={`/student/courses/${lecture.id}`}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-3.5 transition-colors hover:border-primary/40 hover:bg-secondary"
-                >
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span
-                      className={cn(
-                        'grid size-9 shrink-0 place-items-center rounded-lg text-sm font-bold',
-                        done
-                          ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                          : 'bg-primary/10 text-primary',
-                      )}
-                    >
-                      {done ? <CheckCircle2 className="size-4" /> : index + 1}
-                    </span>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="truncate font-bold text-foreground">{lecture.title}</p>
-                        {lecture.isNew && (
-                          <span className="flex shrink-0 items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold text-primary">
-                            <Sparkles className="size-2.5" />
-                            جديد
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {lecture.completedLessons}/{lecture.totalLessons} درس
-                      </p>
-                    </div>
+            groupEnrolledLectures(course).map((group) => (
+              <div key={group.id ?? 'no-section'} className="flex flex-col gap-2">
+                {group.title && (
+                  <div className="flex items-center gap-2 px-0.5">
+                    <span className="h-4 w-1 rounded-full bg-primary" />
+                    <h4 className="text-sm font-bold text-foreground">{group.title}</h4>
+                    <span className="text-xs text-muted-foreground">({group.lectures.length})</span>
                   </div>
-                  <span className="flex shrink-0 items-center gap-1 text-xs font-bold text-primary">
-                    <PlayCircle className="size-4" />
-                    {lecture.completedLessons > 0 ? 'متابعة' : 'ابدأ'}
-                  </span>
-                </Link>
-              )
-            })
+                )}
+                {group.lectures.map((lecture, index) => (
+                  <EnrolledLectureRow key={lecture.dbId} lecture={lecture} index={index} />
+                ))}
+              </div>
+            ))
           )}
         </div>
       )}
     </Card>
+  )
+}
+
+// Groups a course's lectures by section (section order preserved), with any
+// unclassified lectures placed in a trailing group. Courses without sections
+// return a single untitled group.
+function groupEnrolledLectures(course: EnrolledMonthlyCourse) {
+  const groups: { id: string | null; title: string | null; lectures: EnrolledMonthlyCourse['lectures'] }[] = []
+  const sections = course.sections ?? []
+  if (sections.length === 0) {
+    return [{ id: null, title: null, lectures: course.lectures }]
+  }
+  for (const section of sections) {
+    const lectures = course.lectures.filter((l) => l.sectionId === section.id)
+    if (lectures.length > 0) groups.push({ id: section.id, title: section.title, lectures })
+  }
+  const unclassified = course.lectures.filter(
+    (l) => !l.sectionId || !sections.some((s) => s.id === l.sectionId),
+  )
+  if (unclassified.length > 0) {
+    groups.push({
+      id: null,
+      title: groups.length > 0 ? 'محاضرات أخرى' : null,
+      lectures: unclassified,
+    })
+  }
+  return groups
+}
+
+function EnrolledLectureRow({
+  lecture,
+  index,
+}: {
+  lecture: EnrolledMonthlyCourse['lectures'][number]
+  index: number
+}) {
+  const done = lecture.totalLessons > 0 && lecture.completedLessons === lecture.totalLessons
+  return (
+    <Link
+      href={`/student/courses/${lecture.id}`}
+      className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-3.5 transition-colors hover:border-primary/40 hover:bg-secondary"
+    >
+      <div className="flex min-w-0 items-center gap-3">
+        <span
+          className={cn(
+            'grid size-9 shrink-0 place-items-center rounded-lg text-sm font-bold',
+            done
+              ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+              : 'bg-primary/10 text-primary',
+          )}
+        >
+          {done ? <CheckCircle2 className="size-4" /> : index + 1}
+        </span>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="truncate font-bold text-foreground">{lecture.title}</p>
+            {lecture.isNew && (
+              <span className="flex shrink-0 items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold text-primary">
+                <Sparkles className="size-2.5" />
+                جديد
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {lecture.completedLessons}/{lecture.totalLessons} درس
+          </p>
+        </div>
+      </div>
+      <span className="flex shrink-0 items-center gap-1 text-xs font-bold text-primary">
+        <PlayCircle className="size-4" />
+        {lecture.completedLessons > 0 ? 'متابعة' : 'ابدأ'}
+      </span>
+    </Link>
   )
 }

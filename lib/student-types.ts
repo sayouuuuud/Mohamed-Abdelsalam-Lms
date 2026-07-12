@@ -115,6 +115,14 @@ export type EnrolledCourseLecture = {
   isNew: boolean
   /** تاريخ إضافة المحاضرة للكورس (ISO) */
   addedAt: string
+  /** التصنيف اللي المحاضرة تابعة له داخل الكورس (null = بدون تصنيف) */
+  sectionId: string | null
+}
+
+/** تصنيف داخل الكورس يجمّع مجموعة محاضرات (مثال: المراجعة النهائية) */
+export type EnrolledCourseSection = {
+  id: string
+  title: string
 }
 
 /** كورس شهري اشترك فيه الطالب كباقة */
@@ -137,6 +145,8 @@ export type EnrolledMonthlyCourse = {
   /** عدد المحاضرات المضافة بعد الاشتراك ولم يفتحها الطالب بعد */
   newLecturesCount: number
   lectures: EnrolledCourseLecture[]
+  /** تصنيفات الكورس مرتّبة (لتجميع المحاضرات في العرض) */
+  sections: EnrolledCourseSection[]
 }
 
 // ---------------------------------------------------------------------------

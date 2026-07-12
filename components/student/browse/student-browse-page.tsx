@@ -22,6 +22,31 @@ function formatEGP(value: number) {
   return new Intl.NumberFormat('ar-EG').format(value)
 }
 
+// Groups a course's lectures by their section, preserving section order and
+// placing any unclassified lectures in a trailing "بدون تصنيف" group. When the
+// course has no sections at all, returns a single untitled group.
+function groupLecturesBySection(course: FlatCourse) {
+  const groups: { id: string | null; title: string | null; lectures: FlatLecture[] }[] = []
+  if (!course.sections || course.sections.length === 0) {
+    return [{ id: null, title: null, lectures: course.lectures }]
+  }
+  for (const section of course.sections) {
+    const lectures = course.lectures.filter((l) => l.sectionId === section.id)
+    if (lectures.length > 0) groups.push({ id: section.id, title: section.title, lectures })
+  }
+  const unclassified = course.lectures.filter(
+    (l) => !l.sectionId || !course.sections.some((s) => s.id === l.sectionId),
+  )
+  if (unclassified.length > 0) {
+    groups.push({
+      id: null,
+      title: groups.length > 0 ? 'محاضرات أخرى' : null,
+      lectures: unclassified,
+    })
+  }
+  return groups
+}
+
 type FlatCourse = {
   dbId?: string
   slug: string
@@ -32,6 +57,7 @@ type FlatCourse = {
   oldPrice?: number
   badge?: string
   lectures: FlatLecture[]
+  sections: { id: string; title: string }[]
   stageTitle: string
   branchTitle: string
 }
@@ -47,6 +73,7 @@ type FlatLecture = {
   badge?: string
   lessonsCount: number
   lessons: Lesson[]
+  sectionId?: string | null
   stageTitle: string
   branchTitle: string
 }
@@ -84,6 +111,7 @@ export function StudentBrowsePage({
             badge: course.badge,
             stageTitle: stage.title,
             branchTitle: branch.title,
+            sections: course.sections ?? [],
             lectures: course.lectures.map((lecture) => ({
               dbId: lecture.dbId,
               slug: lecture.id,
@@ -95,6 +123,7 @@ export function StudentBrowsePage({
               badge: lecture.badge,
               lessonsCount: lecture.lessons.length,
               lessons: lecture.lessons,
+              sectionId: lecture.sectionId ?? null,
               stageTitle: stage.title,
               branchTitle: branch.title,
             })),
@@ -277,13 +306,24 @@ function CourseDetailsModal({ course, inCart, onAddCourse, onLectureDetails, onC
           </div>
           <button type="button" onClick={onClose} aria-label="إغلاق" className="grid size-9 shrink-0 place-items-center rounded-full bg-muted text-foreground"><X className="size-4" /></button>
         </header>
-        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-6">
-          <h3 className="mb-2 text-sm font-bold text-foreground">محتوى الكورس ({course.lectures.length} محاضرة)</h3>
-          {course.lectures.map((lecture, index) => (
-            <button key={lecture.dbId ?? lecture.slug} type="button" onClick={() => onLectureDetails(lecture)} className="flex items-center justify-between gap-4 rounded-xl border border-border p-4 text-right transition-colors hover:bg-muted">
-              <div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-lg bg-primary/10 font-bold text-primary">{index + 1}</span><div><p className="font-bold text-foreground">{lecture.title}</p><p className="text-xs text-muted-foreground">{lecture.lessonsCount} درس</p></div></div>
-              <span className="text-xs font-bold text-primary">عرض التفاصيل</span>
-            </button>
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-6">
+          <h3 className="text-sm font-bold text-foreground">محتوى الكورس ({course.lectures.length} محاضرة)</h3>
+          {groupLecturesBySection(course).map((group) => (
+            <div key={group.id ?? 'no-section'} className="flex flex-col gap-2">
+              {group.title && (
+                <div className="flex items-center gap-2">
+                  <span className="h-4 w-1 rounded-full bg-primary" />
+                  <h4 className="text-sm font-bold text-foreground">{group.title}</h4>
+                  <span className="text-xs text-muted-foreground">({group.lectures.length})</span>
+                </div>
+              )}
+              {group.lectures.map((lecture, index) => (
+                <button key={lecture.dbId ?? lecture.slug} type="button" onClick={() => onLectureDetails(lecture)} className="flex items-center justify-between gap-4 rounded-xl border border-border p-4 text-right transition-colors hover:bg-muted">
+                  <div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-lg bg-primary/10 font-bold text-primary">{index + 1}</span><div><p className="font-bold text-foreground">{lecture.title}</p><p className="text-xs text-muted-foreground">{lecture.lessonsCount} درس</p></div></div>
+                  <span className="text-xs font-bold text-primary">عرض التفاصيل</span>
+                </button>
+              ))}
+            </div>
           ))}
         </div>
         <footer className="flex items-center justify-between gap-3 border-t border-border p-4">

@@ -7,6 +7,7 @@ import type {
   CourseDetail,
   CourseItem,
   EnrolledCourseLecture,
+  EnrolledCourseSection,
   EnrolledMonthlyCourse,
   Lesson,
   QuestionKind,
@@ -473,8 +474,22 @@ export async function getEnrolledMonthlyCourses(): Promise<EnrolledMonthlyCourse
   // All lectures currently linked to those courses (ordered).
   const { data: lectureRows } = await supabase
     .from('lectures')
-    .select('id, slug, title, image, monthly_course_id, course_sort_order, sort_order, created_at, lessons ( id )')
+    .select('id, slug, title, image, monthly_course_id, course_section_id, course_sort_order, sort_order, created_at, lessons ( id )')
     .in('monthly_course_id', courseIds)
+
+  // Sections per course (best-effort; table may not exist pre-migration).
+  const { data: sectionRows } = await supabase
+    .from('course_sections')
+    .select('id, monthly_course_id, title, sort_order')
+    .in('monthly_course_id', courseIds)
+    .order('sort_order', { ascending: true })
+
+  const sectionsByCourse = new Map<string, EnrolledCourseSection[]>()
+  for (const row of (sectionRows as any[]) ?? []) {
+    const list = sectionsByCourse.get(row.monthly_course_id) ?? []
+    list.push({ id: row.id, title: row.title })
+    sectionsByCourse.set(row.monthly_course_id, list)
+  }
 
   // Student progress to compute completed lessons per lecture.
   const progress = await getProgress(supabase, user.id)
@@ -519,6 +534,7 @@ export async function getEnrolledMonthlyCourses(): Promise<EnrolledMonthlyCourse
         completedLessons: done,
         isNew,
         addedAt,
+        sectionId: lecture.course_section_id ?? null,
       }
     })
 
@@ -540,6 +556,7 @@ export async function getEnrolledMonthlyCourses(): Promise<EnrolledMonthlyCourse
       progressPercent,
       newLecturesCount,
       lectures,
+      sections: sectionsByCourse.get(course.id) ?? [],
     })
   }
 

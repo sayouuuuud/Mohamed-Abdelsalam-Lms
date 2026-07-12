@@ -11,6 +11,7 @@ export type {
   CourseItem,
   CourseDetail,
   EnrolledCourseLecture,
+  EnrolledCourseSection,
   EnrolledMonthlyCourse,
 } from './student-types'
 
