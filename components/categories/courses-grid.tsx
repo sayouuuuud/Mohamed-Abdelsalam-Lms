@@ -1,10 +1,12 @@
 'use client'
 
+import { useState } from 'react'
 import Image from 'next/image'
-import { Pencil, Trash2, Plus, BookOpen, EyeOff } from 'lucide-react'
+import { Pencil, Trash2, Plus, BookOpen, EyeOff, ChevronDown, PlayCircle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 import { useCurriculum } from './curriculum-context'
 import type { AdminBranch, AdminStage } from '@/app/admin/categories/actions'
 
@@ -15,6 +17,9 @@ function formatEGP(value: number) {
 export function CoursesGrid() {
   const { stages, openCreateCourse, openEditCourse, requestDeleteCourse } =
     useCurriculum()
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+  const toggle = (id: string) =>
+    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }))
 
   const branchesWithContext: { stage: AdminStage; branch: AdminBranch }[] = []
   for (const stage of stages) {
@@ -122,6 +127,51 @@ export function CoursesGrid() {
                         </span>
                       )}
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => toggle(course.id)}
+                      disabled={course.lectureCount === 0}
+                      aria-expanded={!!expanded[course.id]}
+                      className={cn(
+                        'flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold transition-colors',
+                        course.lectureCount === 0
+                          ? 'cursor-not-allowed text-muted-foreground opacity-60'
+                          : 'text-foreground hover:bg-secondary',
+                      )}
+                    >
+                      <span>
+                        {course.lectureCount === 0
+                          ? 'لا توجد محاضرات بعد'
+                          : `عرض المحاضرات (${course.lectureCount})`}
+                      </span>
+                      {course.lectureCount > 0 && (
+                        <ChevronDown
+                          className={cn(
+                            'size-4 transition-transform',
+                            expanded[course.id] && 'rotate-180',
+                          )}
+                        />
+                      )}
+                    </button>
+
+                    {expanded[course.id] && course.lectures.length > 0 && (
+                      <ol className="flex flex-col gap-1 rounded-lg bg-secondary/50 p-2">
+                        {course.lectures.map((lecture, index) => (
+                          <li
+                            key={lecture.id}
+                            className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-foreground"
+                          >
+                            <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-background text-[10px] font-bold text-muted-foreground">
+                              {index + 1}
+                            </span>
+                            <PlayCircle className="size-3.5 shrink-0 text-muted-foreground" />
+                            <span className="line-clamp-1">{lecture.title}</span>
+                          </li>
+                        ))}
+                      </ol>
+                    )}
+
                     <div className="mt-auto flex gap-2 pt-3">
                       <Button
                         variant="outline"

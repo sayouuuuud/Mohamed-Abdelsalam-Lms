@@ -6,6 +6,13 @@ import { logActivity } from '@/lib/audit-log'
 import { revalidatePath } from 'next/cache'
 
 // ── Admin-facing types (use the real uuid `id`) ───────────────────
+export type AdminCourseLecture = {
+  id: string
+  slug: string
+  title: string
+  sortOrder: number
+}
+
 export type AdminMonthlyCourse = {
   id: string
   branchId: string
@@ -19,6 +26,7 @@ export type AdminMonthlyCourse = {
   isPublished: boolean
   sortOrder: number
   lectureCount: number
+  lectures: AdminCourseLecture[]
 }
 
 export type AdminBranch = {
@@ -99,7 +107,10 @@ export async function getCurriculumAdmin(): Promise<AdminStage[]> {
       .from('monthly_courses')
       .select('id, branch_id, slug, title, description, image, price, old_price, badge, is_published, sort_order')
       .order('sort_order', { ascending: true }),
-    supabase.from('lectures').select('id, branch_id, monthly_course_id'),
+    supabase
+      .from('lectures')
+      .select('id, slug, title, branch_id, monthly_course_id, course_sort_order, sort_order')
+      .order('sort_order', { ascending: true }),
   ])
 
   if (stagesRes.error || !stagesRes.data) {
@@ -109,6 +120,7 @@ export async function getCurriculumAdmin(): Promise<AdminStage[]> {
 
   const lectureCountByBranch = new Map<string, number>()
   const lectureCountByCourse = new Map<string, number>()
+  const lecturesByCourse = new Map<string, AdminCourseLecture[]>()
   for (const row of lecturesRes.data ?? []) {
     lectureCountByBranch.set(
       row.branch_id,
@@ -119,7 +131,20 @@ export async function getCurriculumAdmin(): Promise<AdminStage[]> {
         row.monthly_course_id,
         (lectureCountByCourse.get(row.monthly_course_id) ?? 0) + 1,
       )
+      const list = lecturesByCourse.get(row.monthly_course_id) ?? []
+      list.push({
+        id: row.id,
+        slug: row.slug,
+        title: row.title,
+        sortOrder: row.course_sort_order ?? row.sort_order ?? 0,
+      })
+      lecturesByCourse.set(row.monthly_course_id, list)
     }
+  }
+
+  // Order each course's lectures by their position within the course.
+  for (const list of lecturesByCourse.values()) {
+    list.sort((a, b) => a.sortOrder - b.sortOrder)
   }
 
   const coursesByBranch = new Map<string, AdminMonthlyCourse[]>()
@@ -138,6 +163,7 @@ export async function getCurriculumAdmin(): Promise<AdminStage[]> {
       isPublished: !!row.is_published,
       sortOrder: row.sort_order,
       lectureCount: lectureCountByCourse.get(row.id) ?? 0,
+      lectures: lecturesByCourse.get(row.id) ?? [],
     })
     coursesByBranch.set(row.branch_id, list)
   }
