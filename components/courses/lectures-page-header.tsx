@@ -12,9 +12,9 @@ export function LecturesPageHeader() {
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
       <div className="text-right">
-        <h2 className="text-2xl font-bold text-foreground">المحاضرات</h2>
+        <h2 className="text-2xl font-bold text-foreground">الكورسات والمحاضرات</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          أضف المحاضرات وحدد المرحلة والفرع التابعة له، وأدر دروس كل محاضرة
+          أدر المحاضرات والكورسات: أضف محاضرة وحدد فرعها ودروسها، أو نظّم الكورسات وتصنيفاتها
         </p>
       </div>
 

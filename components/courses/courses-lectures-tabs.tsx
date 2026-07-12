@@ -2,32 +2,33 @@
 
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
-import { CurriculumGrid } from './curriculum-grid'
-import { CoursesGrid } from './courses-grid'
+import { LecturesStats } from './lectures-stats'
+import { LecturesGrid } from './lectures-grid'
+import { CoursesGrid } from '@/components/categories/courses-grid'
 
-export function CurriculumTabs() {
-  const [tab, setTab] = useState<'branches' | 'courses'>('branches')
+export function CoursesLecturesTabs() {
+  const [tab, setTab] = useState<'lectures' | 'courses'>('lectures')
 
   return (
     <div className="space-y-5">
       <div
         className="flex w-fit items-center gap-1 rounded-xl border border-border bg-secondary/50 p-1"
         role="tablist"
-        aria-label="عرض التصنيفات"
+        aria-label="عرض الكورسات والمحاضرات"
       >
         <button
           type="button"
           role="tab"
-          aria-selected={tab === 'branches'}
-          onClick={() => setTab('branches')}
+          aria-selected={tab === 'lectures'}
+          onClick={() => setTab('lectures')}
           className={cn(
             'rounded-lg px-5 py-2 text-sm font-bold transition-colors',
-            tab === 'branches'
+            tab === 'lectures'
               ? 'bg-card text-foreground shadow-sm'
               : 'text-muted-foreground',
           )}
         >
-          الفروع
+          المحاضرات
         </button>
         <button
           type="button"
@@ -45,7 +46,14 @@ export function CurriculumTabs() {
         </button>
       </div>
 
-      {tab === 'branches' ? <CurriculumGrid /> : <CoursesGrid />}
+      {tab === 'lectures' ? (
+        <div className="space-y-6">
+          <LecturesStats />
+          <LecturesGrid />
+        </div>
+      ) : (
+        <CoursesGrid />
+      )}
     </div>
   )
 }
