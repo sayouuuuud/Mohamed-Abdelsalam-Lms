@@ -8,7 +8,7 @@ import {
   Plus,
   GitBranch,
   BookOpen,
-  Coins,
+  Layers,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -26,6 +26,7 @@ export function CurriculumGrid() {
     openCreateBranch,
     openEditBranch,
     requestDeleteBranch,
+    openCreateCourse,
   } = useCurriculum()
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
@@ -139,15 +140,30 @@ export function CurriculumGrid() {
                           <h4 className="text-sm font-bold text-foreground">
                             {branch.title}
                           </h4>
-                          <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-                            <BookOpen className="size-3.5" />
-                            {branch.lectureCount} محاضرة
+                          <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Layers className="size-3.5" />
+                              {branch.courses.length} كورس
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <BookOpen className="size-3.5" />
+                              {branch.lectureCount}
+                            </span>
                           </span>
                         </div>
                         <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
                           {branch.description}
                         </p>
                         <div className="mt-3 flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 flex-1 text-xs"
+                            onClick={() => openCreateCourse(branch.id)}
+                          >
+                            <Plus className="size-3.5" />
+                            كورس
+                          </Button>
                           <Button
                             variant="outline"
                             size="sm"

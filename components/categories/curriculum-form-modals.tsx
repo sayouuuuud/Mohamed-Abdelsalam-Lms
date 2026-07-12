@@ -30,6 +30,13 @@ export function CurriculumFormModals() {
     deletingBranch,
     closeDeleteBranch,
     confirmDeleteBranch,
+    courseFormOpen,
+    editingCourse,
+    closeCourseForm,
+    submitCourseForm,
+    deletingCourse,
+    closeDeleteCourse,
+    confirmDeleteCourse,
   } = useCurriculum()
 
   // ── Stage form state ──
@@ -85,6 +92,41 @@ export function CurriculumFormModals() {
       description: bDescription.trim(),
       topics: bTopics.split('\n').map((t) => t.trim()).filter(Boolean),
       image: bImage,
+    })
+  }
+
+  // ── Course form state ──
+  const [cTitle, setCTitle] = useState('')
+  const [cDescription, setCDescription] = useState('')
+  const [cImage, setCImage] = useState('')
+  const [cPrice, setCPrice] = useState('')
+  const [cOldPrice, setCOldPrice] = useState('')
+  const [cBadge, setCBadge] = useState('')
+  const [cPublished, setCPublished] = useState(true)
+
+  useEffect(() => {
+    if (courseFormOpen) {
+      setCTitle(editingCourse?.title ?? '')
+      setCDescription(editingCourse?.description ?? '')
+      setCImage(editingCourse?.image ?? '')
+      setCPrice(editingCourse ? String(editingCourse.price) : '')
+      setCOldPrice(editingCourse?.oldPrice != null ? String(editingCourse.oldPrice) : '')
+      setCBadge(editingCourse?.badge ?? '')
+      setCPublished(editingCourse?.isPublished ?? true)
+    }
+  }, [courseFormOpen, editingCourse])
+
+  const handleCourseSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!cTitle.trim()) return
+    submitCourseForm({
+      title: cTitle.trim(),
+      description: cDescription.trim(),
+      image: cImage,
+      price: Number(cPrice) || 0,
+      oldPrice: cOldPrice.trim() ? Number(cOldPrice) : null,
+      badge: cBadge.trim(),
+      isPublished: cPublished,
     })
   }
 
@@ -209,6 +251,84 @@ export function CurriculumFormModals() {
         </form>
       </Modal>
 
+      {/* Course form */}
+      <Modal
+        open={courseFormOpen}
+        onClose={closeCourseForm}
+        title={editingCourse ? 'تعديل الكورس' : 'إضافة كورس جديد'}
+        description="الكورس (الشهر) بيجمع محاضرات الفرع بالترتيب ويقدر الطالب يشتريه كامل"
+      >
+        <form onSubmit={handleCourseSubmit} className="space-y-4">
+          <Field label="اسم الكورس (مثل: كورس شهر أكتوبر)">
+            <Input
+              value={cTitle}
+              onChange={(e) => setCTitle(e.target.value)}
+              placeholder="مثال: كورس الشهر الأول"
+              autoFocus
+            />
+          </Field>
+          <Field label="الوصف">
+            <textarea
+              value={cDescription}
+              onChange={(e) => setCDescription(e.target.value)}
+              placeholder="وصف مختصر لمحتوى الكورس"
+              rows={2}
+              className={textareaClass}
+            />
+          </Field>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <Field label="السعر (ج.م)">
+              <Input
+                type="number"
+                inputMode="numeric"
+                value={cPrice}
+                onChange={(e) => setCPrice(e.target.value)}
+                placeholder="٣٠٠"
+              />
+            </Field>
+            <Field label="السعر قبل الخصم (اختياري)">
+              <Input
+                type="number"
+                inputMode="numeric"
+                value={cOldPrice}
+                onChange={(e) => setCOldPrice(e.target.value)}
+                placeholder="٤٥٠"
+              />
+            </Field>
+            <Field label="الشارة (اختياري)">
+              <Input
+                value={cBadge}
+                onChange={(e) => setCBadge(e.target.value)}
+                placeholder="جديد / الأكثر طلبًا"
+              />
+            </Field>
+          </div>
+          <ImageUploadField
+            label="صورة الكورس"
+            value={cImage}
+            onChange={setCImage}
+            hint="تظهر للطلاب على كارت الكورس. لو فاضية هنستخدم صورة أول محاضرة."
+          />
+          <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <input
+              type="checkbox"
+              checked={cPublished}
+              onChange={(e) => setCPublished(e.target.checked)}
+              className="size-4 rounded border-border"
+            />
+            منشور ويظهر للطلاب
+          </label>
+          <div className="flex justify-start gap-2 pt-2">
+            <Button type="submit">
+              {editingCourse ? 'حفظ التغييرات' : 'إضافة الكورس'}
+            </Button>
+            <Button type="button" variant="outline" onClick={closeCourseForm}>
+              إلغاء
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
       {/* Delete confirmations */}
       <ConfirmDialog
         open={!!deletingStage}
@@ -223,6 +343,13 @@ export function CurriculumFormModals() {
         onConfirm={confirmDeleteBranch}
         title="حذف التصنيف الفرعي"
         description={`هل أنت متأكد من حذف تصنيف "${deletingBranch?.title}"؟ سيتم حذف كل المحاضرات التابعة له. لا يمكن التراجع.`}
+      />
+      <ConfirmDialog
+        open={!!deletingCourse}
+        onClose={closeDeleteCourse}
+        onConfirm={confirmDeleteCourse}
+        title="حذف الكورس"
+        description={`هل أنت متأكد من حذف كورس "${deletingCourse?.title}"؟ المحاضرات التابعة له مش هتتحذف، بس هيتفك ارتباطها بالكورس وترجع محاضرات مستقلة.`}
       />
     </>
   )

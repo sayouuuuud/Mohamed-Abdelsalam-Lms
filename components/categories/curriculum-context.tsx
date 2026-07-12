@@ -12,14 +12,19 @@ import { useRouter } from 'next/navigation'
 import {
   type AdminStage,
   type AdminBranch,
+  type AdminMonthlyCourse,
   type StageInput,
   type BranchInput,
+  type MonthlyCourseInput,
   createStage,
   updateStage,
   deleteStage,
   createBranch,
   updateBranch,
   deleteBranch,
+  createMonthlyCourse,
+  updateMonthlyCourse,
+  deleteMonthlyCourse,
 } from '@/app/admin/categories/actions'
 
 type CurriculumContextValue = {
@@ -32,6 +37,10 @@ type CurriculumContextValue = {
   openCreateBranch: (stageId: string) => void
   openEditBranch: (stageId: string, branch: AdminBranch) => void
   requestDeleteBranch: (branch: AdminBranch) => void
+  // course actions
+  openCreateCourse: (branchId: string) => void
+  openEditCourse: (course: AdminMonthlyCourse) => void
+  requestDeleteCourse: (course: AdminMonthlyCourse) => void
   // stage modal state
   stageFormOpen: boolean
   editingStage: AdminStage | null
@@ -49,6 +58,15 @@ type CurriculumContextValue = {
   deletingBranch: AdminBranch | null
   closeDeleteBranch: () => void
   confirmDeleteBranch: () => void
+  // course modal state
+  courseFormOpen: boolean
+  editingCourse: AdminMonthlyCourse | null
+  courseBranchId: string | null
+  closeCourseForm: () => void
+  submitCourseForm: (values: Omit<MonthlyCourseInput, 'branchId'>) => void
+  deletingCourse: AdminMonthlyCourse | null
+  closeDeleteCourse: () => void
+  confirmDeleteCourse: () => void
 }
 
 const CurriculumContext = createContext<CurriculumContextValue | null>(null)
@@ -76,6 +94,11 @@ export function CurriculumProvider({
   const [branchStageId, setBranchStageId] = useState<string | null>(null)
   const [deletingBranch, setDeletingBranch] = useState<AdminBranch | null>(null)
 
+  const [courseFormOpen, setCourseFormOpen] = useState(false)
+  const [editingCourse, setEditingCourse] = useState<AdminMonthlyCourse | null>(null)
+  const [courseBranchId, setCourseBranchId] = useState<string | null>(null)
+  const [deletingCourse, setDeletingCourse] = useState<AdminMonthlyCourse | null>(null)
+
   const value = useMemo<CurriculumContextValue>(
     () => ({
       stages: initialStages,
@@ -99,6 +122,17 @@ export function CurriculumProvider({
         setBranchFormOpen(true)
       },
       requestDeleteBranch: (branch) => setDeletingBranch(branch),
+      openCreateCourse: (branchId) => {
+        setEditingCourse(null)
+        setCourseBranchId(branchId)
+        setCourseFormOpen(true)
+      },
+      openEditCourse: (course) => {
+        setEditingCourse(course)
+        setCourseBranchId(course.branchId)
+        setCourseFormOpen(true)
+      },
+      requestDeleteCourse: (course) => setDeletingCourse(course),
 
       stageFormOpen,
       editingStage,
@@ -167,6 +201,41 @@ export function CurriculumProvider({
           router.refresh()
         }
       },
+
+      courseFormOpen,
+      editingCourse,
+      courseBranchId,
+      closeCourseForm: () => setCourseFormOpen(false),
+      submitCourseForm: async (values) => {
+        const isEdit = !!editingCourse
+        const id = editingCourse?.id
+        const branchId = courseBranchId
+        setCourseFormOpen(false)
+        setEditingCourse(null)
+        const res = isEdit
+          ? await updateMonthlyCourse(id!, values)
+          : await createMonthlyCourse({ ...values, branchId: branchId! })
+        if (res.error) {
+          toast.error(res.error)
+        } else {
+          toast.success(isEdit ? 'تم تحديث الكورس' : 'تمت إضافة الكورس')
+          router.refresh()
+        }
+      },
+      deletingCourse,
+      closeDeleteCourse: () => setDeletingCourse(null),
+      confirmDeleteCourse: async () => {
+        if (!deletingCourse) return
+        const id = deletingCourse.id
+        setDeletingCourse(null)
+        const res = await deleteMonthlyCourse(id)
+        if (res.error) {
+          toast.error(res.error)
+        } else {
+          toast.success('تم حذف الكورس')
+          router.refresh()
+        }
+      },
     }),
     [
       initialStages,
@@ -177,6 +246,10 @@ export function CurriculumProvider({
       editingBranch,
       branchStageId,
       deletingBranch,
+      courseFormOpen,
+      editingCourse,
+      courseBranchId,
+      deletingCourse,
       router,
     ],
   )
