@@ -184,6 +184,34 @@ export async function unenrollCourse(courseSlug: string) {
   return { success: true }
 }
 
+// Cancels a monthly-course bundle subscription by removing its order_items
+// (the single `course_bundle` row) from the student's orders.
+export async function unenrollMonthlyCourse(courseDbId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'غير مسجّل الدخول.' }
+
+  const { data: orders } = await supabase.from('orders').select('id').eq('student_id', user.id)
+  const orderIds = orders?.map((o: any) => o.id) || []
+
+  if (orderIds.length > 0) {
+    const { error } = await supabase
+      .from('order_items')
+      .delete()
+      .eq('monthly_course_id', courseDbId)
+      .in('order_id', orderIds)
+
+    if (error) {
+      console.error('[v0] unenrollMonthlyCourse error:', error.message)
+      return { error: 'حدث خطأ أثناء إلغاء الاشتراك. حاول مرة أخرى.' }
+    }
+  }
+
+  revalidatePath('/student/courses')
+  revalidatePath('/student')
+  return { success: true }
+}
+
 // Helper to build targeted calendar query filters for a student
 async function getStudentCalendarFilters(supabase: any, student: any) {
   // 1. Get student profile for grade

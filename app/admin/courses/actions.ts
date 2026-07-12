@@ -226,6 +226,48 @@ export async function getBranchOptions(): Promise<BranchOption[]> {
     .map(({ _stageOrder, ...rest }) => rest)
 }
 
+// Quick-create a monthly course from inside the lecture form. Returns the new
+// course id so the caller can immediately select it for the lecture.
+export async function createMonthlyCourseQuick(input: {
+  branchId: string
+  title: string
+}): Promise<{ id: string; title: string } | { error: string }> {
+  const supabase = await createClient()
+  if (!(await hasResourceAccess(supabase, 'courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+
+  const title = input.title.trim()
+  if (!title || !input.branchId) return { error: 'اكتب اسم الكورس واختر الفرع.' }
+
+  const { count } = await supabase
+    .from('monthly_courses')
+    .select('id', { count: 'exact', head: true })
+    .eq('branch_id', input.branchId)
+
+  const { data, error } = await supabase
+    .from('monthly_courses')
+    .insert({
+      branch_id: input.branchId,
+      slug: slugify(title),
+      title,
+      is_published: true,
+      sort_order: (count ?? 0) + 1,
+    })
+    .select('id, title')
+    .single()
+
+  if (error || !data) {
+    console.log('[v0] createMonthlyCourseQuick error:', error?.message)
+    return { error: 'تعذّر إنشاء الكورس.' }
+  }
+
+  logActivity({ action: 'create', resource: 'categories', targetLabel: `كورس: ${title}` }).catch(() => {})
+  revalidatePath('/admin/courses')
+  revalidatePath('/admin/categories')
+  revalidatePath('/categories')
+  revalidatePath('/')
+  return { id: data.id, title: data.title }
+}
+
 // ── Lecture CRUD ──────────────────────────────────────────────────
 export async function createLecture(input: LectureInput) {
   const supabase = await createClient()

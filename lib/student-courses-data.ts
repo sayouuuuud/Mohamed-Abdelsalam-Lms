@@ -10,6 +10,8 @@ export type {
   Assignment,
   CourseItem,
   CourseDetail,
+  EnrolledCourseLecture,
+  EnrolledMonthlyCourse,
 } from './student-types'
 
 export {

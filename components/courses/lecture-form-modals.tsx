@@ -8,8 +8,11 @@ import { Input } from '@/components/ui/input'
 import { ImageUploadField } from '@/components/ui/image-upload-field'
 import { AttachmentsUploadField } from '@/components/ui/attachments-upload-field'
 import { cn } from '@/lib/utils'
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
+import { Plus, X } from 'lucide-react'
 import { useLectures } from './lectures-context'
-import type { LessonAttachment } from '@/app/admin/courses/actions'
+import { createMonthlyCourseQuick, type LessonAttachment } from '@/app/admin/courses/actions'
 
 const textareaClass =
   'w-full resize-none rounded-xl border border-border bg-secondary/60 px-4 py-2.5 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:bg-card'
@@ -36,6 +39,8 @@ export function LectureFormModals() {
     confirmDeleteLesson,
   } = useLectures()
 
+  const router = useRouter()
+
   // ── Lecture form state ──
   const [stageId, setStageId] = useState('')
   const [branchId, setBranchId] = useState('')
@@ -47,6 +52,15 @@ export function LectureFormModals() {
   const [badge, setBadge] = useState('')
   const [image, setImage] = useState('')
   const [releaseDate, setReleaseDate] = useState('')
+
+  // Inline "create a new course" state (keyed per branch so newly-created
+  // courses show up immediately without waiting for a full data refresh).
+  const [creatingCourse, setCreatingCourse] = useState(false)
+  const [newCourseTitle, setNewCourseTitle] = useState('')
+  const [savingCourse, setSavingCourse] = useState(false)
+  const [extraCourses, setExtraCourses] = useState<
+    Record<string, { id: string; title: string }[]>
+  >({})
 
   // Unique stages derived from branch options
   const stages = useMemo(() => {
@@ -88,8 +102,39 @@ export function LectureFormModals() {
       } else {
         setReleaseDate('')
       }
+      setCreatingCourse(false)
+      setNewCourseTitle('')
     }
   }, [lectureFormOpen, editingLecture, branchOptions])
+
+  // Courses for the selected branch = server data + any just-created inline.
+  const coursesForBranch = useMemo(() => {
+    const base = branchOptions.find((b) => b.id === branchId)?.monthlyCourses ?? []
+    const extra = extraCourses[branchId] ?? []
+    const seen = new Set(base.map((c) => c.id))
+    return [...base, ...extra.filter((c) => !seen.has(c.id))]
+  }, [branchOptions, branchId, extraCourses])
+
+  const handleCreateCourse = async () => {
+    const name = newCourseTitle.trim()
+    if (!name || !branchId) return
+    setSavingCourse(true)
+    const res = await createMonthlyCourseQuick({ branchId, title: name })
+    setSavingCourse(false)
+    if ('error' in res) {
+      toast.error(res.error)
+      return
+    }
+    setExtraCourses((prev) => ({
+      ...prev,
+      [branchId]: [...(prev[branchId] ?? []), { id: res.id, title: res.title }],
+    }))
+    setMonthlyCourseId(res.id)
+    setCreatingCourse(false)
+    setNewCourseTitle('')
+    toast.success('تم إنشاء الكورس وربطه بالمحاضرة')
+    router.refresh()
+  }
 
   // Reset branch when stage changes to one that doesn't contain it
   const handleStageChange = (value: string) => {
@@ -191,17 +236,66 @@ export function LectureFormModals() {
           </div>
 
           <Field label="الكورس / الشهر (اختياري)">
-            <select
-              value={monthlyCourseId}
-              onChange={(event) => setMonthlyCourseId(event.target.value)}
-              disabled={!branchId}
-              className={cn(selectClass, !branchId && 'opacity-50')}
-            >
-              <option value="">بدون كورس — تظهر في تاب المحاضرات فقط</option>
-              {(branchOptions.find((branch) => branch.id === branchId)?.monthlyCourses ?? []).map((course) => (
-                <option key={course.id} value={course.id}>{course.title}</option>
-              ))}
-            </select>
+            {creatingCourse ? (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={newCourseTitle}
+                    onChange={(e) => setNewCourseTitle(e.target.value)}
+                    placeholder="اسم الكورس (مثال: كورس شهر أكتوبر)"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.nativeEvent.isComposing && e.keyCode !== 229) {
+                        e.preventDefault()
+                        handleCreateCourse()
+                      }
+                    }}
+                    autoFocus
+                  />
+                  <Button type="button" onClick={handleCreateCourse} disabled={savingCourse || !newCourseTitle.trim()}>
+                    {savingCourse ? 'جارٍ الحفظ...' : 'إنشاء'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => {
+                      setCreatingCourse(false)
+                      setNewCourseTitle('')
+                    }}
+                    aria-label="إلغاء إنشاء الكورس"
+                  >
+                    <X className="size-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  هيتعمل كورس جديد داخل الفرع المحدد وتتربط بيه المحاضرة تلقائيًا.
+                </p>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <select
+                  value={monthlyCourseId}
+                  onChange={(event) => setMonthlyCourseId(event.target.value)}
+                  disabled={!branchId}
+                  className={cn(selectClass, !branchId && 'opacity-50')}
+                >
+                  <option value="">بدون كورس — تظهر في تاب المحاضرات فقط</option>
+                  {coursesForBranch.map((course) => (
+                    <option key={course.id} value={course.id}>{course.title}</option>
+                  ))}
+                </select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="shrink-0 gap-1.5"
+                  disabled={!branchId}
+                  onClick={() => setCreatingCourse(true)}
+                >
+                  <Plus className="size-4" />
+                  كورس جديد
+                </Button>
+              </div>
+            )}
           </Field>
 
           <Field label="عنوان المحاضرة">

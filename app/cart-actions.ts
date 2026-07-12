@@ -260,49 +260,33 @@ export async function createOrder(input: {
     await supabase.rpc('increment_coupon_used', { p_code: appliedCouponCode })
   }
 
-  const bundleIds = items.flatMap((item) => item.monthlyCourseId ? [item.monthlyCourseId] : [])
-  const { data: bundledLectures } = bundleIds.length
-    ? await supabase.from('lectures').select('id, title, monthly_course_id').in('monthly_course_id', bundleIds)
-    : { data: [] as { id: string; title: string; monthly_course_id: string }[] }
-
-  const orderItemRows = items.flatMap((item) => {
-    if (!item.monthlyCourseId) {
-      return [{
-        order_id: order.id,
-        lecture_id: item.lectureId,
-        monthly_course_id: null,
-        item_type: 'lecture',
-        lecture_title: item.title,
-        branch_title: item.branchTitle,
-        stage_title: item.stageTitle,
-        price: item.price,
-      }]
-    }
-
-    const accessRows = (bundledLectures ?? [])
-      .filter((lecture) => lecture.monthly_course_id === item.monthlyCourseId)
-      .map((lecture) => ({
-        order_id: order.id,
-        lecture_id: lecture.id,
-        monthly_course_id: item.monthlyCourseId,
-        item_type: 'lecture',
-        lecture_title: lecture.title,
-        branch_title: item.branchTitle,
-        stage_title: item.stageTitle,
-        price: 0,
-      }))
-
-    return [{
-      order_id: order.id,
-      lecture_id: null,
-      monthly_course_id: item.monthlyCourseId,
-      item_type: 'course_bundle',
-      lecture_title: item.title,
-      branch_title: item.branchTitle,
-      stage_title: item.stageTitle,
-      price: item.price,
-    }, ...accessRows]
-  })
+  // Course bundles are stored as a single `course_bundle` row. Access to the
+  // bundle's lectures (current and future) is derived dynamically at read time
+  // in getPurchasedLectureIds, so we intentionally do NOT freeze a per-lecture
+  // snapshot here.
+  const orderItemRows = items.map((item) =>
+    item.monthlyCourseId
+      ? {
+          order_id: order.id,
+          lecture_id: null,
+          monthly_course_id: item.monthlyCourseId,
+          item_type: 'course_bundle',
+          lecture_title: item.title,
+          branch_title: item.branchTitle,
+          stage_title: item.stageTitle,
+          price: item.price,
+        }
+      : {
+          order_id: order.id,
+          lecture_id: item.lectureId,
+          monthly_course_id: null,
+          item_type: 'lecture',
+          lecture_title: item.title,
+          branch_title: item.branchTitle,
+          stage_title: item.stageTitle,
+          price: item.price,
+        },
+  )
 
   const { error: itemsErr } = await supabase.from('order_items').insert(orderItemRows)
   if (itemsErr) return { error: itemsErr.message }

@@ -6,6 +6,8 @@ import type {
   AssignmentStatus,
   CourseDetail,
   CourseItem,
+  EnrolledCourseLecture,
+  EnrolledMonthlyCourse,
   Lesson,
   QuestionKind,
   Section,
@@ -298,26 +300,70 @@ async function getProgress(
   return { completedLessonIds, assignmentStatus }
 }
 
-// Distinct lecture ids the current student has purchased (approved orders).
+// Distinct lecture ids the current student has access to (approved orders).
+// A purchased single lecture unlocks that lecture. A purchased course bundle
+// unlocks every lecture *currently* linked to that course — including lectures
+// the teacher adds to the course later, so access stays dynamic.
 async function getPurchasedLectureIds(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
 ): Promise<string[]> {
   const { data, error } = await supabase
     .from('orders')
-    .select('status, order_items ( lecture_id )')
+    .select('status, order_items ( lecture_id, monthly_course_id, item_type )')
     .eq('student_id', userId)
     .eq('status', 'approved')
 
   if (error || !data) return []
 
   const ids = new Set<string>()
+  const courseIds = new Set<string>()
   for (const order of data as any[]) {
     for (const item of order.order_items ?? []) {
-      if (item.lecture_id) ids.add(item.lecture_id)
+      if (item.item_type === 'course_bundle' && item.monthly_course_id) {
+        courseIds.add(item.monthly_course_id)
+      } else if (item.lecture_id) {
+        ids.add(item.lecture_id)
+      }
     }
   }
+
+  // Expand purchased course bundles into their current lecture set.
+  if (courseIds.size > 0) {
+    const { data: courseLectures } = await supabase
+      .from('lectures')
+      .select('id, monthly_course_id')
+      .in('monthly_course_id', [...courseIds])
+    for (const row of courseLectures ?? []) {
+      if (row.id) ids.add(row.id)
+    }
+  }
+
   return [...ids]
+}
+
+// Distinct monthly-course ids the student has purchased as a bundle.
+async function getPurchasedCourseIds(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('status, order_items ( monthly_course_id, item_type )')
+    .eq('student_id', userId)
+    .eq('status', 'approved')
+
+  if (error || !data) return []
+
+  const courseIds = new Set<string>()
+  for (const order of data as any[]) {
+    for (const item of order.order_items ?? []) {
+      if (item.item_type === 'course_bundle' && item.monthly_course_id) {
+        courseIds.add(item.monthly_course_id)
+      }
+    }
+  }
+  return [...courseIds]
 }
 
 // All purchased lectures as portal "courses".
@@ -379,6 +425,131 @@ export async function getPurchasedCourseDetail(
 ): Promise<CourseDetail | undefined> {
   const courses = await getPurchasedCourses()
   return courses.find((c) => c.id === slug)
+}
+
+// The monthly courses the student is enrolled in (bought as a bundle), each
+// with its ordered lectures, progress, and "new since you enrolled" flags.
+// Used by the "كورساتي" page. "New" is decided purely by the lecture's
+// created_at vs the student's enrollment date (per product decision).
+export async function getEnrolledMonthlyCourses(): Promise<EnrolledMonthlyCourse[]> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return []
+
+  // When did the student's approved order for each course land? Use the
+  // earliest approved order that contains the bundle as the enrollment date.
+  const { data: orderRows, error: orderErr } = await supabase
+    .from('orders')
+    .select('created_at, status, order_items ( monthly_course_id, item_type )')
+    .eq('student_id', user.id)
+    .eq('status', 'approved')
+
+  if (orderErr || !orderRows) return []
+
+  const enrolledAtByCourse = new Map<string, string>()
+  for (const order of orderRows as any[]) {
+    for (const item of order.order_items ?? []) {
+      if (item.item_type === 'course_bundle' && item.monthly_course_id) {
+        const existing = enrolledAtByCourse.get(item.monthly_course_id)
+        const created = order.created_at as string
+        if (!existing || new Date(created) < new Date(existing)) {
+          enrolledAtByCourse.set(item.monthly_course_id, created)
+        }
+      }
+    }
+  }
+
+  const courseIds = [...enrolledAtByCourse.keys()]
+  if (courseIds.length === 0) return []
+
+  // Course metadata.
+  const { data: courseRows } = await supabase
+    .from('monthly_courses')
+    .select('id, slug, title, description, image, branches:branch_id ( title, stages:stage_id ( title ) )')
+    .in('id', courseIds)
+
+  // All lectures currently linked to those courses (ordered).
+  const { data: lectureRows } = await supabase
+    .from('lectures')
+    .select('id, slug, title, image, monthly_course_id, course_sort_order, sort_order, created_at, lessons ( id )')
+    .in('monthly_course_id', courseIds)
+
+  // Student progress to compute completed lessons per lecture.
+  const progress = await getProgress(supabase, user.id)
+
+  const lecturesByCourse = new Map<string, any[]>()
+  for (const row of (lectureRows as any[]) ?? []) {
+    const list = lecturesByCourse.get(row.monthly_course_id) ?? []
+    list.push(row)
+    lecturesByCourse.set(row.monthly_course_id, list)
+  }
+
+  const out: EnrolledMonthlyCourse[] = []
+  for (const course of (courseRows as any[]) ?? []) {
+    const enrolledAt = enrolledAtByCourse.get(course.id) ?? new Date().toISOString()
+    const rawLectures = [...(lecturesByCourse.get(course.id) ?? [])].sort(
+      (a, b) =>
+        (a.course_sort_order ?? 0) - (b.course_sort_order ?? 0) ||
+        (a.sort_order ?? 0) - (b.sort_order ?? 0),
+    )
+
+    let totalLessons = 0
+    let completedLessons = 0
+    let newLecturesCount = 0
+    const lectures: EnrolledCourseLecture[] = rawLectures.map((lecture) => {
+      const lessonIds: string[] = (lecture.lessons ?? []).map((l: any) => l.id)
+      const done = lessonIds.filter((id) => progress.completedLessonIds.has(id)).length
+      totalLessons += lessonIds.length
+      completedLessons += done
+
+      // "New" = added to the course after the student enrolled and not yet
+      // started (no completed lessons in it). Uses created_at per product call.
+      const addedAt = (lecture.created_at as string) ?? enrolledAt
+      const isNew = new Date(addedAt) > new Date(enrolledAt) && done === 0
+      if (isNew) newLecturesCount += 1
+
+      return {
+        id: lecture.slug,
+        dbId: lecture.id,
+        title: lecture.title,
+        image: lecture.image || lectureImage(lecture.slug),
+        totalLessons: lessonIds.length,
+        completedLessons: done,
+        isNew,
+        addedAt,
+      }
+    })
+
+    const progressPercent =
+      totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0
+
+    out.push({
+      id: course.slug,
+      dbId: course.id,
+      title: course.title,
+      description: course.description ?? '',
+      image: course.image || lectures[0]?.image || lectureImage(course.slug),
+      branchTitle: course.branches?.title ?? '',
+      stageTitle: course.branches?.stages?.title ?? '',
+      enrolledAt,
+      totalLectures: lectures.length,
+      totalLessons,
+      completedLessons,
+      progressPercent,
+      newLecturesCount,
+      lectures,
+    })
+  }
+
+  // Courses with the most "new" content bubble up first, then by enrollment.
+  out.sort(
+    (a, b) =>
+      b.newLecturesCount - a.newLecturesCount ||
+      new Date(b.enrolledAt).getTime() - new Date(a.enrolledAt).getTime(),
+  )
+  return out
 }
 
 // One purchased lecture's exam/assignment by its id (used by the student
