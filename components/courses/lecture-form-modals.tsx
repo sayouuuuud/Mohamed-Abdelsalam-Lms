@@ -8,8 +8,11 @@ import { Input } from '@/components/ui/input'
 import { ImageUploadField } from '@/components/ui/image-upload-field'
 import { AttachmentsUploadField } from '@/components/ui/attachments-upload-field'
 import { cn } from '@/lib/utils'
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
+import { Plus, X } from 'lucide-react'
 import { useLectures } from './lectures-context'
-import type { LessonAttachment } from '@/app/admin/courses/actions'
+import { createMonthlyCourseQuick, type LessonAttachment } from '@/app/admin/courses/actions'
 
 const textareaClass =
   'w-full resize-none rounded-xl border border-border bg-secondary/60 px-4 py-2.5 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:bg-card'
@@ -36,9 +39,13 @@ export function LectureFormModals() {
     confirmDeleteLesson,
   } = useLectures()
 
+  const router = useRouter()
+
   // ── Lecture form state ──
   const [stageId, setStageId] = useState('')
   const [branchId, setBranchId] = useState('')
+  const [monthlyCourseId, setMonthlyCourseId] = useState('')
+  const [courseSectionId, setCourseSectionId] = useState('')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [price, setPrice] = useState('')
@@ -46,6 +53,16 @@ export function LectureFormModals() {
   const [badge, setBadge] = useState('')
   const [image, setImage] = useState('')
   const [releaseDate, setReleaseDate] = useState('')
+  const [isFree, setIsFree] = useState(false)
+
+  // Inline "create a new course" state (keyed per branch so newly-created
+  // courses show up immediately without waiting for a full data refresh).
+  const [creatingCourse, setCreatingCourse] = useState(false)
+  const [newCourseTitle, setNewCourseTitle] = useState('')
+  const [savingCourse, setSavingCourse] = useState(false)
+  const [extraCourses, setExtraCourses] = useState<
+    Record<string, { id: string; title: string }[]>
+  >({})
 
   // Unique stages derived from branch options
   const stages = useMemo(() => {
@@ -69,12 +86,15 @@ export function LectureFormModals() {
         : undefined
       setStageId(initialBranch?.stageId ?? '')
       setBranchId(editingLecture?.branchId ?? '')
+      setMonthlyCourseId(editingLecture?.monthlyCourseId ?? '')
+      setCourseSectionId(editingLecture?.courseSectionId ?? '')
       setTitle(editingLecture?.title ?? '')
       setDescription(editingLecture?.description ?? '')
       setPrice(editingLecture ? String(editingLecture.price) : '')
       setOldPrice(editingLecture?.oldPrice != null ? String(editingLecture.oldPrice) : '')
       setBadge(editingLecture?.badge ?? '')
       setImage(editingLecture?.image ?? '')
+      setIsFree(editingLecture?.isFree ?? false)
       setWhatYouLearn(editingLecture?.whatYouLearn?.join('\n') ?? '')
       
       if (editingLecture?.releaseDate) {
@@ -86,8 +106,55 @@ export function LectureFormModals() {
       } else {
         setReleaseDate('')
       }
+      setCreatingCourse(false)
+      setNewCourseTitle('')
     }
   }, [lectureFormOpen, editingLecture, branchOptions])
+
+  // Courses for the selected branch = server data + any just-created inline.
+  const coursesForBranch = useMemo(() => {
+    const base = branchOptions.find((b) => b.id === branchId)?.monthlyCourses ?? []
+    const extra = extraCourses[branchId] ?? []
+    const seen = new Set(base.map((c) => c.id))
+    return [...base, ...extra.filter((c) => !seen.has(c.id))]
+  }, [branchOptions, branchId, extraCourses])
+
+  // Sections belong to a course and are managed from the Categories → Courses
+  // tab. Here we only offer the existing sections of the selected course.
+  const sectionsForCourse = useMemo(() => {
+    if (!monthlyCourseId) return []
+    const course = branchOptions
+      .find((b) => b.id === branchId)
+      ?.monthlyCourses.find((c) => c.id === monthlyCourseId)
+    return course?.sections ?? []
+  }, [branchOptions, branchId, monthlyCourseId])
+
+  const handleCourseChange = (value: string) => {
+    setMonthlyCourseId(value)
+    setCourseSectionId('') // section belongs to a specific course
+  }
+
+  const handleCreateCourse = async () => {
+    const name = newCourseTitle.trim()
+    if (!name || !branchId) return
+    setSavingCourse(true)
+    const res = await createMonthlyCourseQuick({ branchId, title: name })
+    setSavingCourse(false)
+    if ('error' in res) {
+      toast.error(res.error)
+      return
+    }
+    setExtraCourses((prev) => ({
+      ...prev,
+      [branchId]: [...(prev[branchId] ?? []), { id: res.id, title: res.title }],
+    }))
+    setMonthlyCourseId(res.id)
+    setCourseSectionId('')
+    setCreatingCourse(false)
+    setNewCourseTitle('')
+    toast.success('تم إنشاء الكورس وربطه بالمحاضرة')
+    router.refresh()
+  }
 
   // Reset branch when stage changes to one that doesn't contain it
   const handleStageChange = (value: string) => {
@@ -103,6 +170,8 @@ export function LectureFormModals() {
     if (!title.trim() || !branchId) return
     submitLectureForm({
       branchId,
+      monthlyCourseId: monthlyCourseId || null,
+      courseSectionId: monthlyCourseId ? courseSectionId || null : null,
       title: title.trim(),
       description: description.trim(),
       price: Number(price) || 0,
@@ -111,6 +180,7 @@ export function LectureFormModals() {
       image: image || null,
       releaseDate: releaseDate || null,
       whatYouLearn: whatYouLearn.split('\n').map(s => s.trim()).filter(Boolean),
+      isFree,
     })
   }
 
@@ -187,6 +257,90 @@ export function LectureFormModals() {
             </Field>
           </div>
 
+          <Field label="الكورس / الشهر (اختياري)">
+            {creatingCourse ? (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={newCourseTitle}
+                    onChange={(e) => setNewCourseTitle(e.target.value)}
+                    placeholder="اسم الكورس (مثال: كورس شهر أكتوبر)"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.nativeEvent.isComposing && e.keyCode !== 229) {
+                        e.preventDefault()
+                        handleCreateCourse()
+                      }
+                    }}
+                    autoFocus
+                  />
+                  <Button type="button" onClick={handleCreateCourse} disabled={savingCourse || !newCourseTitle.trim()}>
+                    {savingCourse ? 'جارٍ الحفظ...' : 'إنشاء'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => {
+                      setCreatingCourse(false)
+                      setNewCourseTitle('')
+                    }}
+                    aria-label="إلغاء إنشاء الكورس"
+                  >
+                    <X className="size-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  هيتعمل كورس جديد داخل الفرع المحدد وتتربط بيه المحاضرة تلقائ��ًا.
+                </p>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <select
+                  value={monthlyCourseId}
+                  onChange={(event) => handleCourseChange(event.target.value)}
+                  disabled={!branchId}
+                  className={cn(selectClass, !branchId && 'opacity-50')}
+                >
+                  <option value="">بدون كورس — تظهر في تاب المحاضرات فقط</option>
+                  {coursesForBranch.map((course) => (
+                    <option key={course.id} value={course.id}>{course.title}</option>
+                  ))}
+                </select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="shrink-0 gap-1.5"
+                  disabled={!branchId}
+                  onClick={() => setCreatingCourse(true)}
+                >
+                  <Plus className="size-4" />
+                  كورس جديد
+                </Button>
+              </div>
+            )}
+          </Field>
+
+          {/* Section inside the course — only relevant once a course is chosen. */}
+          {monthlyCourseId && !creatingCourse && (
+            <Field label="التصنيف داخل الكورس (اختياري)">
+              <select
+                value={courseSectionId}
+                onChange={(event) => setCourseSectionId(event.target.value)}
+                className={selectClass}
+              >
+                <option value="">بدون تصنيف</option>
+                {sectionsForCourse.map((section) => (
+                  <option key={section.id} value={section.id}>{section.title}</option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {sectionsForCourse.length === 0
+                  ? 'مفيش تصنيفات في الكورس ده لسه — تقدر تضيفها من تاب الكورسات في التصنيفات.'
+                  : 'التصنيف بيجمّع ويرتّب محاضرات الكورس (مثال: المراجعة النهائية).'}
+              </p>
+            </Field>
+          )}
+
           <Field label="عنوان المحاضرة">
             <Input
               value={title}
@@ -251,6 +405,21 @@ export function LectureFormModals() {
               إذا حددت موعداً، سيظهر في التقويم وتصبح المحاضرة متاحة في هذا الموعد.
             </p>
           </Field>
+
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-secondary/40 px-4 py-3 transition-colors hover:bg-secondary/60">
+            <input
+              type="checkbox"
+              checked={isFree}
+              onChange={(e) => setIsFree(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-border accent-primary"
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="text-sm font-medium text-foreground">محاضرة مجانية</span>
+              <span className="text-xs text-muted-foreground">
+                المحاضرة تفضل تابعة للكورس، لكن أي زائر (حتى بدون تسجيل) يقدر يتفرج عليها ودروسها.
+              </span>
+            </span>
+          </label>
 
           <Field label="ماذا ستتعلم (كل نقطة في سطر منفصل)">
             <textarea

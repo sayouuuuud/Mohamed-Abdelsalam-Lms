@@ -99,6 +99,57 @@ export type CourseItem =
   | { kind: 'assignment'; assignment: Assignment; sectionId: string }
 
 // ---------------------------------------------------------------------------
+// Purchased monthly courses ("كورساتي")
+// ---------------------------------------------------------------------------
+
+/** محاضرة داخل كورس شهري اشترك فيه الطالب */
+export type EnrolledCourseLecture = {
+  /** slug — يُستخدم في الروابط */
+  id: string
+  dbId: string
+  title: string
+  image: string
+  totalLessons: number
+  completedLessons: number
+  /** أُضيفت للكورس بعد اشتراك الطالب */
+  isNew: boolean
+  /** تاريخ إضافة المحاضرة للكورس (ISO) */
+  addedAt: string
+  /** التصنيف اللي المحاضرة تابعة له داخل الكورس (null = بدون تصنيف) */
+  sectionId: string | null
+}
+
+/** تصنيف داخل الكورس يجمّع مجموعة محاضرات (مثال: المراجعة النهائية) */
+export type EnrolledCourseSection = {
+  id: string
+  title: string
+}
+
+/** كورس شهري اشترك فيه الطالب كباقة */
+export type EnrolledMonthlyCourse = {
+  /** slug للكورس */
+  id: string
+  /** UUID للكورس في قاعدة البيانات */
+  dbId: string
+  title: string
+  description: string
+  image: string
+  branchTitle: string
+  stageTitle: string
+  /** تاريخ اشتراك الطالب (ISO) */
+  enrolledAt: string
+  totalLectures: number
+  totalLessons: number
+  completedLessons: number
+  progressPercent: number
+  /** عدد المحاضرات المضافة بعد الاشتراك ولم يفتحها الطالب بعد */
+  newLecturesCount: number
+  lectures: EnrolledCourseLecture[]
+  /** تصنيفات الكورس مرتّبة (لتجميع المحاضرات في العرض) */
+  sections: EnrolledCourseSection[]
+}
+
+// ---------------------------------------------------------------------------
 // Assignments
 // ---------------------------------------------------------------------------
 

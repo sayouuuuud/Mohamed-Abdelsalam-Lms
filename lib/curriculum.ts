@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import type { Stage, Branch, Lecture, Lesson } from '@/lib/landing-data'
+import type { Stage, Branch, Lecture, Lesson, MonthlyCourse } from '@/lib/landing-data'
 
 // ── Row shapes coming back from Supabase ───────────────────────────
 type StageRow = {
@@ -26,9 +26,24 @@ type BranchRow = {
   topics: string[]
 }
 
+type MonthlyCourseRow = {
+  id: string
+  branch_id: string
+  slug: string
+  title: string
+  description: string
+  image: string | null
+  price: number
+  old_price: number | null
+  badge: string | null
+}
+
 type LectureRow = {
   id: string
   branch_id: string
+  monthly_course_id?: string | null
+  monthly_course_section_id?: string | null
+  course_sort_order?: number | null
   slug: string
   title: string
   description: string
@@ -36,6 +51,7 @@ type LectureRow = {
   old_price: number | null
   badge: string | null
   image?: string | null
+  is_free?: boolean | null
 }
 
 type LessonRow = {
@@ -61,7 +77,7 @@ function mapLesson(row: LessonRow): Lesson {
 export async function getCurriculum(): Promise<Stage[]> {
   const supabase = await createClient()
 
-  const [stagesRes, branchesRes, lecturesRes, lessonsRes] = await Promise.all([
+  const [stagesRes, branchesRes, monthlyCoursesRes, lecturesRes, lessonsRes, sectionsRes] = await Promise.all([
     supabase
       .from('stages')
       .select('id, slug, idx, title, subtitle, rows, formula, image, accent, term_price, term_old_price')
@@ -71,12 +87,21 @@ export async function getCurriculum(): Promise<Stage[]> {
       .select('id, stage_id, slug, title, description, image, topics')
       .order('sort_order', { ascending: true }),
     supabase
+      .from('monthly_courses')
+      .select('id, branch_id, slug, title, description, image, price, old_price, badge')
+      .eq('is_published', true)
+      .order('sort_order', { ascending: true }),
+    supabase
       .from('lectures')
       .select('*')
       .order('sort_order', { ascending: true }),
     supabase
       .from('lessons')
       .select('id, lecture_id, slug, title, duration, is_free')
+      .order('sort_order', { ascending: true }),
+    supabase
+      .from('monthly_course_sections')
+      .select('id, monthly_course_id, title, sort_order')
       .order('sort_order', { ascending: true }),
   ])
 
@@ -105,8 +130,44 @@ export async function getCurriculum(): Promise<Stage[]> {
       badge: row.badge ?? undefined,
       image: row.image ?? undefined,
       lessons: lessonsByLecture.get(row.id) ?? [],
+      sectionId: row.monthly_course_section_id ?? null,
+      isFree: row.is_free ?? false,
     })
     lecturesByBranch.set(row.branch_id, list)
+  }
+
+  // Sections per course (best-effort; table may not exist pre-migration).
+  const sectionsByCourse = new Map<string, { id: string; title: string }[]>()
+  for (const row of (sectionsRes.data as { id: string; monthly_course_id: string; title: string }[]) ?? []) {
+    const list = sectionsByCourse.get(row.monthly_course_id) ?? []
+    list.push({ id: row.id, title: row.title })
+    sectionsByCourse.set(row.monthly_course_id, list)
+  }
+
+  const monthlyCoursesByBranch = new Map<string, MonthlyCourse[]>()
+  for (const row of (monthlyCoursesRes.data as MonthlyCourseRow[]) ?? []) {
+    const branchLectures = lecturesByBranch.get(row.branch_id) ?? []
+    const lectureRows = (lecturesRes.data as LectureRow[]) ?? []
+    const lectureIds = new Set(
+      lectureRows
+        .filter((lecture) => lecture.monthly_course_id === row.id)
+        .sort((a, b) => (a.course_sort_order ?? 0) - (b.course_sort_order ?? 0))
+        .map((lecture) => lecture.id),
+    )
+    const list = monthlyCoursesByBranch.get(row.branch_id) ?? []
+    list.push({
+      id: row.slug,
+      dbId: row.id,
+      title: row.title,
+      description: row.description,
+      image: row.image ?? undefined,
+      price: Number(row.price),
+      oldPrice: row.old_price != null ? Number(row.old_price) : undefined,
+      badge: row.badge ?? undefined,
+      lectures: branchLectures.filter((lecture) => lecture.dbId && lectureIds.has(lecture.dbId)),
+      sections: sectionsByCourse.get(row.id) ?? [],
+    })
+    monthlyCoursesByBranch.set(row.branch_id, list)
   }
 
   const branchesByStage = new Map<string, Branch[]>()
@@ -119,6 +180,7 @@ export async function getCurriculum(): Promise<Stage[]> {
       image: row.image,
       topics: row.topics ?? [],
       lectures: lecturesByBranch.get(row.id) ?? [],
+      monthlyCourses: monthlyCoursesByBranch.get(row.id) ?? [],
     })
     branchesByStage.set(row.stage_id, list)
   }
@@ -152,4 +214,35 @@ export async function getBranchBySlug(
   const branch = stage.branches.find((b) => b.id === branchSlug)
   if (!branch) return undefined
   return { stage, branch }
+}
+
+// Resolves a single monthly course (with its sections + lectures + lessons)
+// inside a branch, used by the public course landing page.
+export async function getCourseBySlug(
+  stageSlug: string,
+  branchSlug: string,
+  courseSlug: string,
+): Promise<{ stage: Stage; branch: Branch; course: MonthlyCourse } | undefined> {
+  const result = await getBranchBySlug(stageSlug, branchSlug)
+  if (!result) return undefined
+  const course = (result.branch.monthlyCourses ?? []).find((c) => c.id === courseSlug)
+  if (!course) return undefined
+  return { stage: result.stage, branch: result.branch, course }
+}
+
+// Resolves a single free lecture inside a course (public preview watch).
+// Returns undefined unless the lecture exists and is marked free.
+export async function getFreeLectureBySlug(
+  stageSlug: string,
+  branchSlug: string,
+  courseSlug: string,
+  lectureSlug: string,
+): Promise<
+  { stage: Stage; branch: Branch; course: MonthlyCourse; lecture: Lecture } | undefined
+> {
+  const result = await getCourseBySlug(stageSlug, branchSlug, courseSlug)
+  if (!result) return undefined
+  const lecture = result.course.lectures.find((l) => l.id === lectureSlug)
+  if (!lecture || !lecture.isFree) return undefined
+  return { ...result, lecture }
 }

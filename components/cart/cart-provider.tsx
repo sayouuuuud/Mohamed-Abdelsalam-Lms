@@ -14,6 +14,8 @@ import {
   getCartItems,
   addToCart as addToCartAction,
   removeFromCart as removeFromCartAction,
+  addCourseToCart,
+  removeCourseFromCart,
   type CartItem,
 } from '@/app/cart-actions'
 import { applyCoupon as applyCouponAction, type AppliedCoupon } from '@/app/coupon-actions'
@@ -26,8 +28,11 @@ type CartContextValue = {
   open: boolean
   setOpen: (open: boolean) => void
   inCart: (lectureId: string) => boolean
+  courseInCart: (courseId: string) => boolean
   add: (lectureId: string, title?: string) => Promise<void>
+  addCourse: (courseId: string, title?: string) => Promise<void>
   remove: (lectureId: string) => Promise<void>
+  removeCourse: (courseId: string) => Promise<void>
   refresh: () => Promise<void>
   // coupon
   coupon: AppliedCoupon | null
@@ -67,6 +72,32 @@ export function CartProvider({ children }: { children: ReactNode }) {
     (lectureId: string) => items.some((i) => i.lectureId === lectureId),
     [items],
   )
+
+  const courseInCart = useCallback(
+    (courseId: string) => items.some((item) => item.monthlyCourseId === courseId),
+    [items],
+  )
+
+  const addCourse = useCallback(async (courseId: string, title?: string) => {
+    const res = await addCourseToCart(courseId)
+    if (res?.error === 'unauthenticated') {
+      toast.error('سجّل دخولك الأول عشان تضيف للسلة')
+      router.push('/auth?mode=register')
+      return
+    }
+    if (res?.error) return void toast.error(res.error)
+    await refresh()
+    toast.success(title ? `تمت إضافة باقة "${title}" للسلة` : 'تمت إضافة باقة الكورس للسلة')
+  }, [refresh, router])
+
+  const removeCourse = useCallback(async (courseId: string) => {
+    setItems((previous) => previous.filter((item) => item.monthlyCourseId !== courseId))
+    const res = await removeCourseFromCart(courseId)
+    if (res?.error) {
+      toast.error(res.error)
+      await refresh()
+    }
+  }, [refresh])
 
   const add = useCallback(
     async (lectureId: string, title?: string) => {
@@ -151,8 +182,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
         open,
         setOpen,
         inCart,
+        courseInCart,
         add,
+        addCourse,
         remove,
+        removeCourse,
         refresh,
         coupon,
         couponLoading,

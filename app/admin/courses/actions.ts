@@ -39,11 +39,14 @@ export type AdminLecture = {
   sortOrder: number
   releaseDate: string | null
   branchId: string
+  monthlyCourseId: string | null
+  courseSectionId: string | null
   branchTitle: string
   stageId: string
   stageTitle: string
   lessons: AdminLesson[]
   whatYouLearn: string[] | null
+  isFree: boolean
 }
 
 export type BranchOption = {
@@ -51,10 +54,17 @@ export type BranchOption = {
   title: string
   stageId: string
   stageTitle: string
+  monthlyCourses: {
+    id: string
+    title: string
+    sections: { id: string; title: string }[]
+  }[]
 }
 
 export type LectureInput = {
   branchId: string
+  monthlyCourseId?: string | null
+  courseSectionId?: string | null
   title: string
   description: string
   instructor?: string | null
@@ -64,6 +74,7 @@ export type LectureInput = {
   image?: string | null
   releaseDate?: string | null
   whatYouLearn?: string[] | null
+  isFree?: boolean
 }
 
 export type LessonInput = {
@@ -184,11 +195,14 @@ export async function getLecturesAdmin(): Promise<AdminLecture[]> {
       sortOrder: row.sort_order,
       releaseDate: row.release_date ?? null,
       branchId: row.branch_id,
+      monthlyCourseId: row.monthly_course_id ?? null,
+      courseSectionId: (row as any).monthly_course_section_id ?? null,
       branchTitle: branch?.title ?? '',
       stageId: branch?.stageId ?? '',
       stageTitle: branch?.stageTitle ?? '',
       lessons: lessonsByLecture.get(row.id) ?? [],
       whatYouLearn: (row as any).what_you_learn ?? null,
+      isFree: (row as any).is_free ?? false,
     }
   })
 }
@@ -199,7 +213,7 @@ export async function getBranchOptions(): Promise<BranchOption[]> {
     supabase.from('stages').select('id, title, sort_order').order('sort_order'),
     supabase
       .from('branches')
-      .select('id, stage_id, title, sort_order')
+      .select('id, stage_id, title, sort_order, monthly_courses(id, title, sort_order, monthly_course_sections(id, title, sort_order))')
       .order('sort_order'),
   ])
 
@@ -213,10 +227,61 @@ export async function getBranchOptions(): Promise<BranchOption[]> {
       title: b.title,
       stageId: b.stage_id,
       stageTitle: stageById.get(b.stage_id)?.title ?? '',
+      monthlyCourses: [...((b as any).monthly_courses ?? [])]
+        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+        .map((course: any) => ({
+          id: course.id,
+          title: course.title,
+          sections: [...(course.monthly_course_sections ?? [])]
+            .sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+            .map((section: any) => ({ id: section.id, title: section.title })),
+        })),
       _stageOrder: stageById.get(b.stage_id)?.order ?? 0,
     }))
     .sort((a, b) => a._stageOrder - b._stageOrder)
     .map(({ _stageOrder, ...rest }) => rest)
+}
+
+// Quick-create a monthly course from inside the lecture form. Returns the new
+// course id so the caller can immediately select it for the lecture.
+export async function createMonthlyCourseQuick(input: {
+  branchId: string
+  title: string
+}): Promise<{ id: string; title: string } | { error: string }> {
+  const supabase = await createClient()
+  if (!(await hasResourceAccess(supabase, 'courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+
+  const title = input.title.trim()
+  if (!title || !input.branchId) return { error: 'اكتب اسم الكورس واختر الفرع.' }
+
+  const { count } = await supabase
+    .from('monthly_courses')
+    .select('id', { count: 'exact', head: true })
+    .eq('branch_id', input.branchId)
+
+  const { data, error } = await supabase
+    .from('monthly_courses')
+    .insert({
+      branch_id: input.branchId,
+      slug: slugify(title),
+      title,
+      is_published: true,
+      sort_order: (count ?? 0) + 1,
+    })
+    .select('id, title')
+    .single()
+
+  if (error || !data) {
+    console.log('[v0] createMonthlyCourseQuick error:', error?.message)
+    return { error: 'تعذّر إنشاء الكورس.' }
+  }
+
+  logActivity({ action: 'create', resource: 'categories', targetLabel: `كورس: ${title}` }).catch(() => {})
+  revalidatePath('/admin/courses')
+  revalidatePath('/admin/categories')
+  revalidatePath('/categories')
+  revalidatePath('/')
+  return { id: data.id, title: data.title }
 }
 
 // ── Lecture CRUD ──────────────────────────────────────────────────
@@ -231,6 +296,8 @@ export async function createLecture(input: LectureInput) {
 
   const row: Record<string, any> = {
     branch_id: input.branchId,
+    monthly_course_id: input.monthlyCourseId || null,
+    monthly_course_section_id: input.monthlyCourseId ? input.courseSectionId || null : null,
     slug: slugify(input.title),
     title: input.title,
     description: input.description,
@@ -241,10 +308,21 @@ export async function createLecture(input: LectureInput) {
     sort_order: (count ?? 0) + 1,
     release_date: input.releaseDate || null,
     what_you_learn: input.whatYouLearn || null,
+    is_free: input.isFree ?? false,
   }
   if (input.image) row.image = input.image
 
   let { error } = await supabase.from('lectures').insert(row)
+  // Retry without `monthly_course_section_id` if that column doesn't exist yet.
+  if (error && /monthly_course_section_id/.test(error.message) && 'monthly_course_section_id' in row) {
+    delete row.monthly_course_section_id
+    ;({ error } = await supabase.from('lectures').insert(row))
+  }
+  // Retry without `is_free` if that column doesn't exist yet (migration pending).
+  if (error && /is_free/.test(error.message) && 'is_free' in row) {
+    delete row.is_free
+    ;({ error } = await supabase.from('lectures').insert(row))
+  }
   // Retry without `image` if that column doesn't exist yet (migration pending).
   if (error && /image/.test(error.message) && 'image' in row) {
     delete row.image
@@ -338,6 +416,8 @@ export async function updateLecture(id: string, input: LectureInput) {
 
   const patch: Record<string, any> = {
     branch_id: input.branchId,
+    monthly_course_id: input.monthlyCourseId || null,
+    monthly_course_section_id: input.monthlyCourseId ? input.courseSectionId || null : null,
     title: input.title,
     description: input.description,
     instructor: input.instructor?.trim() || null,
@@ -346,10 +426,21 @@ export async function updateLecture(id: string, input: LectureInput) {
     badge: input.badge,
     release_date: input.releaseDate || null,
     what_you_learn: input.whatYouLearn || null,
+    is_free: input.isFree ?? false,
   }
   if (input.image !== undefined) patch.image = input.image
 
   let { error } = await supabase.from('lectures').update(patch).eq('id', id)
+  // Retry without `monthly_course_section_id` if that column doesn't exist yet.
+  if (error && /monthly_course_section_id/.test(error.message) && 'monthly_course_section_id' in patch) {
+    delete patch.monthly_course_section_id
+    ;({ error } = await supabase.from('lectures').update(patch).eq('id', id))
+  }
+  // Retry without `is_free` if that column doesn't exist yet (migration pending).
+  if (error && /is_free/.test(error.message) && 'is_free' in patch) {
+    delete patch.is_free
+    ;({ error } = await supabase.from('lectures').update(patch).eq('id', id))
+  }
   // Retry without `image` if that column doesn't exist yet (migration pending).
   if (error && /image/.test(error.message) && 'image' in patch) {
     delete patch.image
@@ -546,10 +637,13 @@ export async function getLectureDetailAdmin(
     sortOrder: row.sort_order,
     releaseDate: row.release_date ?? null,
     branchId: row.branch_id,
+    monthlyCourseId: row.monthly_course_id ?? null,
+    courseSectionId: (row as any).monthly_course_section_id ?? null,
     branchTitle: branch?.title ?? '',
     stageId: branch?.stage_id ?? '',
     stageTitle: branch?.stages?.title ?? '',
     whatYouLearn: (row as any).what_you_learn ?? null,
+    isFree: (row as any).is_free ?? false,
     lessons: (lessonsRes.data ?? []).map((l) => {
       const ct = (l as any).content_type
       return {

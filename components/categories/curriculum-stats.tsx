@@ -1,6 +1,6 @@
 'use client'
 
-import { Layers, GitBranch, BookOpen, Coins } from 'lucide-react'
+import { Layers, GitBranch, BookOpen, GraduationCap } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { useCurriculum } from './curriculum-context'
@@ -12,6 +12,10 @@ export function CurriculumStats() {
   const totalBranches = stages.reduce((sum, s) => sum + s.branches.length, 0)
   const totalLectures = stages.reduce(
     (sum, s) => sum + s.branches.reduce((b, br) => b + br.lectureCount, 0),
+    0,
+  )
+  const totalCourses = stages.reduce(
+    (sum, s) => sum + s.branches.reduce((b, br) => b + br.courses.length, 0),
     0,
   )
 
@@ -30,6 +34,13 @@ export function CurriculumStats() {
       icon: GitBranch,
       color: 'text-emerald-600',
       bg: 'bg-emerald-50 dark:bg-emerald-500/10',
+    },
+    {
+      label: 'إجمالي الكورسات',
+      value: totalCourses.toLocaleString('en-US'),
+      icon: GraduationCap,
+      color: 'text-sky-600',
+      bg: 'bg-sky-50 dark:bg-sky-500/10',
     },
     {
       label: 'إجمالي المحاضرات',

@@ -20,9 +20,32 @@ export type Lecture = {
   // optional admin-uploaded artwork; falls back to /lessons/<slug>.png
   image?: string
   lessons: Lesson[]
+  // التصنيف اللي المحاضرة تابعة له داخل الكورس (null = بدون تصنيف)
+  sectionId?: string | null
+  // محاضرة مجانية: أي زائر يقدر يتفرج عليها ودروسها حتى بدون اشتراك
+  isFree?: boolean
 }
 
-// A branch of the subject (e.g. الجبر). No price — it groups lectures.
+// تصنيف داخل الكورس يجمّع ويرتّب مجموعة محاضرات (مثال: المراجعة النهائية)
+export type CourseSection = {
+  id: string
+  title: string
+}
+
+export type MonthlyCourse = {
+  id: string
+  dbId?: string
+  title: string
+  description: string
+  image?: string
+  price: number
+  oldPrice?: number
+  badge?: string
+  lectures: Lecture[]
+  sections?: CourseSection[]
+}
+
+// A branch of the subject (e.g. الجبر). No price — it groups lectures and monthly courses.
 export type Branch = {
   id: string
   title: string
@@ -30,6 +53,7 @@ export type Branch = {
   image: string
   topics: string[]
   lectures: Lecture[]
+  monthlyCourses?: MonthlyCourse[]
 }
 
 export type Stage = {
