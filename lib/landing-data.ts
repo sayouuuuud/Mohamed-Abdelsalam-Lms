@@ -20,6 +20,14 @@ export type Lecture = {
   // optional admin-uploaded artwork; falls back to /lessons/<slug>.png
   image?: string
   lessons: Lesson[]
+  // التصنيف اللي المحاضرة تابعة له داخل الكورس (null = بدون تصنيف)
+  sectionId?: string | null
+}
+
+// تصنيف داخل الكورس يجمّع ويرتّب مجموعة محاضرات (مثال: المراجعة النهائية)
+export type CourseSection = {
+  id: string
+  title: string
 }
 
 export type MonthlyCourse = {
@@ -32,6 +40,7 @@ export type MonthlyCourse = {
   oldPrice?: number
   badge?: string
   lectures: Lecture[]
+  sections?: CourseSection[]
 }
 
 // A branch of the subject (e.g. الجبر). No price — it groups lectures and monthly courses.

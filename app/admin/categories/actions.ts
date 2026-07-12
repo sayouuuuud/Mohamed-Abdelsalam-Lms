@@ -11,6 +11,15 @@ export type AdminCourseLecture = {
   slug: string
   title: string
   sortOrder: number
+  // التصنيف اللي المحاضرة تابعة له داخل الكورس (null = بدون تصنيف)
+  sectionId: string | null
+}
+
+export type AdminCourseSection = {
+  id: string
+  courseId: string
+  title: string
+  sortOrder: number
 }
 
 export type AdminMonthlyCourse = {
@@ -27,6 +36,7 @@ export type AdminMonthlyCourse = {
   sortOrder: number
   lectureCount: number
   lectures: AdminCourseLecture[]
+  sections: AdminCourseSection[]
 }
 
 export type AdminBranch = {
@@ -94,7 +104,7 @@ function slugify(input: string) {
 export async function getCurriculumAdmin(): Promise<AdminStage[]> {
   const supabase = await createClient()
 
-  const [stagesRes, branchesRes, coursesRes, lecturesRes] = await Promise.all([
+  const [stagesRes, branchesRes, coursesRes, lecturesRes, sectionsRes] = await Promise.all([
     supabase
       .from('stages')
       .select('id, slug, idx, title, subtitle, rows, image, sort_order')
@@ -109,13 +119,30 @@ export async function getCurriculumAdmin(): Promise<AdminStage[]> {
       .order('sort_order', { ascending: true }),
     supabase
       .from('lectures')
-      .select('id, slug, title, branch_id, monthly_course_id, course_sort_order, sort_order')
+      .select('id, slug, title, branch_id, monthly_course_id, course_section_id, course_sort_order, sort_order')
+      .order('sort_order', { ascending: true }),
+    supabase
+      .from('course_sections')
+      .select('id, monthly_course_id, title, sort_order')
       .order('sort_order', { ascending: true }),
   ])
 
   if (stagesRes.error || !stagesRes.data) {
     console.log('[v0] getCurriculumAdmin error:', stagesRes.error?.message)
     return []
+  }
+
+  // Sections grouped per course (best-effort: table may not exist pre-migration).
+  const sectionsByCourse = new Map<string, AdminCourseSection[]>()
+  for (const row of sectionsRes.data ?? []) {
+    const list = sectionsByCourse.get(row.monthly_course_id) ?? []
+    list.push({
+      id: row.id,
+      courseId: row.monthly_course_id,
+      title: row.title,
+      sortOrder: row.sort_order ?? 0,
+    })
+    sectionsByCourse.set(row.monthly_course_id, list)
   }
 
   const lectureCountByBranch = new Map<string, number>()
@@ -137,6 +164,7 @@ export async function getCurriculumAdmin(): Promise<AdminStage[]> {
         slug: row.slug,
         title: row.title,
         sortOrder: row.course_sort_order ?? row.sort_order ?? 0,
+        sectionId: (row as any).course_section_id ?? null,
       })
       lecturesByCourse.set(row.monthly_course_id, list)
     }
@@ -164,6 +192,7 @@ export async function getCurriculumAdmin(): Promise<AdminStage[]> {
       sortOrder: row.sort_order,
       lectureCount: lectureCountByCourse.get(row.id) ?? 0,
       lectures: lecturesByCourse.get(row.id) ?? [],
+      sections: sectionsByCourse.get(row.id) ?? [],
     })
     coursesByBranch.set(row.branch_id, list)
   }
@@ -260,7 +289,7 @@ export async function deleteStage(id: string) {
   const { error } = await supabase.from('stages').delete().eq('id', id)
   if (error) {
     console.log('[v0] deleteStage error:', error.message)
-    return { error: 'تعذّر حذف المرحلة.' }
+    return { error: 'تعذّر حذف المرحل��.' }
   }
   logActivity({ action: 'delete', resource: 'categories', targetId: id, targetLabel: `مرحلة ID: ${id}` }).catch(() => {})
   revalidatePath('/categories')
@@ -421,5 +450,80 @@ export async function deleteMonthlyCourse(id: string) {
   logActivity({ action: 'delete', resource: 'categories', targetId: id, targetLabel: `كورس ID: ${id}` }).catch(() => {})
   revalidatePath('/categories')
   revalidatePath('/')
+  return { success: true }
+  }
+
+// ── Course sections CRUD (تصنيفات داخل الكورس) ────────────────────
+export type CourseSectionInput = {
+  courseId: string
+  title: string
+}
+
+export async function createCourseSection(input: CourseSectionInput) {
+  const supabase = await createClient()
+  if (!(await hasResourceAccess(supabase, 'categories', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+
+  const title = input.title.trim()
+  if (!title || !input.courseId) return { error: 'اكتب اسم التصنيف.' }
+
+  const { count } = await supabase
+    .from('course_sections')
+    .select('id', { count: 'exact', head: true })
+    .eq('monthly_course_id', input.courseId)
+
+  const { error } = await supabase.from('course_sections').insert({
+    monthly_course_id: input.courseId,
+    title,
+    sort_order: (count ?? 0) + 1,
+  })
+
+  if (error) {
+    console.log('[v0] createCourseSection error:', error.message)
+    return { error: 'تعذّر إنشاء التصنيف.' }
+  }
+  logActivity({ action: 'create', resource: 'categories', targetLabel: `تصنيف كورس: ${title}` }).catch(() => {})
+  revalidatePath('/admin/categories')
+  revalidatePath('/categories')
+  revalidatePath('/student/browse')
+  revalidatePath('/student/courses')
+  return { success: true }
+}
+
+export async function updateCourseSection(id: string, input: { title: string }) {
+  const supabase = await createClient()
+  if (!(await hasResourceAccess(supabase, 'categories', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+
+  const title = input.title.trim()
+  if (!title) return { error: 'اكتب اسم التصنيف.' }
+
+  const { error } = await supabase.from('course_sections').update({ title }).eq('id', id)
+  if (error) {
+    console.log('[v0] updateCourseSection error:', error.message)
+    return { error: 'تعذّر تحديث التصنيف.' }
+  }
+  revalidatePath('/admin/categories')
+  revalidatePath('/categories')
+  revalidatePath('/student/browse')
+  revalidatePath('/student/courses')
+  return { success: true }
+}
+
+export async function deleteCourseSection(id: string) {
+  const supabase = await createClient()
+  if (!(await hasResourceAccess(supabase, 'categories', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+
+  // Detach lectures from the section first (keep them in the course).
+  await supabase.from('lectures').update({ course_section_id: null }).eq('course_section_id', id)
+
+  const { error } = await supabase.from('course_sections').delete().eq('id', id)
+  if (error) {
+    console.log('[v0] deleteCourseSection error:', error.message)
+    return { error: 'تعذّر حذف التصنيف.' }
+  }
+  logActivity({ action: 'delete', resource: 'categories', targetId: id, targetLabel: `تصنيف كورس ID: ${id}` }).catch(() => {})
+  revalidatePath('/admin/categories')
+  revalidatePath('/categories')
+  revalidatePath('/student/browse')
+  revalidatePath('/student/courses')
   return { success: true }
 }

@@ -45,6 +45,7 @@ export function LectureFormModals() {
   const [stageId, setStageId] = useState('')
   const [branchId, setBranchId] = useState('')
   const [monthlyCourseId, setMonthlyCourseId] = useState('')
+  const [courseSectionId, setCourseSectionId] = useState('')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [price, setPrice] = useState('')
@@ -85,6 +86,7 @@ export function LectureFormModals() {
       setStageId(initialBranch?.stageId ?? '')
       setBranchId(editingLecture?.branchId ?? '')
       setMonthlyCourseId(editingLecture?.monthlyCourseId ?? '')
+      setCourseSectionId(editingLecture?.courseSectionId ?? '')
       setTitle(editingLecture?.title ?? '')
       setDescription(editingLecture?.description ?? '')
       setPrice(editingLecture ? String(editingLecture.price) : '')
@@ -115,6 +117,21 @@ export function LectureFormModals() {
     return [...base, ...extra.filter((c) => !seen.has(c.id))]
   }, [branchOptions, branchId, extraCourses])
 
+  // Sections belong to a course and are managed from the Categories → Courses
+  // tab. Here we only offer the existing sections of the selected course.
+  const sectionsForCourse = useMemo(() => {
+    if (!monthlyCourseId) return []
+    const course = branchOptions
+      .find((b) => b.id === branchId)
+      ?.monthlyCourses.find((c) => c.id === monthlyCourseId)
+    return course?.sections ?? []
+  }, [branchOptions, branchId, monthlyCourseId])
+
+  const handleCourseChange = (value: string) => {
+    setMonthlyCourseId(value)
+    setCourseSectionId('') // section belongs to a specific course
+  }
+
   const handleCreateCourse = async () => {
     const name = newCourseTitle.trim()
     if (!name || !branchId) return
@@ -130,6 +147,7 @@ export function LectureFormModals() {
       [branchId]: [...(prev[branchId] ?? []), { id: res.id, title: res.title }],
     }))
     setMonthlyCourseId(res.id)
+    setCourseSectionId('')
     setCreatingCourse(false)
     setNewCourseTitle('')
     toast.success('تم إنشاء الكورس وربطه بالمحاضرة')
@@ -151,6 +169,7 @@ export function LectureFormModals() {
     submitLectureForm({
       branchId,
       monthlyCourseId: monthlyCourseId || null,
+      courseSectionId: monthlyCourseId ? courseSectionId || null : null,
       title: title.trim(),
       description: description.trim(),
       price: Number(price) || 0,
@@ -268,14 +287,14 @@ export function LectureFormModals() {
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  هيتعمل كورس جديد داخل الفرع المحدد وتتربط بيه المحاضرة تلقائيًا.
+                  هيتعمل كورس جديد داخل الفرع المحدد وتتربط بيه المحاضرة تلقائ��ًا.
                 </p>
               </div>
             ) : (
               <div className="flex items-center gap-2">
                 <select
                   value={monthlyCourseId}
-                  onChange={(event) => setMonthlyCourseId(event.target.value)}
+                  onChange={(event) => handleCourseChange(event.target.value)}
                   disabled={!branchId}
                   className={cn(selectClass, !branchId && 'opacity-50')}
                 >
@@ -297,6 +316,27 @@ export function LectureFormModals() {
               </div>
             )}
           </Field>
+
+          {/* Section inside the course — only relevant once a course is chosen. */}
+          {monthlyCourseId && !creatingCourse && (
+            <Field label="التصنيف داخل الكورس (اختياري)">
+              <select
+                value={courseSectionId}
+                onChange={(event) => setCourseSectionId(event.target.value)}
+                className={selectClass}
+              >
+                <option value="">بدون تصنيف</option>
+                {sectionsForCourse.map((section) => (
+                  <option key={section.id} value={section.id}>{section.title}</option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {sectionsForCourse.length === 0
+                  ? 'مفيش تصنيفات في الكورس ده لسه — تقدر تضيفها من تاب الكورسات في التصنيفات.'
+                  : 'التصنيف بيجمّع ويرتّب محاضرات الكورس (مثال: المراجعة النهائية).'}
+              </p>
+            </Field>
+          )}
 
           <Field label="عنوان المحاضرة">
             <Input

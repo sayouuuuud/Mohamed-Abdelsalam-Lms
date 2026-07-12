@@ -42,6 +42,7 @@ type LectureRow = {
   id: string
   branch_id: string
   monthly_course_id?: string | null
+  course_section_id?: string | null
   course_sort_order?: number | null
   slug: string
   title: string
@@ -75,7 +76,7 @@ function mapLesson(row: LessonRow): Lesson {
 export async function getCurriculum(): Promise<Stage[]> {
   const supabase = await createClient()
 
-  const [stagesRes, branchesRes, monthlyCoursesRes, lecturesRes, lessonsRes] = await Promise.all([
+  const [stagesRes, branchesRes, monthlyCoursesRes, lecturesRes, lessonsRes, sectionsRes] = await Promise.all([
     supabase
       .from('stages')
       .select('id, slug, idx, title, subtitle, rows, formula, image, accent, term_price, term_old_price')
@@ -96,6 +97,10 @@ export async function getCurriculum(): Promise<Stage[]> {
     supabase
       .from('lessons')
       .select('id, lecture_id, slug, title, duration, is_free')
+      .order('sort_order', { ascending: true }),
+    supabase
+      .from('course_sections')
+      .select('id, monthly_course_id, title, sort_order')
       .order('sort_order', { ascending: true }),
   ])
 
@@ -124,8 +129,17 @@ export async function getCurriculum(): Promise<Stage[]> {
       badge: row.badge ?? undefined,
       image: row.image ?? undefined,
       lessons: lessonsByLecture.get(row.id) ?? [],
+      sectionId: row.course_section_id ?? null,
     })
     lecturesByBranch.set(row.branch_id, list)
+  }
+
+  // Sections per course (best-effort; table may not exist pre-migration).
+  const sectionsByCourse = new Map<string, { id: string; title: string }[]>()
+  for (const row of (sectionsRes.data as { id: string; monthly_course_id: string; title: string }[]) ?? []) {
+    const list = sectionsByCourse.get(row.monthly_course_id) ?? []
+    list.push({ id: row.id, title: row.title })
+    sectionsByCourse.set(row.monthly_course_id, list)
   }
 
   const monthlyCoursesByBranch = new Map<string, MonthlyCourse[]>()
@@ -149,6 +163,7 @@ export async function getCurriculum(): Promise<Stage[]> {
       oldPrice: row.old_price != null ? Number(row.old_price) : undefined,
       badge: row.badge ?? undefined,
       lectures: branchLectures.filter((lecture) => lecture.dbId && lectureIds.has(lecture.dbId)),
+      sections: sectionsByCourse.get(row.id) ?? [],
     })
     monthlyCoursesByBranch.set(row.branch_id, list)
   }
