@@ -474,12 +474,12 @@ export async function getEnrolledMonthlyCourses(): Promise<EnrolledMonthlyCourse
   // All lectures currently linked to those courses (ordered).
   const { data: lectureRows } = await supabase
     .from('lectures')
-    .select('id, slug, title, image, monthly_course_id, course_section_id, course_sort_order, sort_order, created_at, lessons ( id )')
+    .select('id, slug, title, image, monthly_course_id, monthly_course_section_id, course_sort_order, sort_order, created_at, lessons ( id )')
     .in('monthly_course_id', courseIds)
 
   // Sections per course (best-effort; table may not exist pre-migration).
   const { data: sectionRows } = await supabase
-    .from('course_sections')
+    .from('monthly_course_sections')
     .select('id, monthly_course_id, title, sort_order')
     .in('monthly_course_id', courseIds)
     .order('sort_order', { ascending: true })
@@ -534,7 +534,7 @@ export async function getEnrolledMonthlyCourses(): Promise<EnrolledMonthlyCourse
         completedLessons: done,
         isNew,
         addedAt,
-        sectionId: lecture.course_section_id ?? null,
+        sectionId: lecture.monthly_course_section_id ?? null,
       }
     })
 

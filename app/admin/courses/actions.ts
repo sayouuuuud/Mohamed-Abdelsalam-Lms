@@ -194,7 +194,7 @@ export async function getLecturesAdmin(): Promise<AdminLecture[]> {
       releaseDate: row.release_date ?? null,
       branchId: row.branch_id,
       monthlyCourseId: row.monthly_course_id ?? null,
-      courseSectionId: (row as any).course_section_id ?? null,
+      courseSectionId: (row as any).monthly_course_section_id ?? null,
       branchTitle: branch?.title ?? '',
       stageId: branch?.stageId ?? '',
       stageTitle: branch?.stageTitle ?? '',
@@ -210,7 +210,7 @@ export async function getBranchOptions(): Promise<BranchOption[]> {
     supabase.from('stages').select('id, title, sort_order').order('sort_order'),
     supabase
       .from('branches')
-      .select('id, stage_id, title, sort_order, monthly_courses(id, title, sort_order, course_sections(id, title, sort_order))')
+      .select('id, stage_id, title, sort_order, monthly_courses(id, title, sort_order, monthly_course_sections(id, title, sort_order))')
       .order('sort_order'),
   ])
 
@@ -229,7 +229,7 @@ export async function getBranchOptions(): Promise<BranchOption[]> {
         .map((course: any) => ({
           id: course.id,
           title: course.title,
-          sections: [...(course.course_sections ?? [])]
+          sections: [...(course.monthly_course_sections ?? [])]
             .sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
             .map((section: any) => ({ id: section.id, title: section.title })),
         })),
@@ -294,7 +294,7 @@ export async function createLecture(input: LectureInput) {
   const row: Record<string, any> = {
     branch_id: input.branchId,
     monthly_course_id: input.monthlyCourseId || null,
-    course_section_id: input.monthlyCourseId ? input.courseSectionId || null : null,
+    monthly_course_section_id: input.monthlyCourseId ? input.courseSectionId || null : null,
     slug: slugify(input.title),
     title: input.title,
     description: input.description,
@@ -309,9 +309,9 @@ export async function createLecture(input: LectureInput) {
   if (input.image) row.image = input.image
 
   let { error } = await supabase.from('lectures').insert(row)
-  // Retry without `course_section_id` if that column doesn't exist yet.
-  if (error && /course_section_id/.test(error.message) && 'course_section_id' in row) {
-    delete row.course_section_id
+  // Retry without `monthly_course_section_id` if that column doesn't exist yet.
+  if (error && /monthly_course_section_id/.test(error.message) && 'monthly_course_section_id' in row) {
+    delete row.monthly_course_section_id
     ;({ error } = await supabase.from('lectures').insert(row))
   }
   // Retry without `image` if that column doesn't exist yet (migration pending).
@@ -408,7 +408,7 @@ export async function updateLecture(id: string, input: LectureInput) {
   const patch: Record<string, any> = {
     branch_id: input.branchId,
     monthly_course_id: input.monthlyCourseId || null,
-    course_section_id: input.monthlyCourseId ? input.courseSectionId || null : null,
+    monthly_course_section_id: input.monthlyCourseId ? input.courseSectionId || null : null,
     title: input.title,
     description: input.description,
     instructor: input.instructor?.trim() || null,
@@ -421,9 +421,9 @@ export async function updateLecture(id: string, input: LectureInput) {
   if (input.image !== undefined) patch.image = input.image
 
   let { error } = await supabase.from('lectures').update(patch).eq('id', id)
-  // Retry without `course_section_id` if that column doesn't exist yet.
-  if (error && /course_section_id/.test(error.message) && 'course_section_id' in patch) {
-    delete patch.course_section_id
+  // Retry without `monthly_course_section_id` if that column doesn't exist yet.
+  if (error && /monthly_course_section_id/.test(error.message) && 'monthly_course_section_id' in patch) {
+    delete patch.monthly_course_section_id
     ;({ error } = await supabase.from('lectures').update(patch).eq('id', id))
   }
   // Retry without `image` if that column doesn't exist yet (migration pending).

@@ -119,10 +119,10 @@ export async function getCurriculumAdmin(): Promise<AdminStage[]> {
       .order('sort_order', { ascending: true }),
     supabase
       .from('lectures')
-      .select('id, slug, title, branch_id, monthly_course_id, course_section_id, course_sort_order, sort_order')
+      .select('id, slug, title, branch_id, monthly_course_id, monthly_course_section_id, course_sort_order, sort_order')
       .order('sort_order', { ascending: true }),
     supabase
-      .from('course_sections')
+      .from('monthly_course_sections')
       .select('id, monthly_course_id, title, sort_order')
       .order('sort_order', { ascending: true }),
   ])
@@ -164,7 +164,7 @@ export async function getCurriculumAdmin(): Promise<AdminStage[]> {
         slug: row.slug,
         title: row.title,
         sortOrder: row.course_sort_order ?? row.sort_order ?? 0,
-        sectionId: (row as any).course_section_id ?? null,
+        sectionId: (row as any).monthly_course_section_id ?? null,
       })
       lecturesByCourse.set(row.monthly_course_id, list)
     }
@@ -467,11 +467,11 @@ export async function createCourseSection(input: CourseSectionInput) {
   if (!title || !input.courseId) return { error: 'اكتب اسم التصنيف.' }
 
   const { count } = await supabase
-    .from('course_sections')
+    .from('monthly_course_sections')
     .select('id', { count: 'exact', head: true })
     .eq('monthly_course_id', input.courseId)
 
-  const { error } = await supabase.from('course_sections').insert({
+  const { error } = await supabase.from('monthly_course_sections').insert({
     monthly_course_id: input.courseId,
     title,
     sort_order: (count ?? 0) + 1,
@@ -496,7 +496,7 @@ export async function updateCourseSection(id: string, input: { title: string }) 
   const title = input.title.trim()
   if (!title) return { error: 'اكتب اسم التصنيف.' }
 
-  const { error } = await supabase.from('course_sections').update({ title }).eq('id', id)
+  const { error } = await supabase.from('monthly_course_sections').update({ title }).eq('id', id)
   if (error) {
     console.log('[v0] updateCourseSection error:', error.message)
     return { error: 'تعذّر تحديث التصنيف.' }
@@ -513,9 +513,9 @@ export async function deleteCourseSection(id: string) {
   if (!(await hasResourceAccess(supabase, 'categories', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
   // Detach lectures from the section first (keep them in the course).
-  await supabase.from('lectures').update({ course_section_id: null }).eq('course_section_id', id)
+  await supabase.from('lectures').update({ monthly_course_section_id: null }).eq('monthly_course_section_id', id)
 
-  const { error } = await supabase.from('course_sections').delete().eq('id', id)
+  const { error } = await supabase.from('monthly_course_sections').delete().eq('id', id)
   if (error) {
     console.log('[v0] deleteCourseSection error:', error.message)
     return { error: 'تعذّر حذف التصنيف.' }

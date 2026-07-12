@@ -42,7 +42,7 @@ type LectureRow = {
   id: string
   branch_id: string
   monthly_course_id?: string | null
-  course_section_id?: string | null
+  monthly_course_section_id?: string | null
   course_sort_order?: number | null
   slug: string
   title: string
@@ -99,7 +99,7 @@ export async function getCurriculum(): Promise<Stage[]> {
       .select('id, lecture_id, slug, title, duration, is_free')
       .order('sort_order', { ascending: true }),
     supabase
-      .from('course_sections')
+      .from('monthly_course_sections')
       .select('id, monthly_course_id, title, sort_order')
       .order('sort_order', { ascending: true }),
   ])
@@ -129,7 +129,7 @@ export async function getCurriculum(): Promise<Stage[]> {
       badge: row.badge ?? undefined,
       image: row.image ?? undefined,
       lessons: lessonsByLecture.get(row.id) ?? [],
-      sectionId: row.course_section_id ?? null,
+      sectionId: row.monthly_course_section_id ?? null,
     })
     lecturesByBranch.set(row.branch_id, list)
   }
