@@ -22,7 +22,19 @@ export type Lecture = {
   lessons: Lesson[]
 }
 
-// A branch of the subject (e.g. الجبر). No price — it groups lectures.
+export type MonthlyCourse = {
+  id: string
+  dbId?: string
+  title: string
+  description: string
+  image?: string
+  price: number
+  oldPrice?: number
+  badge?: string
+  lectures: Lecture[]
+}
+
+// A branch of the subject (e.g. الجبر). No price — it groups lectures and monthly courses.
 export type Branch = {
   id: string
   title: string
@@ -30,6 +42,7 @@ export type Branch = {
   image: string
   topics: string[]
   lectures: Lecture[]
+  monthlyCourses?: MonthlyCourse[]
 }
 
 export type Stage = {

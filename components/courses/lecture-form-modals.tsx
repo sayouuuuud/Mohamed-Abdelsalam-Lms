@@ -39,6 +39,7 @@ export function LectureFormModals() {
   // ── Lecture form state ──
   const [stageId, setStageId] = useState('')
   const [branchId, setBranchId] = useState('')
+  const [monthlyCourseId, setMonthlyCourseId] = useState('')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [price, setPrice] = useState('')
@@ -69,6 +70,7 @@ export function LectureFormModals() {
         : undefined
       setStageId(initialBranch?.stageId ?? '')
       setBranchId(editingLecture?.branchId ?? '')
+      setMonthlyCourseId(editingLecture?.monthlyCourseId ?? '')
       setTitle(editingLecture?.title ?? '')
       setDescription(editingLecture?.description ?? '')
       setPrice(editingLecture ? String(editingLecture.price) : '')
@@ -103,6 +105,7 @@ export function LectureFormModals() {
     if (!title.trim() || !branchId) return
     submitLectureForm({
       branchId,
+      monthlyCourseId: monthlyCourseId || null,
       title: title.trim(),
       description: description.trim(),
       price: Number(price) || 0,
@@ -186,6 +189,20 @@ export function LectureFormModals() {
               </select>
             </Field>
           </div>
+
+          <Field label="الكورس / الشهر (اختياري)">
+            <select
+              value={monthlyCourseId}
+              onChange={(event) => setMonthlyCourseId(event.target.value)}
+              disabled={!branchId}
+              className={cn(selectClass, !branchId && 'opacity-50')}
+            >
+              <option value="">بدون كورس — تظهر في تاب المحاضرات فقط</option>
+              {(branchOptions.find((branch) => branch.id === branchId)?.monthlyCourses ?? []).map((course) => (
+                <option key={course.id} value={course.id}>{course.title}</option>
+              ))}
+            </select>
+          </Field>
 
           <Field label="عنوان المحاضرة">
             <Input

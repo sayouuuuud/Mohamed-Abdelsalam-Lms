@@ -39,6 +39,7 @@ export type AdminLecture = {
   sortOrder: number
   releaseDate: string | null
   branchId: string
+  monthlyCourseId: string | null
   branchTitle: string
   stageId: string
   stageTitle: string
@@ -51,10 +52,12 @@ export type BranchOption = {
   title: string
   stageId: string
   stageTitle: string
+  monthlyCourses: { id: string; title: string }[]
 }
 
 export type LectureInput = {
   branchId: string
+  monthlyCourseId?: string | null
   title: string
   description: string
   instructor?: string | null
@@ -184,6 +187,7 @@ export async function getLecturesAdmin(): Promise<AdminLecture[]> {
       sortOrder: row.sort_order,
       releaseDate: row.release_date ?? null,
       branchId: row.branch_id,
+      monthlyCourseId: row.monthly_course_id ?? null,
       branchTitle: branch?.title ?? '',
       stageId: branch?.stageId ?? '',
       stageTitle: branch?.stageTitle ?? '',
@@ -199,7 +203,7 @@ export async function getBranchOptions(): Promise<BranchOption[]> {
     supabase.from('stages').select('id, title, sort_order').order('sort_order'),
     supabase
       .from('branches')
-      .select('id, stage_id, title, sort_order')
+      .select('id, stage_id, title, sort_order, monthly_courses(id, title, sort_order)')
       .order('sort_order'),
   ])
 
@@ -213,6 +217,9 @@ export async function getBranchOptions(): Promise<BranchOption[]> {
       title: b.title,
       stageId: b.stage_id,
       stageTitle: stageById.get(b.stage_id)?.title ?? '',
+      monthlyCourses: [...((b as any).monthly_courses ?? [])]
+        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+        .map(({ id, title }) => ({ id, title })),
       _stageOrder: stageById.get(b.stage_id)?.order ?? 0,
     }))
     .sort((a, b) => a._stageOrder - b._stageOrder)
@@ -231,6 +238,7 @@ export async function createLecture(input: LectureInput) {
 
   const row: Record<string, any> = {
     branch_id: input.branchId,
+    monthly_course_id: input.monthlyCourseId || null,
     slug: slugify(input.title),
     title: input.title,
     description: input.description,
@@ -338,6 +346,7 @@ export async function updateLecture(id: string, input: LectureInput) {
 
   const patch: Record<string, any> = {
     branch_id: input.branchId,
+    monthly_course_id: input.monthlyCourseId || null,
     title: input.title,
     description: input.description,
     instructor: input.instructor?.trim() || null,
@@ -546,6 +555,7 @@ export async function getLectureDetailAdmin(
     sortOrder: row.sort_order,
     releaseDate: row.release_date ?? null,
     branchId: row.branch_id,
+    monthlyCourseId: row.monthly_course_id ?? null,
     branchTitle: branch?.title ?? '',
     stageId: branch?.stage_id ?? '',
     stageTitle: branch?.stages?.title ?? '',

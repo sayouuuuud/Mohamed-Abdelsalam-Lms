@@ -5,7 +5,9 @@ import { revalidatePath } from 'next/cache'
 import { computeCoupon } from '@/app/coupon-actions'
 
 export type CartItem = {
-  lectureId: string
+  lectureId: string | null
+  monthlyCourseId: string | null
+  itemType: 'lecture' | 'course_bundle'
   title: string
   branchTitle: string
   stageTitle: string
@@ -24,8 +26,12 @@ export async function getCartItems(): Promise<CartItem[] | null> {
   const { data, error } = await supabase
     .from('cart_items')
     .select(
-      `lecture_id,
+      `lecture_id, monthly_course_id,
        lectures:lecture_id (
+         title, price,
+         branches:branch_id ( title, stages:stage_id ( title ) )
+       ),
+       monthly_courses:monthly_course_id (
          title, price,
          branches:branch_id ( title, stages:stage_id ( title ) )
        )`,
@@ -35,13 +41,18 @@ export async function getCartItems(): Promise<CartItem[] | null> {
 
   if (error || !data) return []
 
-  return data.map((row: any) => ({
-    lectureId: row.lecture_id,
-    title: row.lectures?.title ?? '',
-    branchTitle: row.lectures?.branches?.title ?? '',
-    stageTitle: row.lectures?.branches?.stages?.title ?? '',
-    price: Number(row.lectures?.price ?? 0),
-  }))
+  return data.map((row: any) => {
+    const product = row.lectures ?? row.monthly_courses
+    return {
+      lectureId: row.lecture_id,
+      monthlyCourseId: row.monthly_course_id,
+      itemType: row.monthly_course_id ? 'course_bundle' as const : 'lecture' as const,
+      title: product?.title ?? '',
+      branchTitle: product?.branches?.title ?? '',
+      stageTitle: product?.branches?.stages?.title ?? '',
+      price: Number(product?.price ?? 0),
+    }
+  })
 }
 
 export async function addToCart(lectureId: string) {
@@ -114,6 +125,31 @@ export async function addToCart(lectureId: string) {
 
   // ignore unique-violation (already in cart)
   if (error && error.code !== '23505') return { error: error.message }
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
+export async function addCourseToCart(monthlyCourseId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'unauthenticated' as const }
+
+  const { error } = await supabase.from('cart_items').insert({
+    student_id: user.id,
+    monthly_course_id: monthlyCourseId,
+    lecture_id: null,
+  })
+  if (error && error.code !== '23505') return { error: error.message }
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
+export async function removeCourseFromCart(monthlyCourseId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'unauthenticated' as const }
+  const { error } = await supabase.from('cart_items').delete().eq('student_id', user.id).eq('monthly_course_id', monthlyCourseId)
+  if (error) return { error: error.message }
   revalidatePath('/', 'layout')
   return { success: true }
 }
@@ -224,16 +260,51 @@ export async function createOrder(input: {
     await supabase.rpc('increment_coupon_used', { p_code: appliedCouponCode })
   }
 
-  const { error: itemsErr } = await supabase.from('order_items').insert(
-    items.map((i) => ({
+  const bundleIds = items.flatMap((item) => item.monthlyCourseId ? [item.monthlyCourseId] : [])
+  const { data: bundledLectures } = bundleIds.length
+    ? await supabase.from('lectures').select('id, title, monthly_course_id').in('monthly_course_id', bundleIds)
+    : { data: [] as { id: string; title: string; monthly_course_id: string }[] }
+
+  const orderItemRows = items.flatMap((item) => {
+    if (!item.monthlyCourseId) {
+      return [{
+        order_id: order.id,
+        lecture_id: item.lectureId,
+        monthly_course_id: null,
+        item_type: 'lecture',
+        lecture_title: item.title,
+        branch_title: item.branchTitle,
+        stage_title: item.stageTitle,
+        price: item.price,
+      }]
+    }
+
+    const accessRows = (bundledLectures ?? [])
+      .filter((lecture) => lecture.monthly_course_id === item.monthlyCourseId)
+      .map((lecture) => ({
+        order_id: order.id,
+        lecture_id: lecture.id,
+        monthly_course_id: item.monthlyCourseId,
+        item_type: 'lecture',
+        lecture_title: lecture.title,
+        branch_title: item.branchTitle,
+        stage_title: item.stageTitle,
+        price: 0,
+      }))
+
+    return [{
       order_id: order.id,
-      lecture_id: i.lectureId,
-      lecture_title: i.title,
-      branch_title: i.branchTitle,
-      stage_title: i.stageTitle,
-      price: i.price,
-    })),
-  )
+      lecture_id: null,
+      monthly_course_id: item.monthlyCourseId,
+      item_type: 'course_bundle',
+      lecture_title: item.title,
+      branch_title: item.branchTitle,
+      stage_title: item.stageTitle,
+      price: item.price,
+    }, ...accessRows]
+  })
+
+  const { error: itemsErr } = await supabase.from('order_items').insert(orderItemRows)
   if (itemsErr) return { error: itemsErr.message }
 
   // clear the cart after a successful order

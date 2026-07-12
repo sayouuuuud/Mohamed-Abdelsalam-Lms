@@ -82,12 +82,12 @@ export async function computeCoupon(
       .select('lecture_id')
       .eq('coupon_id', row.id)
     coveredIds = new Set((links ?? []).map((l: any) => l.lecture_id))
-    const covered = items.filter((i) => coveredIds.has(i.lectureId))
+    const covered = items.filter((i) => i.lectureId && coveredIds.has(i.lectureId))
     if (covered.length === 0)
       return { error: 'الكوبون ده مش بينطبق على أي محاضرة في سلتك.' }
     base = covered.reduce((sum, i) => sum + i.price, 0)
   } else {
-    coveredIds = new Set(items.map((i) => i.lectureId))
+    coveredIds = new Set(items.flatMap((i) => i.lectureId ? [i.lectureId] : []))
   }
 
   // Compute discount, capped so the total never goes below zero.
@@ -95,7 +95,7 @@ export async function computeCoupon(
     row.type === 'نسبة مئوية' ? (base * row.value) / 100 : Math.min(row.value, base)
   discount = Math.round(Math.min(discount, base) * 100) / 100
 
-  const coveredCount = items.filter((i) => coveredIds.has(i.lectureId)).length
+  const coveredCount = items.filter((i) => i.lectureId && coveredIds.has(i.lectureId)).length
 
   return {
     applied: {

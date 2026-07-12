@@ -22,6 +22,20 @@ function formatEGP(value: number) {
   return new Intl.NumberFormat('ar-EG').format(value)
 }
 
+type FlatCourse = {
+  dbId?: string
+  slug: string
+  image?: string
+  title: string
+  description: string
+  price: number
+  oldPrice?: number
+  badge?: string
+  lectures: FlatLecture[]
+  stageTitle: string
+  branchTitle: string
+}
+
 type FlatLecture = {
   dbId?: string
   slug: string
@@ -45,10 +59,12 @@ export function StudentBrowsePage({
   gradeLocked?: boolean
 }) {
   const searchParams = useSearchParams()
-  const { add, inCart, setOpen, count } = useCart()
+  const { add, addCourse, inCart, courseInCart, setOpen, count } = useCart()
   const [query, setQuery] = useState(searchParams.get('q') || '')
   const [stageFilter, setStageFilter] = useState<string>('all')
+  const [activeTab, setActiveTab] = useState<'lectures' | 'courses'>('lectures')
   const [details, setDetails] = useState<FlatLecture | null>(null)
+  const [courseDetails, setCourseDetails] = useState<FlatCourse | null>(null)
 
   // Flatten the curriculum tree into a searchable list of lectures.
   const lectures = useMemo<FlatLecture[]>(() => {
@@ -76,6 +92,43 @@ export function StudentBrowsePage({
     return out
   }, [stages])
 
+  const courses = useMemo<FlatCourse[]>(() => {
+    const out: FlatCourse[] = []
+    for (const stage of stages) {
+      for (const branch of stage.branches) {
+        for (const course of branch.monthlyCourses ?? []) {
+          out.push({
+            dbId: course.dbId,
+            slug: course.id,
+            image: course.image,
+            title: course.title,
+            description: course.description,
+            price: course.price,
+            oldPrice: course.oldPrice,
+            badge: course.badge,
+            stageTitle: stage.title,
+            branchTitle: branch.title,
+            lectures: course.lectures.map((lecture) => ({
+              dbId: lecture.dbId,
+              slug: lecture.id,
+              image: lecture.image,
+              title: lecture.title,
+              description: lecture.description,
+              price: lecture.price,
+              oldPrice: lecture.oldPrice,
+              badge: lecture.badge,
+              lessonsCount: lecture.lessons.length,
+              lessons: lecture.lessons,
+              stageTitle: stage.title,
+              branchTitle: branch.title,
+            })),
+          })
+        }
+      }
+    }
+    return out
+  }, [stages])
+
   const filtered = useMemo(() => {
     const q = query.trim()
     return lectures.filter((l) => {
@@ -88,6 +141,19 @@ export function StudentBrowsePage({
       )
     })
   }, [lectures, query, stageFilter])
+
+  const filteredCourses = useMemo(() => {
+    const q = query.trim()
+    return courses.filter((course) => {
+      if (stageFilter !== 'all' && course.stageTitle !== stageFilter) return false
+      if (!q) return true
+      return (
+        course.title.includes(q) ||
+        course.branchTitle.includes(q) ||
+        course.stageTitle.includes(q)
+      )
+    })
+  }, [courses, query, stageFilter])
 
   const stageNames = useMemo(() => stages.map((s) => s.title), [stages])
 
@@ -113,6 +179,27 @@ export function StudentBrowsePage({
             السلة ({count})
           </button>
         )}
+      </div>
+
+      <div className="flex w-fit items-center gap-1 rounded-xl border border-border bg-muted p-1" role="tablist" aria-label="نوع المحتوى">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'lectures'}
+          onClick={() => setActiveTab('lectures')}
+          className={cn('rounded-lg px-5 py-2 text-sm font-bold transition-colors', activeTab === 'lectures' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground')}
+        >
+          المحاضرات
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'courses'}
+          onClick={() => setActiveTab('courses')}
+          className={cn('rounded-lg px-5 py-2 text-sm font-bold transition-colors', activeTab === 'courses' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground')}
+        >
+          الكورسات
+        </button>
       </div>
 
       {/* Search + stage filter */}
@@ -146,7 +233,7 @@ export function StudentBrowsePage({
       </div>
 
       {/* Lectures grid */}
-      {filtered.length === 0 ? (
+      {activeTab === 'lectures' && (filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border py-16 text-center">
           <div className="grid size-14 place-items-center rounded-full bg-muted text-muted-foreground">
             <BookOpen className="size-6" />
@@ -243,6 +330,48 @@ export function StudentBrowsePage({
             )
           })}
         </div>
+      ))}
+
+      {activeTab === 'courses' && (
+        filteredCourses.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border py-16 text-center">
+            <div className="grid size-14 place-items-center rounded-full bg-muted text-muted-foreground"><BookOpen className="size-6" /></div>
+            <p className="text-sm text-muted-foreground">مفيش كورسات مطابقة لبحثك حاليًا.</p>
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {filteredCourses.map((course) => (
+              <article key={course.dbId ?? course.slug} className="flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition-shadow hover:shadow-md">
+                <div className="relative aspect-[16/10] overflow-hidden bg-muted">
+                  <Image src={course.image || course.lectures[0]?.image || '/lessons/complex-numbers.png'} alt={course.title} fill sizes="(max-width: 640px) 100vw, 50vw" className="object-cover" />
+                  {course.badge && <span className="absolute right-3 top-3 rounded-lg bg-primary px-2 py-1 text-xs font-bold text-primary-foreground">{course.badge}</span>}
+                </div>
+                <div className="flex flex-1 flex-col gap-3 p-5">
+                  <div className="flex flex-col gap-1">
+                    <p className="text-xs font-semibold text-primary">{course.stageTitle} · {course.branchTitle}</p>
+                    <h2 className="text-lg font-bold text-foreground">{course.title}</h2>
+                    <p className="line-clamp-2 text-sm text-muted-foreground">{course.description}</p>
+                  </div>
+                  <p className="text-xs font-semibold text-muted-foreground">{course.lectures.length} محاضرة</p>
+                  <div className="mt-auto flex items-center justify-between gap-3 border-t border-border pt-4">
+                    <div><strong className="text-lg text-foreground">{formatEGP(course.price)}</strong> <span className="text-xs font-bold text-primary">ج.م</span></div>
+                    <button type="button" onClick={() => setCourseDetails(course)} className="rounded-full bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">عرض تفاصيل الكورس</button>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        )
+      )}
+
+      {courseDetails && (
+        <CourseDetailsModal
+          course={courseDetails}
+          inCart={courseDetails.dbId ? courseInCart(courseDetails.dbId) : false}
+          onAddCourse={() => courseDetails.dbId && addCourse(courseDetails.dbId, courseDetails.title)}
+          onLectureDetails={setDetails}
+          onClose={() => setCourseDetails(null)}
+        />
       )}
 
       {/* Lecture details modal */}
@@ -254,6 +383,43 @@ export function StudentBrowsePage({
           onClose={() => setDetails(null)}
         />
       )}
+    </div>
+  )
+}
+
+function CourseDetailsModal({ course, inCart, onAddCourse, onLectureDetails, onClose }: {
+  course: FlatCourse
+  inCart: boolean
+  onAddCourse: () => void
+  onLectureDetails: (lecture: FlatLecture) => void
+  onClose: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <button type="button" aria-label="إغلاق" onClick={onClose} className="absolute inset-0 bg-foreground/40 backdrop-blur-sm" />
+      <section className="relative z-10 flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-border bg-background shadow-2xl" aria-labelledby="course-details-title">
+        <header className="flex items-start justify-between gap-4 border-b border-border p-6">
+          <div className="flex flex-col gap-1">
+            <p className="text-xs font-semibold text-primary">{course.stageTitle} · {course.branchTitle}</p>
+            <h2 id="course-details-title" className="text-xl font-bold text-foreground">{course.title}</h2>
+            <p className="text-sm leading-relaxed text-muted-foreground">{course.description}</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="إغلاق" className="grid size-9 shrink-0 place-items-center rounded-full bg-muted text-foreground"><X className="size-4" /></button>
+        </header>
+        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-6">
+          <h3 className="mb-2 text-sm font-bold text-foreground">محتوى الكورس ({course.lectures.length} محاضرة)</h3>
+          {course.lectures.map((lecture, index) => (
+            <button key={lecture.dbId ?? lecture.slug} type="button" onClick={() => onLectureDetails(lecture)} className="flex items-center justify-between gap-4 rounded-xl border border-border p-4 text-right transition-colors hover:bg-muted">
+              <div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-lg bg-primary/10 font-bold text-primary">{index + 1}</span><div><p className="font-bold text-foreground">{lecture.title}</p><p className="text-xs text-muted-foreground">{lecture.lessonsCount} درس</p></div></div>
+              <span className="text-xs font-bold text-primary">عرض التفاصيل</span>
+            </button>
+          ))}
+        </div>
+        <footer className="flex items-center justify-between gap-3 border-t border-border p-4">
+          <div><strong className="text-xl text-foreground">{formatEGP(course.price)}</strong> <span className="text-xs font-bold text-primary">ج.م</span></div>
+          <button type="button" disabled={inCart || !course.dbId} onClick={onAddCourse} className={cn('rounded-full px-5 py-2.5 text-sm font-bold', inCart ? 'bg-muted text-muted-foreground' : 'bg-primary text-primary-foreground')}>{inCart ? 'الباقة في السلة' : 'اشترِ الكورس كاملًا'}</button>
+        </footer>
+      </section>
     </div>
   )
 }

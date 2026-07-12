@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import type { Stage, Branch, Lecture, Lesson } from '@/lib/landing-data'
+import type { Stage, Branch, Lecture, Lesson, MonthlyCourse } from '@/lib/landing-data'
 
 // ── Row shapes coming back from Supabase ───────────────────────────
 type StageRow = {
@@ -26,9 +26,23 @@ type BranchRow = {
   topics: string[]
 }
 
+type MonthlyCourseRow = {
+  id: string
+  branch_id: string
+  slug: string
+  title: string
+  description: string
+  image: string | null
+  price: number
+  old_price: number | null
+  badge: string | null
+}
+
 type LectureRow = {
   id: string
   branch_id: string
+  monthly_course_id?: string | null
+  course_sort_order?: number | null
   slug: string
   title: string
   description: string
@@ -61,7 +75,7 @@ function mapLesson(row: LessonRow): Lesson {
 export async function getCurriculum(): Promise<Stage[]> {
   const supabase = await createClient()
 
-  const [stagesRes, branchesRes, lecturesRes, lessonsRes] = await Promise.all([
+  const [stagesRes, branchesRes, monthlyCoursesRes, lecturesRes, lessonsRes] = await Promise.all([
     supabase
       .from('stages')
       .select('id, slug, idx, title, subtitle, rows, formula, image, accent, term_price, term_old_price')
@@ -69,6 +83,11 @@ export async function getCurriculum(): Promise<Stage[]> {
     supabase
       .from('branches')
       .select('id, stage_id, slug, title, description, image, topics')
+      .order('sort_order', { ascending: true }),
+    supabase
+      .from('monthly_courses')
+      .select('id, branch_id, slug, title, description, image, price, old_price, badge')
+      .eq('is_published', true)
       .order('sort_order', { ascending: true }),
     supabase
       .from('lectures')
@@ -109,6 +128,31 @@ export async function getCurriculum(): Promise<Stage[]> {
     lecturesByBranch.set(row.branch_id, list)
   }
 
+  const monthlyCoursesByBranch = new Map<string, MonthlyCourse[]>()
+  for (const row of (monthlyCoursesRes.data as MonthlyCourseRow[]) ?? []) {
+    const branchLectures = lecturesByBranch.get(row.branch_id) ?? []
+    const lectureRows = (lecturesRes.data as LectureRow[]) ?? []
+    const lectureIds = new Set(
+      lectureRows
+        .filter((lecture) => lecture.monthly_course_id === row.id)
+        .sort((a, b) => (a.course_sort_order ?? 0) - (b.course_sort_order ?? 0))
+        .map((lecture) => lecture.id),
+    )
+    const list = monthlyCoursesByBranch.get(row.branch_id) ?? []
+    list.push({
+      id: row.slug,
+      dbId: row.id,
+      title: row.title,
+      description: row.description,
+      image: row.image ?? undefined,
+      price: Number(row.price),
+      oldPrice: row.old_price != null ? Number(row.old_price) : undefined,
+      badge: row.badge ?? undefined,
+      lectures: branchLectures.filter((lecture) => lecture.dbId && lectureIds.has(lecture.dbId)),
+    })
+    monthlyCoursesByBranch.set(row.branch_id, list)
+  }
+
   const branchesByStage = new Map<string, Branch[]>()
   for (const row of (branchesRes.data as BranchRow[]) ?? []) {
     const list = branchesByStage.get(row.stage_id) ?? []
@@ -119,6 +163,7 @@ export async function getCurriculum(): Promise<Stage[]> {
       image: row.image,
       topics: row.topics ?? [],
       lectures: lecturesByBranch.get(row.id) ?? [],
+      monthlyCourses: monthlyCoursesByBranch.get(row.id) ?? [],
     })
     branchesByStage.set(row.stage_id, list)
   }
