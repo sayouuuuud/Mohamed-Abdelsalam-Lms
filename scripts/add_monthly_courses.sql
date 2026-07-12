@@ -44,7 +44,10 @@ create policy "monthly_courses_admin_all" on public.monthly_courses for all usin
 
 -- Prevent linking a lecture to a course in another branch.
 create or replace function public.validate_lecture_monthly_course_branch()
-returns trigger language plpgsql as $$
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
 begin
   if new.monthly_course_id is not null and not exists (
     select 1 from public.monthly_courses mc
