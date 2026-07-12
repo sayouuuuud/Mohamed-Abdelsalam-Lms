@@ -53,6 +53,7 @@ export function LectureFormModals() {
   const [badge, setBadge] = useState('')
   const [image, setImage] = useState('')
   const [releaseDate, setReleaseDate] = useState('')
+  const [isFree, setIsFree] = useState(false)
 
   // Inline "create a new course" state (keyed per branch so newly-created
   // courses show up immediately without waiting for a full data refresh).
@@ -93,6 +94,7 @@ export function LectureFormModals() {
       setOldPrice(editingLecture?.oldPrice != null ? String(editingLecture.oldPrice) : '')
       setBadge(editingLecture?.badge ?? '')
       setImage(editingLecture?.image ?? '')
+      setIsFree(editingLecture?.isFree ?? false)
       setWhatYouLearn(editingLecture?.whatYouLearn?.join('\n') ?? '')
       
       if (editingLecture?.releaseDate) {
@@ -178,6 +180,7 @@ export function LectureFormModals() {
       image: image || null,
       releaseDate: releaseDate || null,
       whatYouLearn: whatYouLearn.split('\n').map(s => s.trim()).filter(Boolean),
+      isFree,
     })
   }
 
@@ -402,6 +405,21 @@ export function LectureFormModals() {
               إذا حددت موعداً، سيظهر في التقويم وتصبح المحاضرة متاحة في هذا الموعد.
             </p>
           </Field>
+
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-secondary/40 px-4 py-3 transition-colors hover:bg-secondary/60">
+            <input
+              type="checkbox"
+              checked={isFree}
+              onChange={(e) => setIsFree(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-border accent-primary"
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="text-sm font-medium text-foreground">محاضرة مجانية</span>
+              <span className="text-xs text-muted-foreground">
+                المحاضرة تفضل تابعة للكورس، لكن أي زائر (حتى بدون تسجيل) يقدر يتفرج عليها ودروسها.
+              </span>
+            </span>
+          </label>
 
           <Field label="ماذا ستتعلم (كل نقطة في سطر منفصل)">
             <textarea

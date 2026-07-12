@@ -203,11 +203,11 @@ function LectureCard({ lecture, index }: { lecture: Lecture; index: number }) {
   )
 }
 
-function MonthlyCourseCard({ course, index }: { course: MonthlyCourse; index: number }) {
-  const [open, setOpen] = useState(false)
+function MonthlyCourseCard({ course, index, href }: { course: MonthlyCourse; index: number; href: string }) {
   const { addCourse, courseInCart, setOpen: setCartOpen } = useCart()
   const added = course.dbId ? courseInCart(course.dbId) : false
   const lessonsCount = course.lectures.reduce((sum, lecture) => sum + lecture.lessons.length, 0)
+  const freeCount = course.lectures.filter((lecture) => lecture.isFree).length
 
   async function handleAdd(openCart = false) {
     if (!course.dbId) return
@@ -217,28 +217,26 @@ function MonthlyCourseCard({ course, index }: { course: MonthlyCourse; index: nu
 
   return (
     <article className="flex flex-col overflow-hidden rounded-[1.75rem] border border-navy/10 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl dark:border-ink-line dark:bg-ink-raised">
-      <div className="relative aspect-[16/10] overflow-hidden bg-cream dark:bg-ink-base">
-        <Image src={course.image || course.lectures[0]?.image || '/lessons/complex-numbers.png'} alt={course.title} fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover" />
+      <Link href={href} className="relative block aspect-[16/10] overflow-hidden bg-cream dark:bg-ink-base">
+        <Image src={course.image || course.lectures[0]?.image || '/lessons/complex-numbers.png'} alt={course.title} fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover transition-transform duration-500 hover:scale-105" />
         <span className="absolute right-4 top-4 grid size-10 place-items-center rounded-xl bg-white/90 font-mono text-sm font-bold text-navy">{String(index + 1).padStart(2, '0')}</span>
         {course.badge && <span className="absolute left-4 top-4 rounded-full bg-gold px-3 py-1 text-xs font-bold text-navy">{course.badge}</span>}
-      </div>
+        {freeCount > 0 && <span className="absolute bottom-4 right-4 inline-flex items-center gap-1 rounded-full bg-emerald-deep px-3 py-1 text-xs font-bold text-cream"><Play className="size-3" />{freeCount} مجانية</span>}
+      </Link>
       <div className="flex flex-1 flex-col gap-4 p-6">
         <div className="flex flex-col gap-2">
-          <h3 className="font-heading text-xl font-bold text-navy dark:text-ink-fg">{course.title}</h3>
+          <Link href={href}>
+            <h3 className="font-heading text-xl font-bold text-navy transition-colors hover:text-emerald-deep dark:text-ink-fg dark:hover:text-teal-glow">{course.title}</h3>
+          </Link>
           <p className="text-pretty text-sm leading-relaxed text-navy-soft dark:text-ink-dim">{course.description}</p>
         </div>
         <div className="flex flex-wrap gap-2 text-xs font-bold text-navy-soft dark:text-ink-dim">
           <span className="rounded-lg bg-cream px-3 py-2 dark:bg-ink-base">{course.lectures.length} محاضرة</span>
           <span className="rounded-lg bg-cream px-3 py-2 dark:bg-ink-base">{lessonsCount} درس</span>
         </div>
-        <button type="button" onClick={() => setOpen((value) => !value)} className="flex items-center justify-between rounded-2xl border border-navy/10 bg-cream/60 px-4 py-3 text-sm font-bold text-navy dark:border-ink-line dark:bg-ink-base dark:text-ink-fg">
-          <span>عرض تفاصيل الكورس</span><ArrowRight className="size-4 -rotate-180" />
-        </button>
-        {open && (
-          <ol className="flex flex-col gap-2 rounded-2xl border border-navy/10 p-3 dark:border-ink-line">
-            {course.lectures.map((lecture, lectureIndex) => <li key={lecture.id} className="flex items-center gap-3 rounded-xl bg-cream/60 px-3 py-2.5 text-sm font-semibold text-navy dark:bg-ink-base dark:text-ink-fg"><span className="grid size-8 place-items-center rounded-lg bg-emerald-brand/15 text-emerald-deep">{lectureIndex + 1}</span>{lecture.title}</li>)}
-          </ol>
-        )}
+        <Link href={href} className="flex items-center justify-between rounded-2xl border border-navy/10 bg-cream/60 px-4 py-3 text-sm font-bold text-navy transition-colors hover:bg-cream dark:border-ink-line dark:bg-ink-base dark:text-ink-fg dark:hover:bg-ink-raised">
+          <span>عرض تفاصيل الكورس والمحاضرات</span><ArrowRight className="size-4 -rotate-180" />
+        </Link>
         <div className="mt-auto flex items-center justify-between gap-3 border-t border-navy/10 pt-4 dark:border-ink-line">
           <div><strong className="font-heading text-xl text-navy dark:text-ink-fg">{formatEGP(course.price)}</strong> <span className="text-xs font-bold text-gold-deep">ج.م</span></div>
           <button type="button" onClick={() => handleAdd(true)} className="rounded-full bg-navy px-5 py-3 text-sm font-bold text-cream dark:bg-violet-glow">{added ? 'أكمل الشراء' : 'اشترك في الكورس'}</button>
@@ -268,7 +266,7 @@ export function BranchDetail({ stage, branch }: { stage: Stage; branch: Branch }
           {/* breadcrumb */}
           <nav className="flex flex-wrap items-center gap-2 text-sm font-semibold text-cream/60">
             <Link href="/#stages" className="transition-colors hover:text-gold dark:hover:text-teal-glow">
-              المراحل
+              ال��راحل
             </Link>
             <ArrowRight className="size-3.5" />
             <Link href={`/stages/${stage.id}`} className="transition-colors hover:text-gold dark:hover:text-teal-glow">
@@ -343,7 +341,7 @@ export function BranchDetail({ stage, branch }: { stage: Stage; branch: Branch }
 
         {courses.length > 0 ? (
           <div className="mt-12 grid gap-7 sm:grid-cols-2">
-            {courses.map((course, index) => <MonthlyCourseCard key={course.dbId ?? course.id} course={course} index={index} />)}
+            {courses.map((course, index) => <MonthlyCourseCard key={course.dbId ?? course.id} course={course} index={index} href={`/stages/${stage.id}/${branch.id}/${course.id}`} />)}
           </div>
         ) : (
           <div className="mx-auto mt-12 max-w-xl rounded-2xl border border-dashed border-navy/15 bg-white p-10 text-center text-navy-soft dark:border-ink-line dark:bg-ink-raised dark:text-ink-dim">

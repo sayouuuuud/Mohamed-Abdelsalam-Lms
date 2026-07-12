@@ -51,6 +51,7 @@ type LectureRow = {
   old_price: number | null
   badge: string | null
   image?: string | null
+  is_free?: boolean | null
 }
 
 type LessonRow = {
@@ -130,6 +131,7 @@ export async function getCurriculum(): Promise<Stage[]> {
       image: row.image ?? undefined,
       lessons: lessonsByLecture.get(row.id) ?? [],
       sectionId: row.monthly_course_section_id ?? null,
+      isFree: row.is_free ?? false,
     })
     lecturesByBranch.set(row.branch_id, list)
   }
@@ -212,4 +214,35 @@ export async function getBranchBySlug(
   const branch = stage.branches.find((b) => b.id === branchSlug)
   if (!branch) return undefined
   return { stage, branch }
+}
+
+// Resolves a single monthly course (with its sections + lectures + lessons)
+// inside a branch, used by the public course landing page.
+export async function getCourseBySlug(
+  stageSlug: string,
+  branchSlug: string,
+  courseSlug: string,
+): Promise<{ stage: Stage; branch: Branch; course: MonthlyCourse } | undefined> {
+  const result = await getBranchBySlug(stageSlug, branchSlug)
+  if (!result) return undefined
+  const course = (result.branch.monthlyCourses ?? []).find((c) => c.id === courseSlug)
+  if (!course) return undefined
+  return { stage: result.stage, branch: result.branch, course }
+}
+
+// Resolves a single free lecture inside a course (public preview watch).
+// Returns undefined unless the lecture exists and is marked free.
+export async function getFreeLectureBySlug(
+  stageSlug: string,
+  branchSlug: string,
+  courseSlug: string,
+  lectureSlug: string,
+): Promise<
+  { stage: Stage; branch: Branch; course: MonthlyCourse; lecture: Lecture } | undefined
+> {
+  const result = await getCourseBySlug(stageSlug, branchSlug, courseSlug)
+  if (!result) return undefined
+  const lecture = result.course.lectures.find((l) => l.id === lectureSlug)
+  if (!lecture || !lecture.isFree) return undefined
+  return { ...result, lecture }
 }

@@ -46,6 +46,7 @@ export type AdminLecture = {
   stageTitle: string
   lessons: AdminLesson[]
   whatYouLearn: string[] | null
+  isFree: boolean
 }
 
 export type BranchOption = {
@@ -73,6 +74,7 @@ export type LectureInput = {
   image?: string | null
   releaseDate?: string | null
   whatYouLearn?: string[] | null
+  isFree?: boolean
 }
 
 export type LessonInput = {
@@ -200,6 +202,7 @@ export async function getLecturesAdmin(): Promise<AdminLecture[]> {
       stageTitle: branch?.stageTitle ?? '',
       lessons: lessonsByLecture.get(row.id) ?? [],
       whatYouLearn: (row as any).what_you_learn ?? null,
+      isFree: (row as any).is_free ?? false,
     }
   })
 }
@@ -305,6 +308,7 @@ export async function createLecture(input: LectureInput) {
     sort_order: (count ?? 0) + 1,
     release_date: input.releaseDate || null,
     what_you_learn: input.whatYouLearn || null,
+    is_free: input.isFree ?? false,
   }
   if (input.image) row.image = input.image
 
@@ -312,6 +316,11 @@ export async function createLecture(input: LectureInput) {
   // Retry without `monthly_course_section_id` if that column doesn't exist yet.
   if (error && /monthly_course_section_id/.test(error.message) && 'monthly_course_section_id' in row) {
     delete row.monthly_course_section_id
+    ;({ error } = await supabase.from('lectures').insert(row))
+  }
+  // Retry without `is_free` if that column doesn't exist yet (migration pending).
+  if (error && /is_free/.test(error.message) && 'is_free' in row) {
+    delete row.is_free
     ;({ error } = await supabase.from('lectures').insert(row))
   }
   // Retry without `image` if that column doesn't exist yet (migration pending).
@@ -417,6 +426,7 @@ export async function updateLecture(id: string, input: LectureInput) {
     badge: input.badge,
     release_date: input.releaseDate || null,
     what_you_learn: input.whatYouLearn || null,
+    is_free: input.isFree ?? false,
   }
   if (input.image !== undefined) patch.image = input.image
 
@@ -424,6 +434,11 @@ export async function updateLecture(id: string, input: LectureInput) {
   // Retry without `monthly_course_section_id` if that column doesn't exist yet.
   if (error && /monthly_course_section_id/.test(error.message) && 'monthly_course_section_id' in patch) {
     delete patch.monthly_course_section_id
+    ;({ error } = await supabase.from('lectures').update(patch).eq('id', id))
+  }
+  // Retry without `is_free` if that column doesn't exist yet (migration pending).
+  if (error && /is_free/.test(error.message) && 'is_free' in patch) {
+    delete patch.is_free
     ;({ error } = await supabase.from('lectures').update(patch).eq('id', id))
   }
   // Retry without `image` if that column doesn't exist yet (migration pending).
