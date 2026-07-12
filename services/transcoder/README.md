@@ -1,0 +1,95 @@
+# Transcoder Worker
+
+خدمة Node.js مستقلة مسؤولة عن تحويل الفيديوهات الخام لـ HLS متعدد الجودات.
+تشتغل خارج Vercel (Railway / Fly.io / أي VPS) لأن FFmpeg يحتاج CPU/RAM ووقت طويل.
+
+## البنية
+
+```
+src/
+  server.ts   ← نقطة الدخول + HTTP server (health + /wake)
+  worker.ts   ← job processor: ينزّل → يحوّل → يرفع → يحدّث DB
+  ffmpeg.ts   ← wrapper على FFmpeg multi-output HLS
+  r2.ts       ← تنزيل وتحميل Cloudflare R2 (S3-compatible)
+  db.ts       ← اتصال Supabase: claim jobs + تحديث حالة
+```
+
+## متطلبات النشر
+
+- **FFmpeg** مثبّت على السيرفر (في Docker image: `apk add ffmpeg`).
+- **Node.js 20+**
+- **Environment variables** (انسخ `.env.example` لـ `.env`):
+
+| المتغير | الوصف |
+|---|---|
+| `SUPABASE_URL` | رابط مشروع Supabase |
+| `SUPABASE_SERVICE_KEY` | service_role key (مش anon) |
+| `R2_ENDPOINT` | `https://<ACCOUNT_ID>.r2.cloudflarestorage.com` |
+| `R2_ACCESS_KEY_ID` | R2 API Token |
+| `R2_SECRET_ACCESS_KEY` | R2 API Secret |
+| `R2_BUCKET` | اسم الـ bucket |
+| `WORKER_MODE` | `http` (scale-to-zero) أو `poll` (always-on) |
+| `WORKER_WAKE_SECRET` | سر لحماية endpoint الـ /wake |
+| `PORT` | port السيرفر (افتراضي 4000) |
+| `POLL_INTERVAL_MS` | وقت الاستطلاع في poll mode (افتراضي 10000) |
+| `TMP_DIR` | مجلد الملفات المؤقتة (افتراضي /tmp) |
+
+## طرق النشر
+
+### Railway (موصى به — scale-to-zero)
+
+```bash
+# من مجلد services/transcoder
+railway init
+railway up
+
+# ضبط المتغيرات
+railway variables set SUPABASE_URL=... SUPABASE_SERVICE_KEY=... ...
+
+# الـ WORKER_WAKE_URL هيكون: https://<your-app>.railway.app/wake
+```
+
+### Docker
+
+```bash
+docker build -t transcoder .
+docker run -p 4000:4000 --env-file .env transcoder
+```
+
+### Fly.io
+
+```bash
+fly launch --name transcoder --no-deploy
+fly secrets set SUPABASE_URL=... SUPABASE_SERVICE_KEY=... ...
+fly deploy
+```
+
+## وضعا التشغيل
+
+### `WORKER_MODE=http` (scale-to-zero — موصى به للمبتدئين)
+
+الوركر "نايم" لما مفيش شغل. المنصة تبعث POST `/wake` بعد كل رفع جديد.
+ده بيوفّر في التكلفة لأنك مش بتدفع وهو فاضي.
+
+```
+المنصة (Vercel) ──POST /wake──► الوركر يصحى ──► ينفّذ job ──► ينام
+```
+
+### `WORKER_MODE=poll`
+
+الوركر يستطلع DB كل `POLL_INTERVAL_MS`. مناسب لو في رفع كثير ومستمر.
+
+## الـ /wake endpoint
+
+```bash
+curl -X POST https://your-transcoder.railway.app/wake \
+  -H "Authorization: Bearer YOUR_WORKER_WAKE_SECRET"
+# → { "queued": true }
+```
+
+## Health Check
+
+```bash
+curl https://your-transcoder.railway.app/health
+# → { "ok": true, "mode": "http", "uptime": 42.3 }
+```

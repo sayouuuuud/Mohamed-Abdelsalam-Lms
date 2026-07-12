@@ -204,6 +204,7 @@ export function VideoUploadField({
 
   const statusIcon: Record<VideoStatus | 'idle' | 'uploading' | 'processing', React.ReactNode> = {
     idle:       null,
+    pending:    <Loader2 className="size-4 animate-spin text-muted-foreground" />,
     uploading:  <Loader2 className="size-4 animate-spin text-primary" />,
     processing: <Loader2 className="size-4 animate-spin text-amber-500" />,
     ready:      <CheckCircle2 className="size-4 text-emerald-500" />,
