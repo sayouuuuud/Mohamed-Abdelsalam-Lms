@@ -163,23 +163,24 @@ drop policy if exists "service_role_all_video_jobs"  on public.video_jobs;
 
 -- الأدمن (service_role يتجاوز RLS تلقائياً)
 -- سياسة authenticated للأدمن فقط (يعتمد على دالة is_admin الموجودة)
+-- ملاحظة: دالة is_admin() في هذه القاعدة بدون arguments (تقرأ auth.uid() داخلياً)
 create policy "admin_all_streaming_settings"
   on public.streaming_settings for all
   to authenticated
-  using    (public.is_admin(auth.uid()))
-  with check (public.is_admin(auth.uid()));
+  using    (public.is_admin())
+  with check (public.is_admin());
 
 create policy "admin_all_videos"
   on public.videos for all
   to authenticated
-  using    (public.is_admin(auth.uid()))
-  with check (public.is_admin(auth.uid()));
+  using    (public.is_admin())
+  with check (public.is_admin());
 
 create policy "admin_all_video_jobs"
   on public.video_jobs for all
   to authenticated
-  using    (public.is_admin(auth.uid()))
-  with check (public.is_admin(auth.uid()));
+  using    (public.is_admin())
+  with check (public.is_admin());
 
 -- ---------------------------------------------------------------
 -- 7. منح الصلاحيات لـ service_role (للوركر)
