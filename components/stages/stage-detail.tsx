@@ -171,7 +171,7 @@ export function StageDetail({ stage }: { stage: Stage }) {
                 {/* footer: CTA pinned to bottom — no price (prices live on lectures) */}
                 <div className="mt-auto flex items-center justify-between gap-3 pt-6">
                   <span className="text-sm font-semibold text-navy-soft dark:text-ink-dim">
-                    شوف المحاضرات والأسعار
+                    شوف الكورسات والأسعار
                   </span>
                   <span className="inline-flex size-11 items-center justify-center rounded-full bg-navy text-cream transition-all duration-200 group-hover:bg-gold group-hover:text-navy-deep dark:bg-ink-base dark:text-ink-fg dark:group-hover:bg-violet-glow dark:group-hover:text-white">
                     <ArrowRight className="size-5" />
@@ -206,7 +206,7 @@ export function StageDetail({ stage }: { stage: Stage }) {
                 اشترك في {stage.title} كاملة
               </h3>
               <p className="mt-3 max-w-xl text-pretty leading-relaxed text-cream/70">
-                {stage.branches.length} فروع كاملة بكل المحاضرات والدروس والامتحانات والمتابعة — في
+                {stage.branches.length} فروع كاملة بكل الكورسات والدروس والامتحانات والمتابعة — في
                 باقة واحدة بسعر أوفر بكتير من الاشتراك المنفصل.
               </p>
 

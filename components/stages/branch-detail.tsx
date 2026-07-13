@@ -91,7 +91,7 @@ function LectureCard({ lecture, index }: { lecture: Lecture; index: number }) {
         >
           <span className="inline-flex items-center gap-2">
             <Layers className="size-4 text-emerald-deep" />
-            محتوى المحاضرة ({lecture.lessons.length} درس)
+            محتوى المحاضرة ({lecture.lessons.length} محاضرة)
           </span>
           <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-deep">
             عرض
@@ -232,7 +232,7 @@ function MonthlyCourseCard({ course, index, href }: { course: MonthlyCourse; ind
         </div>
         <div className="flex flex-wrap gap-2 text-xs font-bold text-navy-soft dark:text-ink-dim">
           <span className="rounded-lg bg-cream px-3 py-2 dark:bg-ink-base">{course.lectures.length} محاضرة</span>
-          <span className="rounded-lg bg-cream px-3 py-2 dark:bg-ink-base">{lessonsCount} درس</span>
+          <span className="rounded-lg bg-cream px-3 py-2 dark:bg-ink-base">{lessonsCount} محاضرة</span>
         </div>
         <Link href={href} className="flex items-center justify-between rounded-2xl border border-navy/10 bg-cream/60 px-4 py-3 text-sm font-bold text-navy transition-colors hover:bg-cream dark:border-ink-line dark:bg-ink-base dark:text-ink-fg dark:hover:bg-ink-raised">
           <span>عرض تفاصيل الكورس والمحاضرات</span><ArrowRight className="size-4 -rotate-180" />
@@ -296,7 +296,7 @@ export function BranchDetail({ stage, branch }: { stage: Stage; branch: Branch }
                 </span>
                 <span className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-navy-deep/40 px-4 py-2.5 text-sm text-cream/90">
                   <PlayCircle className="size-4 text-emerald-brand" />
-                  {totalLessons} درس
+                  {totalLessons} محاضرة
                 </span>
               </div>
             </div>
