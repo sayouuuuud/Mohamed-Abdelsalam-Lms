@@ -71,7 +71,7 @@ export function StageDetail({ stage }: { stage: Stage }) {
                 </span>
                 <span className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-navy-deep/40 px-4 py-2.5 text-sm text-cream/90">
                   <PlayCircle className="size-4 text-emerald-brand" />
-                  {totalLessons} درس
+                  {totalLessons} محاضرة
                 </span>
               </div>
             </div>
@@ -110,7 +110,7 @@ export function StageDetail({ stage }: { stage: Stage }) {
             اختار الفرع اللي محتاجه، أو خد المرحلة كاملة
           </h2>
           <p className="mt-3 max-w-2xl text-pretty leading-relaxed text-navy-soft dark:text-ink-dim">
-            كل فرع مشروح من الصفر خطوة بخطوة، وكل درس وراه امتحان يثبّت المعلومة.
+            كل فرع مشروح من الصفر خطوة بخطوة، وكل محاضرة وراها امتحان يثبّت المعلومة.
           </p>
         </div>
 
@@ -155,7 +155,7 @@ export function StageDetail({ stage }: { stage: Stage }) {
                   </span>
                   <span className="inline-flex items-center gap-1.5">
                     <PlayCircle className="size-4 text-emerald-deep" />
-                    {countLessons(branch)} درس
+                    {countLessons(branch)} محاضرة
                   </span>
                 </div>
 
@@ -212,9 +212,9 @@ export function StageDetail({ stage }: { stage: Stage }) {
 
               <ul className="mt-6 grid gap-3 sm:grid-cols-2">
                 {[
-                  { icon: PlayCircle, text: `${totalLessons} درس فيديو بجودة عالية` },
+                  { icon: PlayCircle, text: `${totalLessons} محاضرة فيديو بجودة عالية` },
                   { icon: InfinityIcon, text: 'وصول مدى الترم بدون حدود' },
-                  { icon: Check, text: 'امتحانات وواجبات بعد كل درس' },
+                  { icon: Check, text: 'امتحانات وواجبات بعد كل محاضرة' },
                   { icon: ShieldCheck, text: 'متابعة وتقارير لمستواك' },
                 ].map(({ icon: Icon, text }) => (
                   <li key={text} className="flex items-center gap-3 text-sm text-cream/85">
