@@ -168,6 +168,19 @@ export async function getSiteNeon(): Promise<string> {
   return data.neon_preset
 }
 
+// Reads the site-wide light mode preset from the PUBLIC theme table.
+export async function getSiteLightPreset(): Promise<string> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('site_theme')
+    .select('light_preset')
+    .eq('id', true)
+    .single()
+
+  if (error || !data?.light_preset) return 'navy-gold'
+  return data.light_preset
+}
+
 export async function updateSettings(newSettings: any) {
   const supabase = await createClient()
   if (!(await hasResourceAccess(supabase, 'settings', 'manage'))) {
@@ -198,13 +211,15 @@ export async function updateSettings(newSettings: any) {
   // visitor (the settings table is admin-only). Keep going even if this fails.
   const activeColor = newSettings?.preferences?.activeColor
   const neonPreset = newSettings?.preferences?.neonPreset
-  if (activeColor || neonPreset) {
+  const lightPreset = newSettings?.preferences?.lightPreset
+  if (activeColor || neonPreset || lightPreset) {
     const themeRow: Record<string, unknown> = {
       id: true,
       updated_at: new Date().toISOString(),
     }
     if (activeColor) themeRow.active_color = activeColor
     if (neonPreset) themeRow.neon_preset = neonPreset
+    if (lightPreset) themeRow.light_preset = lightPreset
 
     const { error: themeError } = await supabase
       .from('site_theme')

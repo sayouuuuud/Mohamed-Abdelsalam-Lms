@@ -172,22 +172,60 @@ export async function getVideoStatus(
 }
 
 // ---------------------------------------------------------------
-// 4. getStreamingSettings — يقرأ streaming_settings للـ UI
+// 4. getStreamingSettings — يقرأ platform_settings للـ UI
 // ---------------------------------------------------------------
 export async function getStreamingSettings(): Promise<{
-  enabled:           boolean
+  enabled:            boolean
   r2Configured:      boolean
+  workerCpuThreads:  number
+  workerRamMb:       number
+  workerConcurrency: number
+  segmentDurationSec:number
 } | null> {
   const supabase = await createAdminClient()
   const { data } = await supabase
     .from('platform_settings')
-    .select('is_streaming_enabled')
+    .select('is_streaming_enabled, worker_cpu_threads, worker_ram_mb, worker_concurrency, segment_duration_sec')
     .eq('id', 1)
     .single()
 
   const r2Configured = isR2Configured()
   return {
-    enabled:            (data?.is_streaming_enabled ?? false) && r2Configured,
+    enabled:             (data?.is_streaming_enabled ?? false) && r2Configured,
     r2Configured,
+    workerCpuThreads:    data?.worker_cpu_threads  ?? 2,
+    workerRamMb:         data?.worker_ram_mb        ?? 2048,
+    workerConcurrency:   data?.worker_concurrency   ?? 1,
+    segmentDurationSec:  data?.segment_duration_sec ?? 4,
   }
+}
+
+// ---------------------------------------------------------------
+// 5. saveStreamingSettings — يحفظ إعدادات الوركر كاملة
+// ---------------------------------------------------------------
+export async function saveStreamingSettings(input: {
+  enabled:            boolean
+  workerCpuThreads:   number
+  workerRamMb:        number
+  workerConcurrency:  number
+  segmentDurationSec: number
+}): Promise<{ ok: true } | { error: string }> {
+  const supabase = await createAdminClient()
+  const { error } = await supabase
+    .from('platform_settings')
+    .upsert({
+      id: 1,
+      is_streaming_enabled:  input.enabled,
+      worker_cpu_threads:    input.workerCpuThreads,
+      worker_ram_mb:         input.workerRamMb,
+      worker_concurrency:    input.workerConcurrency,
+      segment_duration_sec:  input.segmentDurationSec,
+      updated_at:            new Date().toISOString(),
+    }, { onConflict: 'id' })
+
+  if (error) {
+    console.log('[v0] saveStreamingSettings error:', error.message)
+    return { error: 'تعذّر حفظ إعدادات الاستريمنج.' }
+  }
+  return { ok: true }
 }

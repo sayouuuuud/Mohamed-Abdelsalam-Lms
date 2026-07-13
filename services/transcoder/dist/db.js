@@ -1,0 +1,99 @@
+'use strict';
+/**
+ * db.ts
+ * طبقة الاتصال بـ Supabase من داخل الوركر.
+ * بيستخدم SUPABASE_URL + SUPABASE_SERVICE_KEY (service_role) مباشرة —
+ * لا يمر عبر RLS — ده مقصود عشان الوركر يكون خارج دائرة الـ auth.
+ */
+import { createClient } from '@supabase/supabase-js';
+let _client = null;
+export function getDb() {
+    if (_client)
+        return _client;
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_KEY;
+    if (!url || !key) {
+        throw new Error('[transcoder] SUPABASE_URL أو SUPABASE_SERVICE_KEY غير موجودين في .env');
+    }
+    _client = createClient(url, key, {
+        auth: { persistSession: false, autoRefreshToken: false },
+    });
+    return _client;
+}
+// ---------------------------------------------------------------
+// claim: يحجز job واحد بشكل آمن (لا race condition مع replicas متعددة)
+// بيستخدم دالة claim_next_video_job() الـ SQL اللي اتعرّفت في M1
+// ---------------------------------------------------------------
+export async function claimNextJob() {
+    const db = getDb();
+    const { data, error } = await db.rpc('claim_next_video_job');
+    if (error) {
+        console.error('[transcoder] claimNextJob error:', error.message);
+        return null;
+    }
+    if (!data || data.length === 0)
+        return null;
+    const row = data[0];
+    return {
+        jobId: row.job_id,
+        videoId: row.video_id,
+        r2RawKey: row.r2_raw_key,
+        threadsOverride: row.threads_override ?? null,
+    };
+}
+// تحديث حالة الـ job أثناء المعالجة
+export async function updateJobProgress(jobId, progress) {
+    const db = getDb();
+    await db
+        .from('video_jobs')
+        .update({ progress: Math.round(progress), updated_at: new Date().toISOString() })
+        .eq('id', jobId);
+}
+// تحديث حالة الـ video و job عند الانتهاء
+export async function markVideoReady(jobId, videoId, hlsPrefix, durationSeconds) {
+    const db = getDb();
+    const now = new Date().toISOString();
+    await db
+        .from('videos')
+        .update({
+        status: 'ready',
+        r2_hls_prefix: hlsPrefix,
+        duration_sec: durationSeconds,
+        updated_at: now,
+    })
+        .eq('id', videoId);
+    await db
+        .from('video_jobs')
+        .update({ status: 'done', progress: 100, finished_at: now, updated_at: now })
+        .eq('id', jobId);
+}
+// تسجيل فشل
+export async function markVideoFailed(jobId, videoId, errorMsg) {
+    const db = getDb();
+    const now = new Date().toISOString();
+    await db
+        .from('videos')
+        .update({ status: 'error', updated_at: now })
+        .eq('id', videoId);
+    await db
+        .from('video_jobs')
+        .update({ status: 'error', error_message: errorMsg, finished_at: now, updated_at: now })
+        .eq('id', jobId);
+}
+// جلب إعدادات الـ streaming من platform_settings (تم النقل من streaming_settings)
+export async function getStreamingConfig() {
+    const db = getDb();
+    const { data, error } = await db
+        .from('platform_settings')
+        .select('worker_concurrency, worker_cpu_threads')
+        .eq('id', 1)
+        .single();
+    if (error || !data)
+        return null;
+    return {
+        maxConcurrentJobs: data.worker_concurrency ?? 1,
+        ffmpegThreads: data.worker_cpu_threads ?? 2,
+        renditions: ['360p', '480p', '720p'], // افتراضي — يمكن إضافة حقل لاحقاً
+    };
+}
+//# sourceMappingURL=db.js.map

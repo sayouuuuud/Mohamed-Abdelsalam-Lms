@@ -104,7 +104,7 @@ export async function markVideoFailed(
     .eq('id', jobId)
 }
 
-// جلب إعدادات الـ streaming من الـ admin panel (threads + concurrency)
+// جلب إعدادات الـ streaming من platform_settings (تم النقل من streaming_settings)
 export async function getStreamingConfig(): Promise<{
   maxConcurrentJobs: number
   ffmpegThreads: number
@@ -112,15 +112,15 @@ export async function getStreamingConfig(): Promise<{
 } | null> {
   const db = getDb()
   const { data, error } = await db
-    .from('streaming_settings')
-    .select('max_concurrent_jobs, ffmpeg_threads, renditions')
+    .from('platform_settings')
+    .select('worker_concurrency, worker_cpu_threads')
     .eq('id', 1)
     .single()
 
   if (error || !data) return null
   return {
-    maxConcurrentJobs: data.max_concurrent_jobs ?? 2,
-    ffmpegThreads:     data.ffmpeg_threads ?? 0,
-    renditions:        data.renditions ?? ['360p', '480p', '720p'],
+    maxConcurrentJobs: data.worker_concurrency  ?? 1,
+    ffmpegThreads:     data.worker_cpu_threads  ?? 2,
+    renditions:        ['360p', '480p', '720p'],  // افتراضي — يمكن إضافة حقل لاحقاً
   }
 }

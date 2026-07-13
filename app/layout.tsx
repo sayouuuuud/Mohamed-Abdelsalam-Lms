@@ -10,7 +10,8 @@ import { CartModal } from '@/components/cart/cart-modal'
 import { PageViewTracker } from '@/components/analytics/page-view-tracker'
 import { colorPresets } from '@/lib/color-presets'
 import { neonPresets } from '@/lib/neon-presets'
-import { getSiteColor, getSiteNeon } from '@/app/admin/settings/actions'
+import { lightPresets } from '@/lib/light-presets'
+import { getSiteColor, getSiteNeon, getSiteLightPreset } from '@/app/admin/settings/actions'
 import { getSiteContent } from '@/lib/site-content'
 import { getSiteUrl } from '@/lib/seo'
 import './globals.css'
@@ -87,11 +88,13 @@ export default async function RootLayout({
   // أو حساب يقراه، فيفضل ثابت عبر كل الأجهزة وحتى قبل تسجيل الدخول.
   let savedColor = 'navy'
   let savedNeon = 'teal-violet'
+  let savedLight = 'navy-gold'
   let seoContent: any = null
   try {
-    ;[savedColor, savedNeon, { seo: seoContent }] = await Promise.all([
+    ;[savedColor, savedNeon, savedLight, { seo: seoContent }] = await Promise.all([
       getSiteColor(),
       getSiteNeon(),
+      getSiteLightPreset(),
       getSiteContent(),
     ])
   } catch {
@@ -142,6 +145,23 @@ export default async function RootLayout({
                 r2.style.setProperty('--color-teal-deep', neon.tealDeep);
                 r2.style.setProperty('--color-violet-glow', neon.violetGlow);
                 r2.style.setProperty('--color-violet-deep', neon.violetDeep);
+              }
+
+              // ثيمات الوضع الفاتح
+              var lights=${JSON.stringify(lightPresets)};
+              var serverLight=${JSON.stringify(savedLight)};
+              var l=serverLight||localStorage.getItem('light-preset')||'navy-gold';
+              try{localStorage.setItem('light-preset',l)}catch(e){}
+              var light=lights.find(function(p){return p.id===l});
+              if(light){
+                var r3=document.documentElement;
+                r3.style.setProperty('--color-navy', light.navy);
+                r3.style.setProperty('--color-navy-deep', light.navyDeep);
+                r3.style.setProperty('--color-navy-soft', light.navySoft);
+                r3.style.setProperty('--color-gold', light.gold);
+                r3.style.setProperty('--color-gold-deep', light.goldDeep);
+                r3.style.setProperty('--color-emerald-brand', light.emeraldBrand);
+                r3.style.setProperty('--color-emerald-deep', light.emeraldDeep);
               }
             }catch(e){}})();`,
           }}

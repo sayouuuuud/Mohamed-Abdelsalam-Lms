@@ -18,6 +18,7 @@ import {
   LayoutTemplate,
   UsersRound,
   DatabaseBackup,
+  Video,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -28,10 +29,12 @@ import { ToggleSwitch } from '@/components/settings/toggle-switch'
 import { SiteContentTab } from '@/components/settings/site-content-tab'
 import { AssistantsTab } from '@/components/settings/assistants-tab'
 import { BackupTab } from '@/components/settings/backup-tab'
+import { StreamingTab } from '@/components/settings/streaming-tab'
 import type { AssistantRecord } from '@/app/admin/settings/assistants-actions'
 import type { SiteContent } from '@/lib/site-content-defaults'
 import { DEFAULT_SITE_CONTENT } from '@/lib/site-content-defaults'
 import { neonPresets, applyNeonPreset, type NeonPresetId } from '@/lib/neon-presets'
+import { lightPresets, applyLightPreset, type LightPresetId } from '@/lib/light-presets'
 
 // ── Color presets ──────────────────────────────────────────────
 const colorPresets = [
@@ -103,12 +106,13 @@ function applyColorPreset(id: PresetId) {
 }
 
 const baseTabs = [
-  { id: 'profile', label: 'الملف الشخصي', icon: User },
-  { id: 'security', label: 'الأمان', icon: Shield },
-  { id: 'preferences', label: 'التفضيلات', icon: SlidersHorizontal },
-  { id: 'content', label: 'محتوى الموقع', icon: LayoutTemplate },
-  { id: 'assistants', label: 'المساعدون', icon: UsersRound },
-  { id: 'backup', label: 'النسخ الاحتياطي', icon: DatabaseBackup },
+  { id: 'profile',    label: 'الملف الشخصي',     icon: User },
+  { id: 'security',   label: 'الأمان',            icon: Shield },
+  { id: 'preferences',label: 'التفضيلات',         icon: SlidersHorizontal },
+  { id: 'content',    label: 'محتوى الموقع',      icon: LayoutTemplate },
+  { id: 'streaming',  label: 'الفيديو والـ Streaming', icon: Video },
+  { id: 'assistants', label: 'المساعدون',         icon: UsersRound },
+  { id: 'backup',     label: 'النسخ الاحتياطي',   icon: DatabaseBackup },
 ] as const
 
 type TabId = (typeof baseTabs)[number]['id']
@@ -126,6 +130,9 @@ export function SettingsPanel({
   adminProfile,
   initialSiteContent,
   initialPlatformSettings,
+  initialStreamingSettings = null,
+  initialStreamingJobs = [],
+  initialStreamingVideos = [],
   isFullAdmin = false,
   initialAssistants = [],
 }: {
@@ -140,6 +147,9 @@ export function SettingsPanel({
   } | null
   initialSiteContent?: SiteContent
   initialPlatformSettings?: { is_streaming_enabled: boolean } | null
+  initialStreamingSettings?: any
+  initialStreamingJobs?: any[]
+  initialStreamingVideos?: any[]
   isFullAdmin?: boolean
   initialAssistants?: AssistantRecord[]
 }) {
@@ -147,9 +157,9 @@ export function SettingsPanel({
   const [isPending, startTransition] = useTransition()
   const [activeTab, setActiveTab] = useState<TabId>('profile')
 
-  // The "assistants" and "backup" tabs are restricted to full admins only.
+  // The "assistants", "backup", and "streaming" tabs are restricted to full admins only.
   const tabs = baseTabs.filter(
-    (t) => (t.id !== 'assistants' && t.id !== 'backup') || isFullAdmin,
+    (t) => (t.id !== 'assistants' && t.id !== 'backup' && t.id !== 'streaming') || isFullAdmin,
   )
 
   const settings = initialSettings || {
@@ -224,6 +234,9 @@ export function SettingsPanel({
   const [neonPreset, setNeonPreset] = useState<NeonPresetId>(
     (settings.preferences.neonPreset ?? 'teal-violet') as NeonPresetId,
   )
+  const [lightPreset, setLightPreset] = useState<LightPresetId>(
+    (settings.preferences.lightPreset ?? 'navy-gold') as LightPresetId,
+  )
 
   // Email verification on signup (defaults to ON when not previously saved).
   const [requireEmailVerification, setRequireEmailVerification] = useState(
@@ -273,7 +286,7 @@ export function SettingsPanel({
         profile: { firstName, lastName, email, phone, bio },
         notifications: { emailNotif, pushNotif, smsNotif, marketingNotif, weeklyReport },
         security: { requireEmailVerification, allowRegistrations },
-        preferences: { darkMode, autoPublish, activeColor, neonPreset }
+        preferences: { darkMode, autoPublish, activeColor, neonPreset, lightPreset }
       }
 
       const res = await updateSettings(newSettings)
@@ -296,6 +309,11 @@ export function SettingsPanel({
   function handleNeonChange(id: NeonPresetId) {
     setNeonPreset(id)
     applyNeonPreset(id)
+  }
+
+  function handleLightChange(id: LightPresetId) {
+    setLightPreset(id)
+    applyLightPreset(id)
   }
 
   return (
@@ -596,6 +614,44 @@ export function SettingsPanel({
               </p>
             </div>
 
+            {/* Light-mode landing accents picker */}
+            <div className="mt-4 rounded-xl border border-border bg-muted/30 p-4">
+              <p className="mb-3 text-right text-sm font-medium text-foreground">
+                ثيمات الوضع الفاتح
+              </p>
+              <p className="mb-4 text-right text-xs text-muted-foreground">
+                تتحكم في الألوان الرئيسية لصفحة الهبوط (Landing page) عندما يكون الوضع الفاتح مفعلاً.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                {lightPresets.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => handleLightChange(preset.id)}
+                    title={preset.label}
+                    aria-label={preset.label}
+                    className={cn(
+                      'group relative flex size-10 items-center justify-center overflow-hidden rounded-full transition-transform hover:scale-110 border border-border/50',
+                      lightPreset === preset.id && 'ring-2 ring-offset-2 ring-offset-card ring-foreground/30',
+                    )}
+                    style={{
+                      background: `linear-gradient(135deg, ${preset.swatch1} 0 50%, ${preset.swatch2} 50% 100%)`,
+                    }}
+                  >
+                    {lightPreset === preset.id && (
+                      <Check className="size-4 text-white drop-shadow" strokeWidth={3} />
+                    )}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-3 text-right text-xs text-muted-foreground">
+                الثيم الحالي:{' '}
+                <span className="font-semibold text-foreground">
+                  {lightPresets.find((p) => p.id === lightPreset)?.label}
+                </span>
+              </p>
+            </div>
+
             <div className="flex justify-start pt-4">
               <Button onClick={handleSave} disabled={isPending}>حفظ التفضيلات</Button>
             </div>
@@ -605,6 +661,14 @@ export function SettingsPanel({
         {activeTab === 'content' && (
           <SiteContentTab
             initialContent={initialSiteContent ?? DEFAULT_SITE_CONTENT}
+          />
+        )}
+
+        {activeTab === 'streaming' && isFullAdmin && (
+          <StreamingTab
+            settings={initialStreamingSettings}
+            jobs={initialStreamingJobs}
+            videos={initialStreamingVideos}
           />
         )}
 
