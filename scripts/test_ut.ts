@@ -1,1 +1,2 @@
-import { uploadFiles } from '@/lib/uploadthing';  
+// test script — not used in production
+export {}

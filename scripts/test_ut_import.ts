@@ -1,2 +1,2 @@
-import { uploadFiles } from "uploadthing/client";
-console.log(typeof uploadFiles);
+// test script — not used in production
+export {}

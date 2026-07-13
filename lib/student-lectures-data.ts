@@ -72,12 +72,13 @@ type LectureRow = {
 }
 
 // Maps a lesson DB row to the portal Lesson shape.
-function mapOneLesson(l: LectureRow['lessons'][number]): Lesson & { _videoId?: string } {
+function mapOneLesson(l: LectureRow['lessons'][number]): Lesson & { _videoId?: string; _youtubeUrl?: string } {
   const validTypes = ['فيديو', 'مقال', 'تمرين'] as const
   const rawType = l.content_type ?? 'فيديو'
   const type = (validTypes as readonly string[]).includes(rawType)
     ? (rawType as (typeof validTypes)[number])
     : 'فيديو'
+  const isYoutube = l.video_url ? (l.video_url.includes('youtube.com') || l.video_url.includes('youtu.be')) : false
   return {
     id: l.slug,
     lessonId: l.id,
@@ -100,6 +101,8 @@ function mapOneLesson(l: LectureRow['lessons'][number]): Lesson & { _videoId?: s
     // حقل داخلي: يُستخدم لتحديد وضع التشغيل (HLS vs MP4)
     // لا يُرسَل للمتصفح بعد تجريد videoUrl في getPurchasedLesson
     _videoId: l.video_id ?? undefined,
+    // لو الرابط الأصلي يوتيوب، نحتفظ به عشان ما نكسره بتوليد token
+    _youtubeUrl: isYoutube ? l.video_url! : undefined,
   }
 }
 
@@ -658,14 +661,20 @@ export async function getPurchasedLesson(
   }
 
   if (lesson.type === 'فيديو' && lesson.lessonId) {
-    const token = await createPlaybackToken(user.id, lesson.lessonId)
-    // لو الدرس عنده _videoId (HLS جاهز) → ابنِ رابط بوابة HLS الهجينة
-    // وإلا → فضّل على /stream القديم (MP4 fallback — توافق عكسي كامل)
-    const hlsVideoId = (lesson as any)._videoId as string | undefined
-    if (hlsVideoId) {
-      lesson.videoUrl = `/api/hls/${lesson.lessonId}/master.m3u8?t=${encodeURIComponent(token)}`
+    const youtubeUrl = (lesson as any)._youtubeUrl as string | undefined
+    if (youtubeUrl) {
+      // درس يوتيوب: لا حاجة لـ token — الرابط يُعرض مباشرة عبر iframe
+      lesson.videoUrl = youtubeUrl
     } else {
-      lesson.videoUrl = `/api/lectures/${lesson.lessonId}/stream?t=${encodeURIComponent(token)}`
+      const token = await createPlaybackToken(user.id, lesson.lessonId)
+      // لو الدرس عنده _videoId (HLS جاهز) → ابنِ رابط بوابة HLS الهجينة
+      // وإلا → فضّل على /stream القديم (MP4 fallback — توافق عكسي كامل)
+      const hlsVideoId = (lesson as any)._videoId as string | undefined
+      if (hlsVideoId) {
+        lesson.videoUrl = `/api/hls/${lesson.lessonId}/master.m3u8?t=${encodeURIComponent(token)}`
+      } else {
+        lesson.videoUrl = `/api/lectures/${lesson.lessonId}/stream?t=${encodeURIComponent(token)}`
+      }
     }
   }
 

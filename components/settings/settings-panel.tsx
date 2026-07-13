@@ -125,6 +125,7 @@ export function SettingsPanel({
   initialSettings,
   adminProfile,
   initialSiteContent,
+  initialPlatformSettings,
   isFullAdmin = false,
   initialAssistants = [],
 }: {

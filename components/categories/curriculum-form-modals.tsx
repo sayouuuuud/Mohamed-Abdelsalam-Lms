@@ -33,6 +33,7 @@ export function CurriculumFormModals() {
     confirmDeleteBranch,
     courseFormOpen,
     editingCourse,
+    courseBranchId,
     closeCourseForm,
     submitCourseForm,
     deletingCourse,

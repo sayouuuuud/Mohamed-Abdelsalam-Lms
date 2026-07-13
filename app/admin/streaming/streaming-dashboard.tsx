@@ -21,10 +21,14 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import { saveStreamingSettings } from '@/lib/video-actions'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+
+// saveStreamingSettings was moved to platform_settings — this page now redirects to /admin/settings
+async function saveStreamingSettings(_input: any): Promise<{ ok: true } | { error: string }> {
+  return { error: 'هذه الصفحة تم نقلها إلى الإعدادات' }
+}
 
 // ---------------------------------------------------------------
 // Types
@@ -32,11 +36,11 @@ import { cn } from '@/lib/utils'
 type Settings = {
   enabled:            boolean
   r2Configured?:      boolean
-  workerCpuThreads:   number
-  workerRamMb:        number
-  workerConcurrency:  number
-  renditions:         any[]
-  segmentDurationSec: number
+  workerCpuThreads?:  number
+  workerRamMb?:       number
+  workerConcurrency?: number
+  renditions?:        any[]
+  segmentDurationSec?:number
 } | null
 
 type Job = {

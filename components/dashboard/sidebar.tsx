@@ -21,7 +21,6 @@ import {
   ChevronRight,
   X,
   ShieldCheck,
-  Video,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -56,7 +55,6 @@ const navItems: {
   { label: 'خصومات و الكوبونات', icon: Tag, href: '/admin/coupons', resource: 'coupons' },
   { label: 'التقارير', icon: BarChart3, href: '/admin/reports', resource: 'reports' },
   { label: 'سجل المراقبة', icon: ShieldCheck, href: '/admin/activity', resource: 'settings', adminOnly: true },
-  { label: 'الفيديو والـ Streaming', icon: Video, href: '/admin/streaming', resource: 'settings', adminOnly: true },
   { label: 'الإعدادات', icon: Settings, href: '/admin/settings', resource: 'settings' },
 ]
 

@@ -8,6 +8,7 @@ import {
   BookOpen,
   CheckCircle2,
   ChevronDown,
+  ChevronRight,
   ClipboardList,
   Clock,
   FileText,

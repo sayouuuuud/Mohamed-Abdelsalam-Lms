@@ -279,6 +279,7 @@ export function StudentBrowsePage({
         </div>
       )}
 
+      {courseDetails && (
         <CourseDetailsModal
           course={courseDetails}
           inCart={courseDetails.dbId ? courseInCart(courseDetails.dbId) : false}
@@ -286,6 +287,7 @@ export function StudentBrowsePage({
           onClose={() => setCourseDetails(null)}
           purchasedCourseIds={purchasedCourseIds}
         />
+      )}
 
     </div>
   )
