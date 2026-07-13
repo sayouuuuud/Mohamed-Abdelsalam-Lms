@@ -13,6 +13,37 @@ import {
 } from '@/lib/video-actions'
 
 // ---------------------------------------------------------------
+// قراءة مدة الفيديو من الملف مباشرةً (client-side) قبل الرفع
+// ---------------------------------------------------------------
+function readVideoDuration(file: File): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const v = document.createElement('video')
+    v.preload = 'metadata'
+    v.onloadedmetadata = () => {
+      URL.revokeObjectURL(url)
+      resolve(v.duration)
+    }
+    v.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('تعذّر قراءة بيانات الفيديو'))
+    }
+    v.src = url
+  })
+}
+
+// تنسيق الثواني إلى m:ss أو h:mm:ss
+function formatDuration(totalSec: number): string {
+  if (!isFinite(totalSec) || totalSec <= 0) return ''
+  const s = Math.round(totalSec)
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const sec = s % 60
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
+  return `${m}:${String(sec).padStart(2, '0')}`
+}
+
+// ---------------------------------------------------------------
 // Component Props
 // ---------------------------------------------------------------
 export function VideoUploadField({
@@ -23,6 +54,8 @@ export function VideoUploadField({
   // وضع R2 streaming — لو undefined أو false يُستخدم UploadThing القديم
   streamingEnabled = false,
   lessonId,
+  // callback يُستدعى بمدة الفيديو المنسّقة (m:ss) بمجرد اختيار الملف
+  onDurationDetected,
 }: {
   value: string
   onChange: (url: string) => void
@@ -30,6 +63,7 @@ export function VideoUploadField({
   hint?: string
   streamingEnabled?: boolean
   lessonId?: string
+  onDurationDetected?: (formatted: string) => void
 }) {
   // حالة الرفع العادي (Supabase Storage)
   const [uploading, setUploading]         = useState(false)
@@ -186,6 +220,17 @@ export function VideoUploadField({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    // اقرأ مدة الفيديو تلقائياً وبلّغ الـ parent (يشتغل في الوضعين)
+    if (onDurationDetected && file.type.startsWith('video/')) {
+      readVideoDuration(file)
+        .then((sec) => {
+          const formatted = formatDuration(sec)
+          if (formatted) onDurationDetected(formatted)
+        })
+        .catch(() => {
+          /* لو فشلت القراءة نسيب الأدمن يكتب المدة يدوياً */
+        })
+    }
     if (streamingEnabled) {
       void handleR2Upload(file)
     } else {

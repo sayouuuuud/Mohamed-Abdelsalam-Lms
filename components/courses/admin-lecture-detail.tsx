@@ -408,11 +408,11 @@ export function AdminLectureDetail({
             />
           </Field>
           <div className="grid grid-cols-2 gap-4">
-            <Field label="المدة">
+            <Field label="المدة (تلقائية من الفيديو)">
               <Input
                 value={lDuration}
                 onChange={(e) => setLDuration(e.target.value)}
-                placeholder="14:30"
+                placeholder="تتحسب تلقائياً بعد الرفع"
                 dir="ltr"
               />
             </Field>
@@ -427,6 +427,7 @@ export function AdminLectureDetail({
             value={lVideo}
             onChange={setLVideo}
             hint="ارفع ملف الفيديو. هذا ما سيشاهده الطالب."
+            onDurationDetected={setLDuration}
           />
           <Field label="وصف الدرس">
             <textarea

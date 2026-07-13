@@ -236,11 +236,11 @@ export function AdminLessonDetail({
           <Field label="عنوان الدرس">
             <Input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
           </Field>
-          <Field label="المدة">
+          <Field label="المدة (تلقائية من الفيديو)">
             <Input
               value={duration}
               onChange={(e) => setDuration(e.target.value)}
-              placeholder="14:30"
+              placeholder="تتحسب تلقائياً بعد الرفع"
               dir="ltr"
             />
           </Field>
@@ -250,6 +250,7 @@ export function AdminLessonDetail({
             hint={streamingEnabled ? 'سيتم تحويل الفيديو تلقائياً إلى HLS بعد الرفع.' : 'ارفع ملف الفيديو. هذا ما سيشاهده الطالب.'}
             streamingEnabled={streamingEnabled}
             lessonId={lesson.id}
+            onDurationDetected={setDuration}
           />
           <Field label="وصف الدرس">
             <textarea
