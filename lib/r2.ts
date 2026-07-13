@@ -50,6 +50,19 @@ export function getR2Client(): S3Client {
   return _r2
 }
 
+/**
+ * isR2Configured — هل كل متغيرات R2 المطلوبة موجودة؟
+ * يُستخدم لفكّ الاعتماد على R2 تلقائياً: لو غير مهيّأ يرجع النظام لـ UploadThing.
+ */
+export function isR2Configured(): boolean {
+  return Boolean(
+    (process.env.R2_ACCOUNT_ID || process.env.R2_ENDPOINT) &&
+      process.env.R2_ACCESS_KEY_ID &&
+      process.env.R2_SECRET_ACCESS_KEY &&
+      process.env.R2_BUCKET,
+  )
+}
+
 export const R2_BUCKET = () => {
   const b = process.env.R2_BUCKET
   if (!b) throw new Error('[r2] R2_BUCKET env var is not set')

@@ -31,6 +31,7 @@ import { cn } from '@/lib/utils'
 // ---------------------------------------------------------------
 type Settings = {
   enabled:            boolean
+  r2Configured?:      boolean
   workerCpuThreads:   number
   workerRamMb:        number
   workerConcurrency:  number
@@ -181,6 +182,9 @@ export function StreamingDashboard({
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
+  // هل التخزين السحابي (R2) مهيّأ؟ لو لا، النظام مفكوك عن R2 ويستخدم UploadThing
+  const r2Configured = initialSettings?.r2Configured ?? false
+
   // إعدادات محلية (قبل الحفظ)
   const [enabled,            setEnabled]            = useState(initialSettings?.enabled ?? true)
   const [cpuThreads,         setCpuThreads]         = useState(initialSettings?.workerCpuThreads ?? 2)
@@ -232,6 +236,20 @@ export function StreamingDashboard({
         </Button>
       </div>
 
+      {/* R2 not configured banner */}
+      {!r2Configured && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+          <AlertCircle className="mt-0.5 size-5 shrink-0" />
+          <div className="space-y-1">
+            <p className="font-semibold">التخزين السحابي (Cloudflare R2) غير مهيّأ بعد</p>
+            <p className="text-amber-700 dark:text-amber-400/90">
+              نظام الـ HLS Streaming معطّل مؤقتاً، والرفع يتم حالياً بالطريقة العادية (UploadThing / MP4 مباشر).
+              لتفعيل الـ streaming: اضبط متغيرات <code className="font-mono">R2_*</code> في إعدادات المشروع، ثم انشر الوركر، وبعدها فعّل النظام من هنا.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Stats row */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {[
@@ -260,20 +278,27 @@ export function StreamingDashboard({
             <h2 className="text-lg font-bold text-foreground">إعدادات الـ Worker</h2>
           </div>
 
-          {/* تفعيل/إيقاف Streaming */}
-          <label className="flex cursor-pointer items-center gap-2.5">
+          {/* تفعيل/إيقاف Streaming — معطّل لو R2 غير مهيّأ */}
+          <label
+            className={cn(
+              'flex items-center gap-2.5',
+              r2Configured ? 'cursor-pointer' : 'cursor-not-allowed opacity-60',
+            )}
+            title={r2Configured ? undefined : 'اضبط متغيرات R2 أولاً لتفعيل النظام'}
+          >
             <span className="text-sm font-medium text-foreground">تفعيل نظام Streaming</span>
             <div
-              onClick={() => setEnabled((v) => !v)}
+              onClick={() => { if (r2Configured) setEnabled((v) => !v) }}
               className={cn(
-                'relative inline-flex h-6 w-11 cursor-pointer items-center rounded-full transition-colors',
-                enabled ? 'bg-primary' : 'bg-secondary',
+                'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
+                r2Configured ? 'cursor-pointer' : 'cursor-not-allowed',
+                enabled && r2Configured ? 'bg-primary' : 'bg-secondary',
               )}
             >
               <span
                 className={cn(
                   'inline-block size-4 rounded-full bg-white shadow transition-transform',
-                  enabled ? 'translate-x-1' : 'translate-x-6',
+                  enabled && r2Configured ? 'translate-x-1' : 'translate-x-6',
                 )}
               />
             </div>

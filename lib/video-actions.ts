@@ -11,7 +11,7 @@
  */
 
 import { createClient as createAdminClient } from '@/lib/supabase/server'
-import { createR2UploadUrl, r2Keys } from '@/lib/r2'
+import { createR2UploadUrl, r2Keys, isR2Configured } from '@/lib/r2'
 
 // ---------------------------------------------------------------
 // Types
@@ -39,6 +39,11 @@ export async function getVideoUploadUrl(
   contentType: string,
 ): Promise<{ uploadUrl: string; videoId: string; r2Key: string } | { error: string }> {
   try {
+    // فكّ الاعتماد على R2: لو غير مهيّأ نرفض بوضوح بدل ما نتعطّل
+    if (!isR2Configured()) {
+      return { error: 'التخزين السحابي (R2) غير مهيّأ بعد — استخدم الرفع العادي مؤقتاً' }
+    }
+
     const supabase = await createAdminClient()
 
     // تأكد المستخدم أدمن
@@ -171,6 +176,7 @@ export async function getVideoStatus(
 // ---------------------------------------------------------------
 export async function getStreamingSettings(): Promise<{
   enabled:           boolean
+  r2Configured:      boolean
   workerCpuThreads:  number
   workerRamMb:       number
   workerConcurrency: number
@@ -184,8 +190,12 @@ export async function getStreamingSettings(): Promise<{
     .eq('id', 1)
     .single()
   if (!data) return null
+  // فكّ الاعتماد على R2: لو غير مهيّأ، enabled=false مهما كانت قيمة الـ DB
+  // → الرفع يرجع تلقائياً لـ UploadThing، والتشغيل يفضل على /stream القديم
+  const r2Configured = isR2Configured()
   return {
-    enabled:            data.enabled,
+    enabled:            data.enabled && r2Configured,
+    r2Configured,
     workerCpuThreads:   data.worker_cpu_threads,
     workerRamMb:        data.worker_ram_mb,
     workerConcurrency:  data.worker_concurrency,
