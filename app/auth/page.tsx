@@ -8,9 +8,10 @@ import { redirect } from 'next/navigation'
 import { getSiteContent } from '@/lib/site-content'
 
 export const metadata: Metadata = {
-  title: 'تسجيل الدخول / حساب جديد | منصة عبد السلام للرياضيات',
+  title: 'تسجيل الدخول / حساب جديد',
   description:
     'سجّل دخولك أو اعمل حساب جديد على منصة الأستاذ عبد السلام للرياضيات للثانوية العامة.',
+  robots: { index: false, follow: false },
 }
 
 export default async function AuthPage({

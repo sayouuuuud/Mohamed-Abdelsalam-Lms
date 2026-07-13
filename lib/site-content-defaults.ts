@@ -117,6 +117,10 @@ export type SeoContent = {
   description: string
   loaderText: string
   loaderEquation: string
+  /** كلمات مفتاحية مفصولة بفاصلة — تُستخدم في وصف الصفحات */
+  keywords: string
+  /** كود التحقق من Google Search Console */
+  googleVerification: string
 }
 
 export type LoginPanelStat = {
@@ -342,7 +346,9 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
     description:
       'منصة تعليمية متكاملة لشرح مادة الرياضيات للمرحلة الثانوية. ابدأ الآن واضمن تفوقك.',
     loaderText: 'جاري تجهيز المنصة...',
-    loaderEquation: 'f(x) = ∫ e^x dx'
+    loaderEquation: 'f(x) = ∫ e^x dx',
+    keywords: 'رياضيات ثانوي, شرح رياضيات, أولى ثانوي, تانية ثانوي, تالتة ثانوي, كورسات رياضيات',
+    googleVerification: '',
   },
 
   login_panel: {

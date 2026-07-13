@@ -67,11 +67,11 @@ export function StageDetail({ stage }: { stage: Stage }) {
                 </span>
                 <span className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-navy-deep/40 px-4 py-2.5 text-sm text-cream/90">
                   <Layers className="size-4 text-emerald-brand" />
-                  {totalLectures} محاضرة
+                  {totalLectures} كورس
                 </span>
                 <span className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-navy-deep/40 px-4 py-2.5 text-sm text-cream/90">
                   <PlayCircle className="size-4 text-emerald-brand" />
-                  {totalLessons} درس
+                  {totalLessons} محاضرة
                 </span>
               </div>
             </div>
@@ -110,7 +110,7 @@ export function StageDetail({ stage }: { stage: Stage }) {
             اختار الفرع اللي محتاجه، أو خد المرحلة كاملة
           </h2>
           <p className="mt-3 max-w-2xl text-pretty leading-relaxed text-navy-soft dark:text-ink-dim">
-            كل فرع مشروح من الصفر خطوة بخطوة، وكل درس وراه امتحان يثبّت المعلومة.
+            كل فرع مشروح من الصفر خطوة بخطوة، وكل محاضرة وراها امتحان يثبّت المعلومة.
           </p>
         </div>
 
@@ -151,11 +151,11 @@ export function StageDetail({ stage }: { stage: Stage }) {
                 <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-navy-soft dark:text-ink-dim">
                   <span className="inline-flex items-center gap-1.5">
                     <Layers className="size-4 text-emerald-deep" />
-                    {branch.lectures.length} محاضرة
+                    {branch.lectures.length} كورس
                   </span>
                   <span className="inline-flex items-center gap-1.5">
                     <PlayCircle className="size-4 text-emerald-deep" />
-                    {countLessons(branch)} درس
+                    {countLessons(branch)} محاضرة
                   </span>
                 </div>
 
@@ -171,7 +171,7 @@ export function StageDetail({ stage }: { stage: Stage }) {
                 {/* footer: CTA pinned to bottom — no price (prices live on lectures) */}
                 <div className="mt-auto flex items-center justify-between gap-3 pt-6">
                   <span className="text-sm font-semibold text-navy-soft dark:text-ink-dim">
-                    شوف المحاضرات والأسعار
+                    شوف الكورسات والأسعار
                   </span>
                   <span className="inline-flex size-11 items-center justify-center rounded-full bg-navy text-cream transition-all duration-200 group-hover:bg-gold group-hover:text-navy-deep dark:bg-ink-base dark:text-ink-fg dark:group-hover:bg-violet-glow dark:group-hover:text-white">
                     <ArrowRight className="size-5" />
@@ -206,15 +206,15 @@ export function StageDetail({ stage }: { stage: Stage }) {
                 اشترك في {stage.title} كاملة
               </h3>
               <p className="mt-3 max-w-xl text-pretty leading-relaxed text-cream/70">
-                {stage.branches.length} فروع كاملة بكل المحاضرات والدروس والامتحانات والمتابعة — في
+                {stage.branches.length} فروع كاملة بكل الكورسات والدروس والامتحانات والمتابعة — في
                 باقة واحدة بسعر أوفر بكتير من الاشتراك المنفصل.
               </p>
 
               <ul className="mt-6 grid gap-3 sm:grid-cols-2">
                 {[
-                  { icon: PlayCircle, text: `${totalLessons} درس فيديو بجودة عالية` },
+                  { icon: PlayCircle, text: `${totalLessons} محاضرة فيديو بجودة عالية` },
                   { icon: InfinityIcon, text: 'وصول مدى الترم بدون حدود' },
-                  { icon: Check, text: 'امتحانات وواجبات بعد كل درس' },
+                  { icon: Check, text: 'امتحانات وواجبات بعد كل محاضرة' },
                   { icon: ShieldCheck, text: 'متابعة وتقارير لمستواك' },
                 ].map(({ icon: Icon, text }) => (
                   <li key={text} className="flex items-center gap-3 text-sm text-cream/85">

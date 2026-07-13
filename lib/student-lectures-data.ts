@@ -63,6 +63,7 @@ type LectureRow = {
     is_free: boolean
     sort_order: number | null
     video_url: string | null
+    video_id: string | null
     description: string | null
     content_type: string | null
     attachments: { name: string; url: string; type: string }[] | null
@@ -71,7 +72,7 @@ type LectureRow = {
 }
 
 // Maps a lesson DB row to the portal Lesson shape.
-function mapOneLesson(l: LectureRow['lessons'][number]): Lesson {
+function mapOneLesson(l: LectureRow['lessons'][number]): Lesson & { _videoId?: string } {
   const validTypes = ['فيديو', 'مقال', 'تمرين'] as const
   const rawType = l.content_type ?? 'فيديو'
   const type = (validTypes as readonly string[]).includes(rawType)
@@ -96,6 +97,9 @@ function mapOneLesson(l: LectureRow['lessons'][number]): Lesson {
         ? (a.type as 'pdf' | 'doc' | 'image' | 'other')
         : 'other',
     })) : [],
+    // حقل داخلي: يُستخدم لتحديد وضع التشغيل (HLS vs MP4)
+    // لا يُرسَل للمتصفح بعد تجريد videoUrl في getPurchasedLesson
+    _videoId: l.video_id ?? undefined,
   }
 }
 
@@ -257,7 +261,7 @@ const ASSIGNMENT_SELECT = `
 const LECTURE_SELECT = `
   id, slug, title, description, image, instructor, what_you_learn,
   branches:branch_id ( title, image, stages:stage_id ( title ) ),
-  lessons ( id, slug, title, duration, is_free, sort_order, video_url, description, content_type, attachments ),
+  lessons ( id, slug, title, duration, is_free, sort_order, video_url, video_id, description, content_type, attachments ),
   ${ASSIGNMENT_SELECT}
 `
 
@@ -265,7 +269,7 @@ const LECTURE_SELECT = `
 const LECTURE_SELECT_NO_IMAGE = `
   id, slug, title, description, instructor, what_you_learn,
   branches:branch_id ( title, image, stages:stage_id ( title ) ),
-  lessons ( id, slug, title, duration, is_free, sort_order, video_url, description, content_type, attachments ),
+  lessons ( id, slug, title, duration, is_free, sort_order, video_url, video_id, description, content_type, attachments ),
   ${ASSIGNMENT_SELECT}
 `
 
@@ -655,7 +659,14 @@ export async function getPurchasedLesson(
 
   if (lesson.type === 'فيديو' && lesson.lessonId) {
     const token = await createPlaybackToken(user.id, lesson.lessonId)
-    lesson.videoUrl = `/api/lectures/${lesson.lessonId}/stream?t=${encodeURIComponent(token)}`
+    // لو الدرس عنده _videoId (HLS جاهز) → ابنِ رابط بوابة HLS الهجينة
+    // وإلا → فضّل على /stream القديم (MP4 fallback — توافق عكسي كامل)
+    const hlsVideoId = (lesson as any)._videoId as string | undefined
+    if (hlsVideoId) {
+      lesson.videoUrl = `/api/hls/${lesson.lessonId}/master.m3u8?t=${encodeURIComponent(token)}`
+    } else {
+      lesson.videoUrl = `/api/lectures/${lesson.lessonId}/stream?t=${encodeURIComponent(token)}`
+    }
   }
 
   return { course, lesson, index, all }
