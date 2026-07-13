@@ -37,7 +37,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         })
 
         // صفحات الكورسات الشهرية  /stages/[id]/[branchId]/[courseId]
-        for (const course of branch.monthlyCourses) {
+        for (const course of branch.monthlyCourses ?? []) {
           entries.push({
             url: absoluteUrl(`/stages/${stage.id}/${branch.id}/${course.id}`),
             lastModified: now,

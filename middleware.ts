@@ -14,7 +14,8 @@ export const config = {
      * - favicon.ico (favicon file)
      * - image files (.svg, .png, .jpg, .jpeg, .gif, .webp)
      * - font files (.woff, .woff2, .otf, .ttf)
+     * - SEO/PWA files (robots.txt, sitemap.xml, manifest.webmanifest, opengraph-image)
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff|woff2|otf|ttf)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|robots\\.txt|sitemap\\.xml|manifest\\.webmanifest|opengraph-image|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff|woff2|otf|ttf)$).*)',
   ],
 }
