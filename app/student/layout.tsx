@@ -1,5 +1,10 @@
 import { ReactNode } from 'react'
+import type { Metadata } from 'next'
 import { StudentLayout as LayoutComponent } from '@/components/student/student-layout'
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+}
 import { StudentProvider } from '@/components/student/student-context'
 import {
   getStudentProfile,

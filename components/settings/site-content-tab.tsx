@@ -660,7 +660,7 @@ function NavbarEditor({ value, onChange }: { value: NavbarContent; onChange: (v:
   const set = <K extends keyof NavbarContent>(k: K, v: NavbarContent[K]) => onChange({ ...value, [k]: v })
   return (
     <div className="space-y-4">
-      <Field label="اسم الموقع في الشريط"><Input value={value.siteName} onChange={(e) => set('siteName', e.target.value)} className="text-right" /></Field>
+      <Field label="اسم الموقع ف�� الشريط"><Input value={value.siteName} onChange={(e) => set('siteName', e.target.value)} className="text-right" /></Field>
       <LinksEditor label="روابط القائمة" links={value.links} onChange={(v) => set('links', v)} />
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label="نص 'تسجيل الدخول'"><Input value={value.ctaLoginText} onChange={(e) => set('ctaLoginText', e.target.value)} className="text-right" /></Field>
@@ -680,6 +680,29 @@ function SeoEditor({ value, onChange }: { value: SeoContent; onChange: (v: SeoCo
       </Field>
       <Field label="وصف الصفحة (description)" hint="يظهر في نتائج البحث، يُفضّل 120-160 حرف">
         <Textarea value={value.description} onChange={(v) => set('description', v)} rows={3} />
+      </Field>
+      <Field
+        label="الكلمات المفتاحية (Keywords)"
+        hint="كلمات مفصولة بفاصلة — تُستخدم في وصف الصفحات الداخلية"
+      >
+        <Input
+          value={value.keywords || ''}
+          onChange={(e) => set('keywords', e.target.value)}
+          className="text-right"
+          placeholder="رياضيات ثانوي, شرح رياضيات, أولى ثانوي"
+        />
+      </Field>
+      <Field
+        label="كود التحقق من Google Search Console"
+        hint="الكود من <meta name=google-site-verification> — اتركه فارغاً لو مش محتاجه"
+      >
+        <Input
+          value={value.googleVerification || ''}
+          onChange={(e) => set('googleVerification', e.target.value)}
+          dir="ltr"
+          className="text-left font-mono"
+          placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        />
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="نص شاشة التحميل (Loader Text)" hint="النص الذي يظهر أسفل المعادلة الرياضية">

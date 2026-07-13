@@ -12,6 +12,7 @@ import { colorPresets } from '@/lib/color-presets'
 import { neonPresets } from '@/lib/neon-presets'
 import { getSiteColor, getSiteNeon } from '@/app/admin/settings/actions'
 import { getSiteContent } from '@/lib/site-content'
+import { getSiteUrl } from '@/lib/seo'
 import './globals.css'
 
 
@@ -37,10 +38,35 @@ const lemonBrush = localFont({
 
 export async function generateMetadata(): Promise<Metadata> {
   const { seo } = await getSiteContent()
+  const siteUrl = getSiteUrl()
   return {
-    title: seo.title,
+    metadataBase: new URL(siteUrl),
+    title: {
+      default: seo.title,
+      template: `%s | ${seo.title}`,
+    },
     description: seo.description,
+    keywords: seo.keywords || undefined,
     generator: 'v0.app',
+    alternates: {
+      canonical: '/',
+    },
+    openGraph: {
+      type: 'website',
+      locale: 'ar_EG',
+      siteName: seo.title,
+      title: seo.title,
+      description: seo.description,
+      url: '/',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: seo.title,
+      description: seo.description,
+    },
+    ...(seo.googleVerification
+      ? { verification: { google: seo.googleVerification } }
+      : {}),
   }
 }
 
