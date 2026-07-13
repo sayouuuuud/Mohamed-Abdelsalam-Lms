@@ -1,11 +1,12 @@
 import { StudentBrowsePage } from '@/components/student/browse/student-browse-page'
 import { getCurriculum } from '@/lib/curriculum'
-import { getStudentProfile } from '@/app/student/actions'
+import { getStudentProfile, getStudentEnrolledCourses } from '@/app/student/actions'
 
 export default async function BrowsePage() {
-  const [stages, profile] = await Promise.all([
+  const [stages, profile, enrolledCourses] = await Promise.all([
     getCurriculum(),
     getStudentProfile(),
+    getStudentEnrolledCourses(),
   ])
 
   // The student's grade (sec-1/sec-2/sec-3) matches the stage slug. Show only
@@ -15,6 +16,7 @@ export default async function BrowsePage() {
   const grade: string | undefined = profile?.stageTitle || undefined
   const ownStage = grade ? stages.find((s) => s.id === grade) : undefined
   const visibleStages = ownStage ? [ownStage] : stages
+  const purchasedCourseIds = enrolledCourses.map(c => c.id)
 
-  return <StudentBrowsePage stages={visibleStages} gradeLocked={!!ownStage} />
+  return <StudentBrowsePage stages={visibleStages} gradeLocked={!!ownStage} purchasedCourseIds={purchasedCourseIds} />
 }

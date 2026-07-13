@@ -64,6 +64,12 @@ export function AdminLessonDetail({
     setEditOpen(true)
   }
 
+  const [videoType, setVideoType] = useState<'upload' | 'youtube'>(
+    lesson.videoUrl && (lesson.videoUrl.includes('youtube.com') || lesson.videoUrl.includes('youtu.be'))
+      ? 'youtube'
+      : 'upload'
+  )
+
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -244,14 +250,34 @@ export function AdminLessonDetail({
               dir="ltr"
             />
           </Field>
-          <VideoUploadField
-            value={video}
-            onChange={setVideo}
-            hint={streamingEnabled ? 'سيتم تحويل الفيديو تلقائياً إلى HLS بعد الرفع.' : 'ارفع ملف الفيديو. هذا ما سيشاهده الطالب.'}
-            streamingEnabled={streamingEnabled}
-            lessonId={lesson.id}
-            onDurationDetected={setDuration}
-          />
+          
+          <div className="space-y-3 rounded-xl border border-border bg-secondary/30 p-4">
+            <span className="block text-sm font-medium text-foreground">مصدر الفيديو</span>
+            <div className="flex gap-2">
+              <Button type="button" variant={videoType === 'upload' ? 'default' : 'outline'} onClick={() => setVideoType('upload')} className="flex-1">رفع ملف مباشر</Button>
+              <Button type="button" variant={videoType === 'youtube' ? 'default' : 'outline'} onClick={() => setVideoType('youtube')} className="flex-1">رابط يوتيوب</Button>
+            </div>
+            {videoType === 'upload' ? (
+              <VideoUploadField
+                value={video}
+                onChange={setVideo}
+                hint={streamingEnabled ? 'سيتم تحويل الفيديو تلقائياً إلى HLS بعد الرفع.' : 'ارفع ملف الفيديو. هذا ما سيشاهده الطالب.'}
+                streamingEnabled={streamingEnabled}
+                lessonId={lesson.id}
+                onDurationDetected={setDuration}
+              />
+            ) : (
+              <Field label="رابط يوتيوب">
+                <Input
+                  value={video}
+                  onChange={(e) => setVideo(e.target.value)}
+                  placeholder="https://youtube.com/watch?v=..."
+                  dir="ltr"
+                />
+              </Field>
+            )}
+          </div>
+
           <Field label="وصف الدرس">
             <textarea
               value={description}

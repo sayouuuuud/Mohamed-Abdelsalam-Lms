@@ -177,64 +177,17 @@ export async function getVideoStatus(
 export async function getStreamingSettings(): Promise<{
   enabled:           boolean
   r2Configured:      boolean
-  workerCpuThreads:  number
-  workerRamMb:       number
-  workerConcurrency: number
-  renditions:        any[]
-  segmentDurationSec:number
 } | null> {
   const supabase = await createAdminClient()
   const { data } = await supabase
-    .from('streaming_settings')
-    .select('*')
+    .from('platform_settings')
+    .select('is_streaming_enabled')
     .eq('id', 1)
     .single()
-  if (!data) return null
-  // فكّ الاعتماد على R2: لو غير مهيّأ، enabled=false مهما كانت قيمة الـ DB
-  // → الرفع يرجع تلقائياً لـ UploadThing، والتشغيل يفضل على /stream القديم
+
   const r2Configured = isR2Configured()
   return {
-    enabled:            data.enabled && r2Configured,
+    enabled:            (data?.is_streaming_enabled ?? false) && r2Configured,
     r2Configured,
-    workerCpuThreads:   data.worker_cpu_threads,
-    workerRamMb:        data.worker_ram_mb,
-    workerConcurrency:  data.worker_concurrency,
-    renditions:         data.renditions ?? [],
-    segmentDurationSec: data.segment_duration_sec,
-  }
-}
-
-// ---------------------------------------------------------------
-// 5. saveStreamingSettings — يحفظ الإعدادات من لوحة الأدمن
-// ---------------------------------------------------------------
-export async function saveStreamingSettings(input: {
-  enabled:           boolean
-  workerCpuThreads:  number
-  workerRamMb:       number
-  workerConcurrency: number
-  segmentDurationSec:number
-}): Promise<{ ok: true } | { error: string }> {
-  try {
-    const supabase = await createAdminClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { error: 'غير مسجّل' }
-    const { data: adminRow } = await supabase
-      .from('admins').select('id').eq('user_id', user.id).single()
-    if (!adminRow) return { error: 'غير مصرّح' }
-
-    const { error } = await supabase
-      .from('streaming_settings')
-      .update({
-        enabled:             input.enabled,
-        worker_cpu_threads:  input.workerCpuThreads,
-        worker_ram_mb:       input.workerRamMb,
-        worker_concurrency:  input.workerConcurrency,
-        segment_duration_sec:input.segmentDurationSec,
-      })
-      .eq('id', 1)
-    if (error) return { error: error.message }
-    return { ok: true }
-  } catch (err: any) {
-    return { error: err?.message ?? 'خطأ غير متوقع' }
   }
 }

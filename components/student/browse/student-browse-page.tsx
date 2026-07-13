@@ -13,7 +13,9 @@ import {
   Search,
   ShoppingCart,
   X,
+  ChevronDown,
 } from 'lucide-react'
+import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { useCart } from '@/components/cart/cart-provider'
 import type { Stage, Lesson } from '@/lib/landing-data'
@@ -60,6 +62,8 @@ type FlatCourse = {
   sections: { id: string; title: string }[]
   stageTitle: string
   branchTitle: string
+  stageId: string
+  branchId: string
 }
 
 type FlatLecture = {
@@ -71,25 +75,30 @@ type FlatLecture = {
   price: number
   oldPrice?: number
   badge?: string
+  isFree?: boolean
   lessonsCount: number
   lessons: Lesson[]
   sectionId?: string | null
   stageTitle: string
   branchTitle: string
+  stageId: string
+  branchId: string
+  courseId: string
 }
 
 export function StudentBrowsePage({
   stages = [],
   gradeLocked = false,
+  purchasedCourseIds = [],
 }: {
   stages?: Stage[]
   gradeLocked?: boolean
+  purchasedCourseIds?: string[]
 }) {
   const searchParams = useSearchParams()
   const { add, addCourse, inCart, courseInCart, setOpen, count } = useCart()
   const [query, setQuery] = useState(searchParams.get('q') || '')
   const [stageFilter, setStageFilter] = useState<string>('all')
-  const [details, setDetails] = useState<FlatLecture | null>(null)
   const [courseDetails, setCourseDetails] = useState<FlatCourse | null>(null)
 
   // Flatten the curriculum tree into a searchable list of monthly courses.
@@ -111,6 +120,8 @@ export function StudentBrowsePage({
             badge: course.badge,
             stageTitle: stage.title,
             branchTitle: branch.title,
+            stageId: stage.id,
+            branchId: branch.id,
             sections: course.sections ?? [],
             lectures: course.lectures.map((lecture) => ({
               dbId: lecture.dbId,
@@ -121,11 +132,15 @@ export function StudentBrowsePage({
               price: lecture.price,
               oldPrice: lecture.oldPrice,
               badge: lecture.badge,
+              isFree: lecture.isFree,
               lessonsCount: lecture.lessons.length,
               lessons: lecture.lessons,
               sectionId: lecture.sectionId ?? null,
               stageTitle: stage.title,
               branchTitle: branch.title,
+              stageId: stage.id,
+              branchId: branch.id,
+              courseId: course.id,
             })),
           })
         }
@@ -264,36 +279,28 @@ export function StudentBrowsePage({
         </div>
       )}
 
-      {courseDetails && (
         <CourseDetailsModal
           course={courseDetails}
           inCart={courseDetails.dbId ? courseInCart(courseDetails.dbId) : false}
           onAddCourse={() => courseDetails.dbId && addCourse(courseDetails.dbId, courseDetails.title)}
-          onLectureDetails={setDetails}
           onClose={() => setCourseDetails(null)}
+          purchasedCourseIds={purchasedCourseIds}
         />
-      )}
 
-      {/* Lecture details modal */}
-      {details && (
-        <LectureDetailsModal
-          lecture={details}
-          inCart={details.dbId ? inCart(details.dbId) : false}
-          onAdd={() => details.dbId && add(details.dbId, details.title)}
-          onClose={() => setDetails(null)}
-        />
-      )}
     </div>
   )
 }
 
-function CourseDetailsModal({ course, inCart, onAddCourse, onLectureDetails, onClose }: {
+function CourseDetailsModal({ course, inCart, onAddCourse, onClose, purchasedCourseIds }: {
   course: FlatCourse
   inCart: boolean
   onAddCourse: () => void
-  onLectureDetails: (lecture: FlatLecture) => void
   onClose: () => void
+  purchasedCourseIds: string[]
 }) {
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+  const isCoursePurchased = course.dbId ? purchasedCourseIds.includes(course.dbId) : false
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <button type="button" aria-label="إغلاق" onClick={onClose} className="absolute inset-0 bg-foreground/40 backdrop-blur-sm" />
@@ -317,19 +324,131 @@ function CourseDetailsModal({ course, inCart, onAddCourse, onLectureDetails, onC
                   <span className="text-xs text-muted-foreground">({group.lectures.length})</span>
                 </div>
               )}
-              {group.lectures.map((lecture, index) => (
-                <button key={lecture.dbId ?? lecture.slug} type="button" onClick={() => onLectureDetails(lecture)} className="flex items-center justify-between gap-4 rounded-xl border border-border p-4 text-right transition-colors hover:bg-muted">
-                  <div className="flex items-center gap-3"><span className="grid size-9 place-items-center rounded-lg bg-primary/10 font-bold text-primary">{index + 1}</span><div><p className="font-bold text-foreground">{lecture.title}</p><p className="text-xs text-muted-foreground">{lecture.lessonsCount} درس</p></div></div>
-                  <span className="text-xs font-bold text-primary">عرض التفاصيل</span>
-                </button>
-              ))}
+              {group.lectures.map((lecture, index) => {
+                const isOpen = expanded[lecture.dbId ?? lecture.slug] ?? false
+                const isLectureFree = lecture.isFree || course.price === 0
+                const isFreeAccess = isLectureFree || isCoursePurchased
+                
+                return (
+                  <div key={lecture.dbId ?? lecture.slug} className="overflow-hidden rounded-xl border border-border bg-card">
+                    <div className="flex w-full items-center justify-between gap-4 p-4 transition-colors hover:bg-muted">
+                      <div className="flex items-center gap-3">
+                        <span className="grid size-9 place-items-center rounded-lg bg-primary/10 font-bold text-primary">
+                          {index + 1}
+                        </span>
+                        <div>
+                          <p className="font-bold text-foreground flex items-center gap-2">
+                            {lecture.title}
+                            {isLectureFree && (
+                              <span className="rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-400">
+                                مجانية
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">{lecture.lessonsCount} درس</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {isCoursePurchased ? (
+                          <Link
+                            href={`/student/courses/${course.dbId}/lessons/${lecture.lessons[0]?.id}`}
+                            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-secondary px-3 text-xs font-medium text-secondary-foreground transition-colors hover:bg-secondary/80"
+                          >
+                            <Play className="size-3.5" />
+                            شاهد المحاضرة
+                          </Link>
+                        ) : isLectureFree ? (
+                          <Link
+                            href={`/stages/${lecture.stageId}/${lecture.branchId}/${lecture.courseId}/watch/${lecture.slug}`}
+                            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-secondary px-3 text-xs font-medium text-secondary-foreground transition-colors hover:bg-secondary/80"
+                          >
+                            <Play className="size-3.5" />
+                            شاهد مجاناً
+                          </Link>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={onAddCourse}
+                            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-transparent px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                          >
+                            <ShoppingCart className="size-3.5" />
+                            السلة
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExpanded((prev) => ({
+                              ...prev,
+                              [lecture.dbId ?? lecture.slug]: !isOpen,
+                            }))
+                          }
+                          className="flex size-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary transition-colors"
+                        >
+                          <ChevronDown
+                            className={cn(
+                              'size-5 transition-transform',
+                              isOpen ? 'rotate-180' : '',
+                            )}
+                          />
+                        </button>
+                      </div>
+                    </div>
+
+                    {isOpen && (
+                      <div className="border-t border-border bg-secondary/30 p-4">
+                        <ul className="space-y-1">
+                          {lecture.lessons.map((lesson, i) => {
+                            const isLessonFreeAccess = lesson.isFree || isFreeAccess
+                            return (
+                              <li
+                                key={lesson.id}
+                                className="flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-secondary/60"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <span
+                                    className={cn(
+                                      'grid size-8 shrink-0 place-items-center rounded-lg',
+                                      isLessonFreeAccess
+                                        ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                                        : 'bg-secondary text-muted-foreground',
+                                    )}
+                                  >
+                                    {isLessonFreeAccess ? <Play className="size-3.5" /> : <Lock className="size-3.5" />}
+                                  </span>
+                                  <div>
+                                    <span className="block text-sm font-semibold text-foreground">
+                                      {i + 1}. {lesson.title}
+                                    </span>
+                                    {isLessonFreeAccess && !isCoursePurchased && (
+                                      <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                                        معاينة مجانية
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <span className="shrink-0 font-mono text-xs text-muted-foreground">
+                                  {lesson.duration}
+                                </span>
+                              </li>
+                            )
+                          })}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           ))}
         </div>
-        <footer className="flex items-center justify-between gap-3 border-t border-border p-4">
-          <div><strong className="text-xl text-foreground">{formatEGP(course.price)}</strong> <span className="text-xs font-bold text-primary">ج.م</span></div>
-          <button type="button" disabled={inCart || !course.dbId} onClick={onAddCourse} className={cn('rounded-full px-5 py-2.5 text-sm font-bold', inCart ? 'bg-muted text-muted-foreground' : 'bg-primary text-primary-foreground')}>{inCart ? 'الباقة في السلة' : 'اشترِ الكورس كاملًا'}</button>
-        </footer>
+        {!isCoursePurchased && (
+          <footer className="flex items-center justify-between gap-3 border-t border-border p-4">
+            <div><strong className="text-xl text-foreground">{formatEGP(course.price)}</strong> <span className="text-xs font-bold text-primary">ج.م</span></div>
+            <button type="button" disabled={inCart || !course.dbId} onClick={onAddCourse} className={cn('rounded-full px-5 py-2.5 text-sm font-bold', inCart ? 'bg-muted text-muted-foreground' : 'bg-primary text-primary-foreground transition-opacity hover:opacity-90')}>{inCart ? 'الباقة في السلة' : 'اشترِ الكورس كاملًا'}</button>
+          </footer>
+        )}
       </section>
     </div>
   )
@@ -396,38 +515,41 @@ function LectureDetailsModal({
               محتوى المحاضرة ({lecture.lessonsCount} درس)
             </h3>
             <ul className="space-y-1">
-              {lecture.lessons.map((lesson, i) => (
-                <li
-                  key={lesson.id}
-                  className="flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-secondary/60"
-                >
-                  <div className="flex items-center gap-3">
-                    <span
-                      className={cn(
-                        'grid size-8 shrink-0 place-items-center rounded-lg',
-                        lesson.isFree
-                          ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                          : 'bg-secondary text-muted-foreground',
-                      )}
-                    >
-                      {lesson.isFree ? <Play className="size-3.5" /> : <Lock className="size-3.5" />}
-                    </span>
-                    <div>
-                      <span className="block text-sm font-semibold text-foreground">
-                        {i + 1}. {lesson.title}
+              {lecture.lessons.map((lesson, i) => {
+                const isFreeAccess = lesson.isFree || lecture.price === 0
+                return (
+                  <li
+                    key={lesson.id}
+                    className="flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-secondary/60"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={cn(
+                          'grid size-8 shrink-0 place-items-center rounded-lg',
+                          isFreeAccess
+                            ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                            : 'bg-secondary text-muted-foreground',
+                        )}
+                      >
+                        {isFreeAccess ? <Play className="size-3.5" /> : <Lock className="size-3.5" />}
                       </span>
-                      {lesson.isFree && (
-                        <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                          معاينة مجانية
+                      <div>
+                        <span className="block text-sm font-semibold text-foreground">
+                          {i + 1}. {lesson.title}
                         </span>
-                      )}
+                        {isFreeAccess && (
+                          <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                            معاينة مجانية
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <span className="shrink-0 font-mono text-xs text-muted-foreground">
-                    {lesson.duration}
-                  </span>
-                </li>
-              ))}
+                    <span className="shrink-0 font-mono text-xs text-muted-foreground">
+                      {lesson.duration}
+                    </span>
+                  </li>
+                )
+              })}
             </ul>
           </div>
         </div>

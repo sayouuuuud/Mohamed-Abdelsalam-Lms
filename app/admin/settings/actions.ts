@@ -219,3 +219,37 @@ export async function updateSettings(newSettings: any) {
   revalidatePath('/', 'layout')
   return { success: true }
 }
+
+// ── Platform Settings ──────────────────────────────────────────────────────
+
+export async function getPlatformSettings() {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('platform_settings')
+    .select('is_streaming_enabled')
+    .eq('id', 1)
+    .single()
+
+  if (error || !data) return { is_streaming_enabled: false }
+  return data
+}
+
+export async function updatePlatformSettings(input: { is_streaming_enabled: boolean }) {
+  const supabase = await createClient()
+  if (!(await hasResourceAccess(supabase, 'settings', 'manage'))) {
+    return { error: 'غير مسموح. لازم تكون أدمن.' }
+  }
+
+  const { error } = await supabase
+    .from('platform_settings')
+    .upsert({ id: 1, is_streaming_enabled: input.is_streaming_enabled, updated_at: new Date().toISOString() })
+
+  if (error) {
+    console.log('[v0] updatePlatformSettings error:', error.message)
+    return { error: 'تعذّر حفظ إعدادات المنصة.' }
+  }
+
+  logActivity({ action: 'update', resource: 'settings', targetLabel: `إعدادات المنصة - الاستريمنج: ${input.is_streaming_enabled}` }).catch(() => {})
+  revalidatePath('/', 'layout')
+  return { success: true }
+}

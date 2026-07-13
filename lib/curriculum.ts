@@ -36,6 +36,7 @@ type MonthlyCourseRow = {
   price: number
   old_price: number | null
   badge: string | null
+  is_published: boolean | null
 }
 
 type LectureRow = {
@@ -61,6 +62,7 @@ type LessonRow = {
   title: string
   duration: string
   is_free: boolean
+  video_url: string | null
 }
 
 function mapLesson(row: LessonRow): Lesson {
@@ -69,13 +71,23 @@ function mapLesson(row: LessonRow): Lesson {
     title: row.title,
     duration: row.duration,
     isFree: row.is_free,
+    videoUrl: row.video_url,
   }
 }
 
 // Builds the full nested stages → branches → lectures → lessons tree
 // from flat queries (one query per level, assembled in memory).
-export async function getCurriculum(): Promise<Stage[]> {
+export async function getCurriculum(includeUnpublished = false): Promise<Stage[]> {
   const supabase = await createClient()
+
+  let coursesQuery = supabase
+    .from('monthly_courses')
+    .select('id, branch_id, slug, title, description, image, price, old_price, badge, is_published')
+    .order('sort_order', { ascending: true })
+
+  if (!includeUnpublished) {
+    coursesQuery = coursesQuery.eq('is_published', true)
+  }
 
   const [stagesRes, branchesRes, monthlyCoursesRes, lecturesRes, lessonsRes, sectionsRes] = await Promise.all([
     supabase
@@ -86,18 +98,14 @@ export async function getCurriculum(): Promise<Stage[]> {
       .from('branches')
       .select('id, stage_id, slug, title, description, image, topics')
       .order('sort_order', { ascending: true }),
-    supabase
-      .from('monthly_courses')
-      .select('id, branch_id, slug, title, description, image, price, old_price, badge')
-      .eq('is_published', true)
-      .order('sort_order', { ascending: true }),
+    coursesQuery,
     supabase
       .from('lectures')
       .select('*')
       .order('sort_order', { ascending: true }),
     supabase
       .from('lessons')
-      .select('id, lecture_id, slug, title, duration, is_free')
+      .select('id, lecture_id, slug, title, duration, is_free, video_url')
       .order('sort_order', { ascending: true }),
     supabase
       .from('monthly_course_sections')
@@ -164,6 +172,7 @@ export async function getCurriculum(): Promise<Stage[]> {
       price: Number(row.price),
       oldPrice: row.old_price != null ? Number(row.old_price) : undefined,
       badge: row.badge ?? undefined,
+      isPublished: row.is_published ?? true,
       lectures: branchLectures.filter((lecture) => lecture.dbId && lectureIds.has(lecture.dbId)),
       sections: sectionsByCourse.get(row.id) ?? [],
     })
@@ -243,6 +252,6 @@ export async function getFreeLectureBySlug(
   const result = await getCourseBySlug(stageSlug, branchSlug, courseSlug)
   if (!result) return undefined
   const lecture = result.course.lectures.find((l) => l.id === lectureSlug)
-  if (!lecture || !lecture.isFree) return undefined
+  if (!lecture || (!lecture.isFree && result.course.price !== 0)) return undefined
   return { ...result, lecture }
 }

@@ -199,13 +199,13 @@ export function CourseOverview({ course }: { course: CourseDetail }) {
   return (
     <div className="flex flex-col gap-6">
       {/* Breadcrumb */}
-      <Link
-        href="/student/courses"
-        className="inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <ArrowRight className="size-4" />
-        العودة إلى كورساتي
-      </Link>
+        <Link
+          href="/student/courses"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
+        >
+          <ChevronRight className="size-4" />
+          العودة إلى محاضراتي
+        </Link>
 
       {/* Hero */}
       <Card className="flex flex-col gap-6 p-6 lg:flex-row">

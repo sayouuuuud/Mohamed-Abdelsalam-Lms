@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { updateSettings, updateAdminProfile } from '@/app/admin/settings/actions'
+import { updateSettings, updateAdminProfile, updatePlatformSettings } from '@/app/admin/settings/actions'
 import { createClient } from '@/lib/supabase/client'
 import { uploadToStorage } from '@/lib/storage-upload'
 import { useTheme } from '@/components/theme-provider'
@@ -138,6 +138,7 @@ export function SettingsPanel({
     initials: string
   } | null
   initialSiteContent?: SiteContent
+  initialPlatformSettings?: { is_streaming_enabled: boolean } | null
   isFullAdmin?: boolean
   initialAssistants?: AssistantRecord[]
 }) {
@@ -228,6 +229,10 @@ export function SettingsPanel({
     settings.security?.requireEmailVerification !== false,
   )
 
+  const [isStreamingEnabled, setIsStreamingEnabled] = useState(
+    initialPlatformSettings?.is_streaming_enabled ?? false,
+  )
+
   // Whether new students can register (defaults to ON when not previously saved).
   const [allowRegistrations, setAllowRegistrations] = useState(
     settings.security?.allowRegistrations !== false,
@@ -271,8 +276,10 @@ export function SettingsPanel({
       }
 
       const res = await updateSettings(newSettings)
-      if (res.error) {
-        toast.error(res.error)
+      const resPlatform = await updatePlatformSettings({ is_streaming_enabled: isStreamingEnabled })
+
+      if (res.error || resPlatform?.error) {
+        toast.error(res.error || resPlatform?.error)
       } else {
         toast.success('تم حفظ التفضيلات بنجاح')
         router.refresh()
@@ -504,6 +511,12 @@ export function SettingsPanel({
                 onChange={setAutoPublish}
                 label="النشر التلقائي"
                 description="نشر المحاضرات الجديدة تلقائياً بعد المراجعة"
+              />
+              <ToggleSwitch
+                checked={isStreamingEnabled}
+                onChange={setIsStreamingEnabled}
+                label="تفعيل تحويل الفيديو (HLS Streaming)"
+                description="تشفير وتقطيع الفيديوهات لمنع التحميل وتحسين سرعة التشغيل. يتطلب إعداد Cloudflare R2."
               />
             </div>
 

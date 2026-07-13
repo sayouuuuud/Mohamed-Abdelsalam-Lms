@@ -1,14 +1,15 @@
 import { SettingsPageHeader } from '@/components/settings/settings-page-header'
 import { SettingsPanel } from '@/components/settings/settings-panel'
-import { getSettings, getAdminProfile, getSiteContentForAdmin } from './actions'
+import { getSettings, getAdminProfile, getSiteContentForAdmin, getPlatformSettings } from './actions'
 import { isCurrentUserFullAdmin, listAssistants } from './assistants-actions'
 
 export default async function SettingsPage() {
-  const [initialSettings, adminProfile, siteContent, isFullAdmin] =
+  const [initialSettings, adminProfile, siteContent, platformSettings, isFullAdmin] =
     await Promise.all([
       getSettings(),
       getAdminProfile(),
       getSiteContentForAdmin(),
+      getPlatformSettings(),
       isCurrentUserFullAdmin(),
     ])
 
@@ -21,6 +22,7 @@ export default async function SettingsPage() {
         initialSettings={initialSettings}
         adminProfile={adminProfile}
         initialSiteContent={siteContent}
+        initialPlatformSettings={platformSettings}
         isFullAdmin={isFullAdmin}
         initialAssistants={initialAssistants}
       />

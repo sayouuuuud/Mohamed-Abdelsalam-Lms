@@ -98,6 +98,13 @@ export function VideoPlayer({
   const [speed, setSpeed] = useState<number>(1)
   const [settingsOpen, setSettingsOpen] = useState(false)
 
+  const isYoutube = src && (src.includes('youtube.com/') || src.includes('youtu.be/'))
+  const getYoutubeId = (url: string) => {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/
+    const match = url.match(regExp)
+    return match && match[2].length === 11 ? match[2] : null
+  }
+
   // مزامنة سرعة التشغيل مع عنصر الفيديو
   useEffect(() => {
     if (videoRef.current) videoRef.current.playbackRate = speed
@@ -139,6 +146,22 @@ export function VideoPlayer({
   }
 
   const progress = duration ? (current / duration) * 100 : 0
+
+  if (isYoutube) {
+    const yid = getYoutubeId(src!)
+    if (yid) {
+      return (
+        <div className={cn('relative size-full bg-black', className)} dir="ltr">
+          <iframe
+            className="absolute inset-0 size-full border-0"
+            src={`https://www.youtube.com/embed/${yid}?rel=0&modestbranding=1`}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        </div>
+      )
+    }
+  }
 
   return (
     <div

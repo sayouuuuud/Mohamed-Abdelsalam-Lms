@@ -38,7 +38,7 @@ type CurriculumContextValue = {
   openEditBranch: (stageId: string, branch: AdminBranch) => void
   requestDeleteBranch: (branch: AdminBranch) => void
   // course actions
-  openCreateCourse: (branchId: string) => void
+  openCreateCourse: (branchId?: string) => void
   openEditCourse: (course: AdminMonthlyCourse) => void
   requestDeleteCourse: (course: AdminMonthlyCourse) => void
   // stage modal state
@@ -63,7 +63,7 @@ type CurriculumContextValue = {
   editingCourse: AdminMonthlyCourse | null
   courseBranchId: string | null
   closeCourseForm: () => void
-  submitCourseForm: (values: Omit<MonthlyCourseInput, 'branchId'>) => void
+  submitCourseForm: (values: Omit<MonthlyCourseInput, 'branchId'> & { branchId?: string }) => void
   deletingCourse: AdminMonthlyCourse | null
   closeDeleteCourse: () => void
   confirmDeleteCourse: () => void
@@ -124,7 +124,7 @@ export function CurriculumProvider({
       requestDeleteBranch: (branch) => setDeletingBranch(branch),
       openCreateCourse: (branchId) => {
         setEditingCourse(null)
-        setCourseBranchId(branchId)
+        setCourseBranchId(branchId ?? null)
         setCourseFormOpen(true)
       },
       openEditCourse: (course) => {
@@ -209,7 +209,7 @@ export function CurriculumProvider({
       submitCourseForm: async (values) => {
         const isEdit = !!editingCourse
         const id = editingCourse?.id
-        const branchId = courseBranchId
+        const branchId = values.branchId || courseBranchId
         setCourseFormOpen(false)
         setEditingCourse(null)
         const res = isEdit

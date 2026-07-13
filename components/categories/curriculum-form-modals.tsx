@@ -16,6 +16,7 @@ const textareaClass =
 
 export function CurriculumFormModals() {
   const {
+    stages,
     stageFormOpen,
     editingStage,
     closeStageForm,
@@ -102,19 +103,24 @@ export function CurriculumFormModals() {
   const [cPrice, setCPrice] = useState('')
   const [cOldPrice, setCOldPrice] = useState('')
   const [cBadge, setCBadge] = useState('')
-  const [cPublished, setCPublished] = useState(true)
+  const [cPublished, setCPublished] = useState(false)
+  const [cBranchId, setCBranchId] = useState('')
+  const [cIsFree, setCIsFree] = useState(false)
 
   useEffect(() => {
     if (courseFormOpen) {
       setCTitle(editingCourse?.title ?? '')
       setCDescription(editingCourse?.description ?? '')
       setCImage(editingCourse?.image ?? '')
-      setCPrice(editingCourse ? String(editingCourse.price) : '')
+      const isFree = editingCourse ? editingCourse.price === 0 : false
+      setCIsFree(isFree)
+      setCPrice(isFree ? '0' : (editingCourse ? String(editingCourse.price) : ''))
       setCOldPrice(editingCourse?.oldPrice != null ? String(editingCourse.oldPrice) : '')
       setCBadge(editingCourse?.badge ?? '')
-      setCPublished(editingCourse?.isPublished ?? true)
+      setCPublished(editingCourse?.isPublished ?? false)
+      setCBranchId(courseBranchId || (stages[0]?.branches[0]?.id ?? ''))
     }
-  }, [courseFormOpen, editingCourse])
+  }, [courseFormOpen, editingCourse, courseBranchId, stages])
 
   const handleCourseSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -123,10 +129,11 @@ export function CurriculumFormModals() {
       title: cTitle.trim(),
       description: cDescription.trim(),
       image: cImage,
-      price: Number(cPrice) || 0,
+      price: cIsFree ? 0 : (Number(cPrice) || 0),
       oldPrice: cOldPrice.trim() ? Number(cOldPrice) : null,
       badge: cBadge.trim(),
       isPublished: cPublished,
+      branchId: courseBranchId || cBranchId,
     })
   }
 
@@ -259,6 +266,25 @@ export function CurriculumFormModals() {
         description="الكورس (الشهر) بيجمع محاضرات الفرع بالترتيب ويقدر الطالب يشتريه كامل"
       >
         <form onSubmit={handleCourseSubmit} className="space-y-4">
+          {!editingCourse && !courseBranchId && (
+            <Field label="الفرع (المادة)">
+              <select
+                value={cBranchId}
+                onChange={(e) => setCBranchId(e.target.value)}
+                className="w-full rounded-xl border border-border bg-secondary/60 px-4 py-2.5 text-sm text-foreground outline-none transition-colors focus:border-primary focus:bg-card"
+              >
+                {stages.map((stage) => (
+                  <optgroup key={stage.id} label={stage.title}>
+                    {stage.branches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.title}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </Field>
+          )}
           <Field label="اسم الكورس (مثل: كورس شهر أكتوبر)">
             <Input
               value={cTitle}
@@ -276,25 +302,38 @@ export function CurriculumFormModals() {
               className={textareaClass}
             />
           </Field>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Field label="السعر (ج.م)">
-              <Input
-                type="number"
-                inputMode="numeric"
-                value={cPrice}
-                onChange={(e) => setCPrice(e.target.value)}
-                placeholder="٣٠٠"
-              />
-            </Field>
-            <Field label="السعر قبل الخصم (اختياري)">
-              <Input
-                type="number"
-                inputMode="numeric"
-                value={cOldPrice}
-                onChange={(e) => setCOldPrice(e.target.value)}
-                placeholder="٤٥٠"
-              />
-            </Field>
+          <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <input
+              type="checkbox"
+              checked={cIsFree}
+              onChange={(e) => setCIsFree(e.target.checked)}
+              className="size-4 rounded border-border"
+            />
+            كورس مجاني بالكامل
+          </label>
+          {!cIsFree && (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field label="السعر (ج.م)">
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  value={cPrice}
+                  onChange={(e) => setCPrice(e.target.value)}
+                  placeholder="٣٠٠"
+                />
+              </Field>
+              <Field label="السعر قبل الخصم (اختياري)">
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  value={cOldPrice}
+                  onChange={(e) => setCOldPrice(e.target.value)}
+                  placeholder="٤٥٠"
+                />
+              </Field>
+            </div>
+          )}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-1">
             <Field label="الشارة (اختياري)">
               <Input
                 value={cBadge}

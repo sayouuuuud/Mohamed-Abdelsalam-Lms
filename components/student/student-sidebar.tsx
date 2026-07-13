@@ -38,8 +38,8 @@ const navItems: {
   badge?: BadgeKey
 }[] = [
   { label: 'الرئيسية', icon: LayoutDashboard, href: '/student' },
-  { label: 'تصفّح المحاضرات', icon: Compass, href: '/student/browse' },
-  { label: 'كورساتي', icon: BookOpen, href: '/student/courses' },
+  { label: 'تصفح الكورسات', icon: Compass, href: '/student/browse' },
+  { label: 'محاضراتي', icon: BookOpen, href: '/student/courses' },
   { label: 'الاختبارات', icon: ClipboardList, href: '/student/exams' },
   { label: 'الواجبات', icon: FileText, href: '/student/assignments' },
   { label: 'جدولي', icon: CalendarDays, href: '/student/schedule' },

@@ -5,6 +5,8 @@ export type Lesson = {
   duration: string
   // free preview lessons
   isFree?: boolean
+  // youtube video url
+  videoUrl?: string | null
 }
 
 // A lecture belongs to a branch. The PRICE lives here (not on the branch).
@@ -41,6 +43,7 @@ export type MonthlyCourse = {
   price: number
   oldPrice?: number
   badge?: string
+  isPublished: boolean
   lectures: Lecture[]
   sections?: CourseSection[]
 }

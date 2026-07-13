@@ -62,9 +62,9 @@ export function StudentCoursesPage({
     <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold text-foreground">كورساتي</h1>
+        <h1 className="text-2xl font-bold text-foreground">محاضراتي</h1>
         <p className="text-sm text-muted-foreground">
-          تابع الكورسات اللي مشترك فيها، وشوف المحاضرات الجديدة اللي نزّلها المدرّس أول بأول.
+          تابع تقدّمك وكمل محاضراتك من مكان ما وقفت.
         </p>
       </div>
 
