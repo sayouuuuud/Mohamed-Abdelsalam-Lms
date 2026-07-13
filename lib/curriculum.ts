@@ -36,6 +36,7 @@ type MonthlyCourseRow = {
   price: number
   old_price: number | null
   badge: string | null
+  is_published: boolean | null
 }
 
 type LectureRow = {
@@ -61,6 +62,7 @@ type LessonRow = {
   title: string
   duration: string
   is_free: boolean
+  video_url: string | null
 }
 
 function mapLesson(row: LessonRow): Lesson {
@@ -69,13 +71,20 @@ function mapLesson(row: LessonRow): Lesson {
     title: row.title,
     duration: row.duration,
     isFree: row.is_free,
+    videoUrl: row.video_url ?? null,
   }
 }
 
 // Builds the full nested stages → branches → lectures → lessons tree
 // from flat queries (one query per level, assembled in memory).
-export async function getCurriculum(): Promise<Stage[]> {
+// Pass includeUnpublished=true (admin only) to also return draft courses.
+export async function getCurriculum(includeUnpublished = false): Promise<Stage[]> {
   const supabase = await createClient()
+
+  const coursesQuery = supabase
+    .from('monthly_courses')
+    .select('id, branch_id, slug, title, description, image, price, old_price, badge, is_published')
+    .order('sort_order', { ascending: true })
 
   const [stagesRes, branchesRes, monthlyCoursesRes, lecturesRes, lessonsRes, sectionsRes] = await Promise.all([
     supabase
@@ -86,18 +95,16 @@ export async function getCurriculum(): Promise<Stage[]> {
       .from('branches')
       .select('id, stage_id, slug, title, description, image, topics')
       .order('sort_order', { ascending: true }),
-    supabase
-      .from('monthly_courses')
-      .select('id, branch_id, slug, title, description, image, price, old_price, badge')
-      .eq('is_published', true)
-      .order('sort_order', { ascending: true }),
+    includeUnpublished
+      ? coursesQuery
+      : coursesQuery.eq('is_published', true),
     supabase
       .from('lectures')
       .select('*')
       .order('sort_order', { ascending: true }),
     supabase
       .from('lessons')
-      .select('id, lecture_id, slug, title, duration, is_free')
+      .select('id, lecture_id, slug, title, duration, is_free, video_url')
       .order('sort_order', { ascending: true }),
     supabase
       .from('monthly_course_sections')
