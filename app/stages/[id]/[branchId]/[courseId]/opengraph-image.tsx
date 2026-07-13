@@ -1,7 +1,9 @@
 import { ImageResponse } from 'next/og'
 import { getCourseBySlug } from '@/lib/curriculum'
 import { getSiteContent } from '@/lib/site-content'
+import { loadCairoFonts } from '@/lib/og-fonts'
 
+export const runtime     = 'nodejs'
 export const size        = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 export const alt         = 'صورة الكورس'
@@ -12,9 +14,10 @@ export default async function Image({
   params: Promise<{ id: string; branchId: string; courseId: string }>
 }) {
   const { id, branchId, courseId } = await params
-  const [result, { seo }] = await Promise.all([
+  const [result, { seo }, fonts] = await Promise.all([
     getCourseBySlug(id, branchId, decodeURIComponent(courseId)),
     getSiteContent(),
+    loadCairoFonts(),
   ])
 
   const courseTitle  = result?.course.title  ?? 'الكورس'
@@ -23,17 +26,6 @@ export default async function Image({
   const price        = result?.course.price  ?? 0
   const siteName     = seo.title
   const priceLabel   = price === 0 ? 'مجاني' : `${price} جنيه`
-
-  let fontData: ArrayBuffer | null = null
-  try {
-    const res = await fetch(
-      'https://fonts.gstatic.com/s/cairo/v28/SLXGc1nY6HkvalIhTp2mxdt0UX8.woff2',
-      { next: { revalidate: 86400 } },
-    )
-    fontData = await res.arrayBuffer()
-  } catch {
-    // يفضل بدون خط
-  }
 
   return new ImageResponse(
     (
@@ -47,7 +39,7 @@ export default async function Image({
           alignItems: 'flex-end',
           backgroundColor: '#0f172a',
           padding: '60px 80px',
-          fontFamily: fontData ? 'Cairo' : 'sans-serif',
+          fontFamily: 'Cairo',
         }}
       >
         {/* breadcrumb */}
@@ -103,9 +95,7 @@ export default async function Image({
     ),
     {
       ...size,
-      fonts: fontData
-        ? [{ name: 'Cairo', data: fontData, weight: 700, style: 'normal' }]
-        : [],
+      fonts,
     },
   )
 }

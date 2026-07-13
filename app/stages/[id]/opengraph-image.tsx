@@ -1,7 +1,9 @@
 import { ImageResponse } from 'next/og'
 import { getStageBySlug } from '@/lib/curriculum'
 import { getSiteContent } from '@/lib/site-content'
+import { loadCairoFonts } from '@/lib/og-fonts'
 
+export const runtime     = 'nodejs'
 export const size        = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 export const alt         = 'صورة المرحلة الدراسية'
@@ -12,23 +14,15 @@ export default async function Image({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const [stage, { seo }] = await Promise.all([getStageBySlug(id), getSiteContent()])
+  const [stage, { seo }, fonts] = await Promise.all([
+    getStageBySlug(id),
+    getSiteContent(),
+    loadCairoFonts(),
+  ])
 
   const title    = stage?.title    ?? 'المرحلة الدراسية'
   const subtitle = stage?.subtitle ?? seo.description
   const siteName = seo.title
-
-  // حمّل خط Cairo عربي من Google Fonts
-  let fontData: ArrayBuffer | null = null
-  try {
-    const res = await fetch(
-      'https://fonts.gstatic.com/s/cairo/v28/SLXGc1nY6HkvalIhTp2mxdt0UX8.woff2',
-      { next: { revalidate: 86400 } },
-    )
-    fontData = await res.arrayBuffer()
-  } catch {
-    // يفضل بدون خط — مقبول
-  }
 
   return new ImageResponse(
     (
@@ -42,7 +36,7 @@ export default async function Image({
           alignItems: 'flex-end',
           backgroundColor: '#1a1f33',
           padding: '60px 80px',
-          fontFamily: fontData ? 'Cairo' : 'sans-serif',
+          fontFamily: 'Cairo',
         }}
       >
         {/* خط ذهبي علوي */}
@@ -91,9 +85,7 @@ export default async function Image({
     ),
     {
       ...size,
-      fonts: fontData
-        ? [{ name: 'Cairo', data: fontData, weight: 700, style: 'normal' }]
-        : [],
+      fonts,
     },
   )
 }
