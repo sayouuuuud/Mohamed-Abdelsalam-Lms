@@ -229,11 +229,32 @@ export async function deleteStudent(code: string) {
     return { error: 'غير مسموح. لازم تكون أدمن عشان تحذف طالب.' }
   }
 
+  // Grab the linked auth user id BEFORE deleting the row so we can also
+  // remove the login account — otherwise the student could still sign in.
+  const { data: row } = await supabase
+    .from('students')
+    .select('user_id')
+    .eq('code', code)
+    .maybeSingle()
+
   const { error } = await supabase.from('students').delete().eq('code', code)
 
   if (error) {
     console.log('[v0] deleteStudent error:', error.message)
     return { error: 'تعذّر حذف الطالب.' }
+  }
+
+  // Delete the auth account too so the credentials stop working entirely.
+  if (row?.user_id) {
+    try {
+      const admin = createAdminClient()
+      const { error: authErr } = await admin.auth.admin.deleteUser(row.user_id)
+      if (authErr) {
+        console.log('[v0] deleteStudent auth delete error:', authErr.message)
+      }
+    } catch (e) {
+      console.log('[v0] deleteStudent auth delete threw:', e instanceof Error ? e.message : String(e))
+    }
   }
 
   logActivity({ action: 'delete', resource: 'students', targetId: code, targetLabel: `طالب كود: ${code}` }).catch(() => {})

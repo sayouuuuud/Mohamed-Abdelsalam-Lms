@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertCircle, CheckCircle2, Film, Loader2, RefreshCw, Upload, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { uploadToStorage } from '@/lib/storage-upload'
+import { uploadToStorageWithProgress } from '@/lib/storage-upload'
 import { cn } from '@/lib/utils'
 import {
   getVideoUploadUrl,
@@ -31,8 +31,9 @@ export function VideoUploadField({
   streamingEnabled?: boolean
   lessonId?: string
 }) {
-  // حالة الرفع العادي (UploadThing legacy)
+  // حالة الرفع العادي (Supabase Storage)
   const [uploading, setUploading]         = useState(false)
+  const [legacyProgress, setLegacyProgress] = useState(0)   // 0-100
   const inputRef                           = useRef<HTMLInputElement>(null)
 
   // حالة R2 streaming
@@ -169,14 +170,16 @@ export function VideoUploadField({
       return
     }
     setUploading(true)
+    setLegacyProgress(0)
     try {
-      const url = await uploadToStorage(file, 'videos')
+      const url = await uploadToStorageWithProgress(file, 'videos', setLegacyProgress)
       onChange(url)
       toast.success('تم رفع الفيديو')
     } catch (e) {
       toast.error(`فشل الرفع: ${e instanceof Error ? e.message : 'خطأ غير معروف'}`)
     } finally {
       setUploading(false)
+      setLegacyProgress(0)
     }
   }
 
@@ -281,6 +284,25 @@ export function VideoUploadField({
               <div className="h-full animate-pulse rounded-full bg-amber-500/60" style={{ width: '100%' }} />
             </div>
           )}
+        </div>
+      )}
+
+      {/* Progress bar (legacy Supabase Storage mode) */}
+      {!isStreaming && uploading && (
+        <div className="space-y-1.5 rounded-xl border border-border bg-secondary/40 p-3">
+          <div className="flex items-center justify-between text-xs">
+            <span className="flex items-center gap-1.5 text-foreground">
+              <Loader2 className="size-4 animate-spin text-primary" />
+              جاري رفع الفيديو...
+            </span>
+            <span className="font-mono text-muted-foreground">{legacyProgress}%</span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
+            <div
+              className="h-full rounded-full bg-primary transition-all duration-300"
+              style={{ width: `${legacyProgress}%` }}
+            />
+          </div>
         </div>
       )}
 
