@@ -67,7 +67,7 @@ export function StageDetail({ stage }: { stage: Stage }) {
                 </span>
                 <span className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-navy-deep/40 px-4 py-2.5 text-sm text-cream/90">
                   <Layers className="size-4 text-emerald-brand" />
-                  {totalLectures} محاضرة
+                  {totalLectures} كورس
                 </span>
                 <span className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-navy-deep/40 px-4 py-2.5 text-sm text-cream/90">
                   <PlayCircle className="size-4 text-emerald-brand" />
@@ -151,7 +151,7 @@ export function StageDetail({ stage }: { stage: Stage }) {
                 <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-navy-soft dark:text-ink-dim">
                   <span className="inline-flex items-center gap-1.5">
                     <Layers className="size-4 text-emerald-deep" />
-                    {branch.lectures.length} محاضرة
+                    {branch.lectures.length} كورس
                   </span>
                   <span className="inline-flex items-center gap-1.5">
                     <PlayCircle className="size-4 text-emerald-deep" />

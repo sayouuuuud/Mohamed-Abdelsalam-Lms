@@ -78,7 +78,7 @@ function LectureRow({
         </div>
         <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-navy-soft dark:text-ink-dim">
           <BookOpen className="size-3.5" />
-          {lessonsCount} درس
+          {lessonsCount} محاضرة
         </p>
       </div>
 
@@ -157,7 +157,7 @@ export function CourseLanding({
             <div>
               <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-sm font-semibold text-gold backdrop-blur dark:text-teal-glow">
                 <Sparkles className="size-4" />
-                كورس من {branch.title}
+                محاضرة من {branch.title}
               </span>
               <h1 className="mt-5 text-balance font-heading text-4xl font-extrabold leading-tight text-cream md:text-6xl">
                 {course.title}
@@ -169,7 +169,7 @@ export function CourseLanding({
               <div className="mt-8 flex flex-wrap gap-3">
                 <span className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-navy-deep/40 px-4 py-2.5 text-sm text-cream/90">
                   <Layers className="size-4 text-gold" />
-                  {course.lectures.length} محاضرة
+                  {course.lectures.length} قسم
                 </span>
                 <span className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-navy-deep/40 px-4 py-2.5 text-sm text-cream/90">
                   <PlayCircle className="size-4 text-emerald-brand" />
@@ -178,7 +178,7 @@ export function CourseLanding({
                 {freeCount > 0 && (
                   <span className="inline-flex items-center gap-2 rounded-xl border border-emerald-brand/30 bg-emerald-brand/10 px-4 py-2.5 text-sm text-emerald-100">
                     <Play className="size-4 text-emerald-brand" />
-                    {freeCount} محاضرة مجانية
+                    {freeCount} قسم مجاني
                   </span>
                 )}
               </div>
@@ -246,10 +246,10 @@ export function CourseLanding({
             محتوى الكورس
           </span>
           <h2 className="mt-3 text-balance font-heading text-3xl font-extrabold text-navy md:text-4xl dark:text-ink-fg">
-            التصنيفات والمحاضرات
+            التصنيفات والأقسام
           </h2>
           <p className="mt-3 max-w-2xl text-pretty leading-relaxed text-navy-soft dark:text-ink-dim">
-            كل التصنيفات ومحاضراتها بالترتيب. المحاضرات المجانية تقدر تتفرج عليها فورًا، والباقي يتفتح بالاشتراك.
+            كل التصنيفات وأقسامها بالترتيب. الأقسام المجانية تقدر تتفرج عليها فورًا، والباقي يتفتح بالاشتراك.
           </p>
         </div>
 
@@ -270,7 +270,7 @@ export function CourseLanding({
                       {group.title}
                     </h3>
                     <span className="text-xs font-semibold text-navy-soft dark:text-ink-dim">
-                      ({group.lectures.length} محاضرة)
+                      ({group.lectures.length} قسم)
                     </span>
                   </div>
                   <div className="flex flex-col gap-3">

@@ -266,7 +266,7 @@ export function BranchDetail({ stage, branch }: { stage: Stage; branch: Branch }
           {/* breadcrumb */}
           <nav className="flex flex-wrap items-center gap-2 text-sm font-semibold text-cream/60">
             <Link href="/#stages" className="transition-colors hover:text-gold dark:hover:text-teal-glow">
-              ال��راحل
+              المراحل
             </Link>
             <ArrowRight className="size-3.5" />
             <Link href={`/stages/${stage.id}`} className="transition-colors hover:text-gold dark:hover:text-teal-glow">
