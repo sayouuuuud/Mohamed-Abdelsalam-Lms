@@ -109,6 +109,7 @@ export function AdminLectureDetail({
   const [lDuration, setLDuration] = useState('')
   const [lIsFree, setLIsFree] = useState(false)
   const [lVideo, setLVideo] = useState('')
+  const [lVideoType, setLVideoType] = useState<'upload' | 'youtube'>('upload')
   const [lDesc, setLDesc] = useState('')
   const [lAttachments, setLAttachments] = useState<LessonAttachment[]>([])
 
@@ -118,6 +119,7 @@ export function AdminLectureDetail({
     setLDuration('')
     setLIsFree(false)
     setLVideo('')
+    setLVideoType('upload')
     setLDesc('')
     setLAttachments([])
     setLessonOpen(true)
@@ -129,6 +131,11 @@ export function AdminLectureDetail({
     setLDuration(lesson.duration)
     setLIsFree(lesson.isFree)
     setLVideo(lesson.videoUrl ?? '')
+    setLVideoType(
+      lesson.videoUrl && (lesson.videoUrl.includes('youtube.com') || lesson.videoUrl.includes('youtu.be'))
+        ? 'youtube'
+        : 'upload'
+    )
     setLDesc(lesson.description ?? '')
     setLAttachments(lesson.attachments ?? [])
     setLessonOpen(true)
@@ -423,12 +430,30 @@ export function AdminLectureDetail({
               </div>
             </Field>
           </div>
-          <VideoUploadField
-            value={lVideo}
-            onChange={setLVideo}
-            hint="ارفع ملف الفيديو. هذا ما سيشاهده الطالب."
-            onDurationDetected={setLDuration}
-          />
+          <div className="space-y-3 rounded-xl border border-border bg-secondary/30 p-4">
+            <span className="block text-sm font-medium text-foreground">مصدر الفيديو</span>
+            <div className="flex gap-2">
+              <Button type="button" variant={lVideoType === 'upload' ? 'default' : 'outline'} onClick={() => setLVideoType('upload')} className="flex-1">رفع ملف مباشر</Button>
+              <Button type="button" variant={lVideoType === 'youtube' ? 'default' : 'outline'} onClick={() => setLVideoType('youtube')} className="flex-1">رابط يوتيوب</Button>
+            </div>
+            {lVideoType === 'upload' ? (
+              <VideoUploadField
+                value={lVideo}
+                onChange={setLVideo}
+                hint="ارفع ملف الفيديو. هذا ما سيشاهده الطالب."
+                onDurationDetected={setLDuration}
+              />
+            ) : (
+              <Field label="رابط يوتيوب">
+                <Input
+                  value={lVideo}
+                  onChange={(e) => setLVideo(e.target.value)}
+                  placeholder="https://youtube.com/watch?v=..."
+                  dir="ltr"
+                />
+              </Field>
+            )}
+          </div>
           <Field label="وصف الدرس">
             <textarea
               value={lDesc}
