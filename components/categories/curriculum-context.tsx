@@ -13,9 +13,11 @@ import {
   type AdminStage,
   type AdminBranch,
   type AdminMonthlyCourse,
+  type AdminTerm,
   type StageInput,
   type BranchInput,
   type MonthlyCourseInput,
+  type TermInput,
   createStage,
   updateStage,
   deleteStage,
@@ -25,6 +27,9 @@ import {
   createMonthlyCourse,
   updateMonthlyCourse,
   deleteMonthlyCourse,
+  createTerm,
+  updateTerm,
+  deleteTerm,
 } from '@/app/admin/categories/actions'
 
 type CurriculumContextValue = {
@@ -41,6 +46,10 @@ type CurriculumContextValue = {
   openCreateCourse: (branchId?: string) => void
   openEditCourse: (course: AdminMonthlyCourse) => void
   requestDeleteCourse: (course: AdminMonthlyCourse) => void
+  // term actions
+  openCreateTerm: (stageId: string) => void
+  openEditTerm: (term: AdminTerm) => void
+  requestDeleteTerm: (term: AdminTerm) => void
   // stage modal state
   stageFormOpen: boolean
   editingStage: AdminStage | null
@@ -67,6 +76,15 @@ type CurriculumContextValue = {
   deletingCourse: AdminMonthlyCourse | null
   closeDeleteCourse: () => void
   confirmDeleteCourse: () => void
+  // term modal state
+  termFormOpen: boolean
+  editingTerm: AdminTerm | null
+  termStageId: string | null
+  closeTermForm: () => void
+  submitTermForm: (values: Omit<TermInput, 'stageId'>) => void
+  deletingTerm: AdminTerm | null
+  closeDeleteTerm: () => void
+  confirmDeleteTerm: () => void
 }
 
 const CurriculumContext = createContext<CurriculumContextValue | null>(null)
