@@ -11,12 +11,20 @@ import {
 } from 'lucide-react'
 import { countLessons, type Stage } from '@/lib/landing-data'
 import { SubscribeButton } from './subscribe-button'
+import { DEFAULT_SITE_CONTENT, type StageOfferContent } from '@/lib/site-content-defaults'
 
 function formatEGP(value: number) {
   return new Intl.NumberFormat('ar-EG').format(value)
 }
 
-export function StageDetail({ stage }: { stage: Stage }) {
+export function StageDetail({
+  stage,
+  stageOffer,
+}: {
+  stage: Stage
+  stageOffer?: StageOfferContent
+}) {
+  const offer = stageOffer ?? DEFAULT_SITE_CONTENT.stage_offer
   const totalLessons = stage.branches.reduce((sum, b) => sum + countLessons(b), 0)
   const totalLectures = stage.branches.reduce((sum, b) => sum + b.lectures.length, 0)
   // All lecture db ids in this stage (for "subscribe to the whole stage").
@@ -200,34 +208,32 @@ export function StageDetail({ stage }: { stage: Stage }) {
             <div>
               <span className="inline-flex items-center gap-2 rounded-full bg-gold/20 px-3 py-1 text-xs font-bold text-gold">
                 <Sparkles className="size-3.5" />
-                العرض الأوفر
+                {offer.badgeText}
               </span>
               <h3 className="mt-4 text-balance font-heading text-3xl font-extrabold text-cream md:text-4xl">
-                اشترك في {stage.title} كاملة
+                {offer.headingTemplate.replace('{stageName}', stage.title)}
               </h3>
               <p className="mt-3 max-w-xl text-pretty leading-relaxed text-cream/70">
-                {stage.branches.length} فروع كاملة بكل الكورسات والدروس والامتحانات والمتابعة — في
-                باقة واحدة بسعر أوفر بكتير من الاشتراك المنفصل.
+                {offer.description}
               </p>
 
               <ul className="mt-6 grid gap-3 sm:grid-cols-2">
-                {[
-                  { icon: PlayCircle, text: `${totalLessons} محاضرة فيديو بجودة عالية` },
-                  { icon: InfinityIcon, text: 'وصول مدى الترم بدون حدود' },
-                  { icon: Check, text: 'امتحانات وواجبات بعد كل محاضرة' },
-                  { icon: ShieldCheck, text: 'متابعة وتقارير لمستواك' },
-                ].map(({ icon: Icon, text }) => (
-                  <li key={text} className="flex items-center gap-3 text-sm text-cream/85">
-                    <Icon className="size-5 shrink-0 text-emerald-brand" />
-                    {text}
-                  </li>
-                ))}
+                {offer.featureItems.map((text, i) => {
+                  const icons = [PlayCircle, InfinityIcon, Check, ShieldCheck]
+                  const Icon = icons[i % icons.length]
+                  return (
+                    <li key={i} className="flex items-center gap-3 text-sm text-cream/85">
+                      <Icon className="size-5 shrink-0 text-emerald-brand" />
+                      {text}
+                    </li>
+                  )
+                })}
               </ul>
             </div>
 
             {/* right: price card */}
             <div className="rounded-[1.75rem] border border-white/10 bg-navy-deep/50 p-7 backdrop-blur">
-              <p className="text-sm font-semibold text-cream/60">سعر الترم كامل</p>
+              <p className="text-sm font-semibold text-cream/60">{offer.priceLabel}</p>
               <div className="mt-2 flex items-end gap-2">
                 {stage.termOldPrice && (
                   <span className="text-xl text-cream/40 line-through">
@@ -247,11 +253,11 @@ export function StageDetail({ stage }: { stage: Stage }) {
 
               <SubscribeButton
                 lectureIds={stageLectureIds}
-                label="اشترك في المرحلة كاملة"
+                label={offer.buttonText}
                 className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full bg-gold px-6 py-4 text-base font-bold text-navy-deep transition-transform duration-200 hover:-translate-y-0.5 disabled:opacity-70 dark:bg-violet-glow dark:text-white dark:shadow-[0_0_24px_oklch(0.66_0.2_292_/_0.4)]"
               />
               <p className="mt-3 text-center text-xs text-cream/50">
-                ضمان استرجاع خلال 7 أيام
+                {offer.guaranteeText}
               </p>
             </div>
           </div>
