@@ -665,7 +665,7 @@ function NavbarEditor({ value, onChange }: { value: NavbarContent; onChange: (v:
     const file = e.target.files?.[0]
     if (!file) return
     startLogoUpload(async () => {
-      const url = await uploadToStorage(file, 'logos')
+      const url = await uploadToStorage(file, 'images')
       if (url) set('logoUrl', url)
     })
   }
