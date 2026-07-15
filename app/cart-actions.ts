@@ -134,6 +134,60 @@ export async function addCourseToCart(monthlyCourseId: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'unauthenticated' as const }
 
+  // If the course is free, auto-enroll immediately without going through the cart.
+  const { data: course } = await supabase
+    .from('monthly_courses')
+    .select(`price, title, branches:branch_id ( title, stages:stage_id ( title ) )`)
+    .eq('id', monthlyCourseId)
+    .single()
+
+  if (course && Number(course.price) === 0) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name, phone, email')
+      .eq('id', user.id)
+      .single()
+
+    const code = generateOrderCode()
+    const branchTitle = (course.branches as any)?.title || ''
+    const stageTitle = (course.branches as any)?.stages?.title || ''
+
+    const { data: order, error: orderErr } = await supabase
+      .from('orders')
+      .insert({
+        code,
+        student_id: user.id,
+        student_name: profile?.full_name || 'طالب',
+        student_email: profile?.email || user.email || '',
+        student_phone: profile?.phone || '',
+        method: 'مجاني',
+        reference: '',
+        note: '',
+        subtotal: 0,
+        discount: 0,
+        coupon_code: null,
+        total: 0,
+        status: 'approved',
+      })
+      .select('id')
+      .single()
+
+    if (!orderErr && order) {
+      await supabase.from('order_items').insert({
+        order_id: order.id,
+        lecture_id: null,
+        monthly_course_id: monthlyCourseId,
+        item_type: 'course_bundle',
+        lecture_title: course.title,
+        branch_title: branchTitle,
+        stage_title: stageTitle,
+        price: 0,
+      })
+      revalidatePath('/', 'layout')
+      return { success: true, enrolledFree: true }
+    }
+  }
+
   const { error } = await supabase.from('cart_items').insert({
     student_id: user.id,
     monthly_course_id: monthlyCourseId,
