@@ -106,6 +106,7 @@ export type FooterContent = {
 
 export type NavbarContent = {
   siteName: string
+  logoUrl: string
   links: FooterLink[]
   ctaLoginText: string
   ctaRegisterText: string
@@ -135,6 +136,16 @@ export type LoginPanelContent = {
   stats: LoginPanelStat[]
 }
 
+export type StageOfferContent = {
+  badgeText: string
+  headingTemplate: string   // {stageName} will be replaced at runtime
+  description: string
+  featureItems: string[]    // 4 bullet points
+  priceLabel: string
+  buttonText: string
+  guaranteeText: string
+}
+
 export type SiteContent = {
   hero: HeroContent
   features: FeaturesContent
@@ -145,6 +156,7 @@ export type SiteContent = {
   navbar: NavbarContent
   seo: SeoContent
   login_panel: LoginPanelContent
+  stage_offer: StageOfferContent
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -330,6 +342,7 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
 
   navbar: {
     siteName: 'عبد السلام',
+    logoUrl: '',
     links: [
       { label: 'المنهج', href: '#features' },
       { label: 'المراحل', href: '#stages' },
@@ -349,6 +362,22 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
     loaderEquation: 'f(x) = ∫ e^x dx',
     keywords: 'رياضيات ثانوي, شرح رياضيات, أولى ثانوي, تانية ثانوي, تالتة ثانوي, كورسات رياضيات',
     googleVerification: '',
+  },
+
+  stage_offer: {
+    badgeText: 'العرض الأوفر',
+    headingTemplate: 'اشترك في {stageName} كاملة',
+    description:
+      'فروع كاملة بكل الكورسات والدروس والامتحانات والمتابعة — في باقة واحدة بسعر أوفر بكتير من الاشتراك المنفصل.',
+    featureItems: [
+      'محاضرة فيديو بجودة عالية',
+      'وصول مدى الترم بدون حدود',
+      'امتحانات وواجبات بعد كل محاضرة',
+      'متابعة وتقارير لمستواك',
+    ],
+    priceLabel: 'سعر الترم كامل',
+    buttonText: 'اشترك في المرحلة كاملة',
+    guaranteeText: 'ضمان استرجاع خلال 7 أيام',
   },
 
   login_panel: {

@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import {
   Bell,
   Moon,
@@ -282,7 +282,37 @@ export function StudentHeader({
   onToggleTheme: () => void
 }) {
   const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
+  const [searchValue, setSearchValue] = useState(searchParams.get('q') || '')
+
+  // Clear search input when navigating away from the browse page.
+  useEffect(() => {
+    if (!pathname.startsWith('/student/browse')) {
+      setSearchValue('')
+    }
+  }, [pathname])
+
+  // Sync input value when URL search param changes (e.g. back/forward navigation).
+  useEffect(() => {
+    if (pathname.startsWith('/student/browse')) {
+      setSearchValue(searchParams.get('q') || '')
+    }
+  }, [searchParams, pathname])
+
+  const handleSearch = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key !== 'Enter' || e.nativeEvent.isComposing) return
+      const q = e.currentTarget.value.trim()
+      if (q) {
+        router.push(`/student/browse?q=${encodeURIComponent(q)}`)
+      } else {
+        router.push('/student/browse')
+      }
+    },
+    [router],
+  )
+
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-card/80 backdrop-blur">
       <div className="flex items-center gap-3 px-4 py-3 sm:px-6">
@@ -306,18 +336,10 @@ export function StudentHeader({
           <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <input
             type="search"
-            defaultValue={searchParams.get('q') || ''}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                const q = e.currentTarget.value.trim()
-                if (q) {
-                  router.push(`/student/browse?q=${encodeURIComponent(q)}`)
-                } else {
-                  router.push('/student/browse')
-                }
-              }
-            }}
-            placeholder="ابحث عن كورس، درس، اختبار..."
+            value={searchValue}
+            onChange={(e) => setSearchValue(e.target.value)}
+            onKeyDown={handleSearch}
+            placeholder="ابحث عن كورس، محاضرة..."
             className="h-11 w-full rounded-xl border border-border bg-secondary/60 pr-10 pl-4 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:bg-card"
           />
         </div>

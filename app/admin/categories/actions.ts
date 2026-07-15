@@ -60,6 +60,8 @@ export type AdminStage = {
   rows: string[]
   image: string
   sortOrder: number
+  termPrice: number
+  termOldPrice: number | null
   branches: AdminBranch[]
 }
 
@@ -69,6 +71,8 @@ export type StageInput = {
   idx: string
   rows: string[]
   image: string
+  termPrice: number
+  termOldPrice: number | null
 }
 
 export type BranchInput = {
@@ -107,7 +111,7 @@ export async function getCurriculumAdmin(): Promise<AdminStage[]> {
   const [stagesRes, branchesRes, coursesRes, lecturesRes, sectionsRes] = await Promise.all([
     supabase
       .from('stages')
-      .select('id, slug, idx, title, subtitle, rows, image, sort_order')
+      .select('id, slug, idx, title, subtitle, rows, image, sort_order, term_price, term_old_price')
       .order('sort_order', { ascending: true }),
     supabase
       .from('branches')
@@ -223,6 +227,8 @@ export async function getCurriculumAdmin(): Promise<AdminStage[]> {
     rows: row.rows ?? [],
     image: row.image,
     sortOrder: row.sort_order,
+    termPrice: Number((row as any).term_price ?? 0),
+    termOldPrice: (row as any).term_old_price != null ? Number((row as any).term_old_price) : null,
     branches: branchesByStage.get(row.id) ?? [],
   }))
 }
@@ -245,6 +251,8 @@ export async function createStage(input: StageInput) {
     rows: input.rows,
     image: input.image || '/stages/sec-1.png',
     sort_order: sortOrder,
+    term_price: input.termPrice ?? 0,
+    term_old_price: input.termOldPrice ?? null,
   })
 
   if (error) {
@@ -269,6 +277,8 @@ export async function updateStage(id: string, input: StageInput) {
       subtitle: input.subtitle,
       rows: input.rows,
       image: input.image,
+      term_price: input.termPrice ?? 0,
+      term_old_price: input.termOldPrice ?? null,
     })
     .eq('id', id)
 

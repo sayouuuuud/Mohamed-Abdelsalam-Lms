@@ -42,6 +42,7 @@ import type {
   SeoContent,
   LoginPanelContent,
   LoginPanelStat,
+  StageOfferContent,
 } from '@/lib/site-content-defaults'
 
 // ── Shared primitives ──────────────────────────────────────────────────────
@@ -658,9 +659,70 @@ function FooterEditor({ value, onChange }: { value: FooterContent; onChange: (v:
 
 function NavbarEditor({ value, onChange }: { value: NavbarContent; onChange: (v: NavbarContent) => void }) {
   const set = <K extends keyof NavbarContent>(k: K, v: NavbarContent[K]) => onChange({ ...value, [k]: v })
+  const logoInputRef = useRef<HTMLInputElement>(null)
+  const [uploadingLogo, startLogoUpload] = useTransition()
+
+  function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    startLogoUpload(async () => {
+      const url = await uploadToStorage(file, 'images')
+      if (url) set('logoUrl', url)
+    })
+  }
+
   return (
     <div className="space-y-4">
-      <Field label="اسم الموقع ف�� الشريط"><Input value={value.siteName} onChange={(e) => set('siteName', e.target.value)} className="text-right" /></Field>
+      {/* Logo upload */}
+      <div>
+        <FieldLabel hint="الصورة تظهر بدلاً من أيقونة ƒ(x) الافتراضية في شريط التنقل">
+          لوجو الموقع
+        </FieldLabel>
+        <div className="mt-2 flex items-center gap-4">
+          <div className="relative size-14 shrink-0 overflow-hidden rounded-xl border border-border bg-secondary">
+            {value.logoUrl ? (
+              <img src={value.logoUrl} alt="logo" className="size-full object-cover" />
+            ) : (
+              <span className="grid size-full place-items-center font-mono text-lg font-bold text-muted-foreground">
+                ƒ(x)
+              </span>
+            )}
+          </div>
+          <div className="flex flex-col gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={uploadingLogo}
+              onClick={() => logoInputRef.current?.click()}
+              className="gap-2"
+            >
+              {uploadingLogo ? <Loader2 className="size-4 animate-spin" /> : <Camera className="size-4" />}
+              {uploadingLogo ? 'جاري الرفع...' : 'رفع لوجو'}
+            </Button>
+            {value.logoUrl && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => set('logoUrl', '')}
+                className="text-destructive hover:text-destructive"
+              >
+                إزالة اللوجو
+              </Button>
+            )}
+          </div>
+          <input
+            ref={logoInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleLogoChange}
+          />
+        </div>
+      </div>
+
+      <Field label="اسم الموقع في الشريط"><Input value={value.siteName} onChange={(e) => set('siteName', e.target.value)} className="text-right" /></Field>
       <LinksEditor label="روابط القائمة" links={value.links} onChange={(v) => set('links', v)} />
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label="نص 'تسجيل الدخول'"><Input value={value.ctaLoginText} onChange={(e) => set('ctaLoginText', e.target.value)} className="text-right" /></Field>
@@ -773,6 +835,76 @@ function LoginPanelEditor({ value, onChange }: { value: LoginPanelContent; onCha
   )
 }
 
+// ── Stage Offer Editor ─────────────────────────────────────────────────────
+
+function StageOfferEditor({
+  value,
+  onChange,
+}: {
+  value: StageOfferContent
+  onChange: (v: StageOfferContent) => void
+}) {
+  const set = <K extends keyof StageOfferContent>(k: K, v: StageOfferContent[K]) =>
+    onChange({ ...value, [k]: v })
+
+  function updateFeature(i: number, text: string) {
+    const updated = [...value.featureItems]
+    updated[i] = text
+    set('featureItems', updated)
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="نص الشارة" hint='مثال: "العرض الأوفر"'>
+          <Input value={value.badgeText} onChange={(e) => set('badgeText', e.target.value)} className="text-right" />
+        </Field>
+        <Field label="نص الزر">
+          <Input value={value.buttonText} onChange={(e) => set('buttonText', e.target.value)} className="text-right" />
+        </Field>
+      </div>
+
+      <Field
+        label="قالب العنوان"
+        hint='استخدم {stageName} وسيستبدل باسم المرحلة تلقائياً — مثال: "اشترك في {stageName} كاملة"'
+      >
+        <Input value={value.headingTemplate} onChange={(e) => set('headingTemplate', e.target.value)} className="text-right" />
+      </Field>
+
+      <Field label="الوصف">
+        <Textarea value={value.description} onChange={(v) => set('description', v)} rows={2} />
+      </Field>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="تسمية السعر" hint='مثال: "سعر الترم كامل"'>
+          <Input value={value.priceLabel} onChange={(e) => set('priceLabel', e.target.value)} className="text-right" />
+        </Field>
+        <Field label="نص ضمان الاسترجاع">
+          <Input value={value.guaranteeText} onChange={(e) => set('guaranteeText', e.target.value)} className="text-right" />
+        </Field>
+      </div>
+
+      <div>
+        <FieldLabel hint="4 نقاط تظهر في قائمة مميزات الكارد">المميزات الأربع</FieldLabel>
+        <div className="mt-2 space-y-2">
+          {value.featureItems.map((item, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <span className="grid size-6 shrink-0 place-items-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
+                {i + 1}
+              </span>
+              <Input
+                value={item}
+                onChange={(e) => updateFeature(i, e.target.value)}
+                className="text-right"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main export ────────────────────────────────────────────────────────────
 
 export function SiteContentTab({ initialContent }: { initialContent: SiteContent }) {
@@ -790,6 +922,7 @@ export function SiteContentTab({ initialContent }: { initialContent: SiteContent
   const [navbar, setNavbar] = useState<NavbarContent>(initialContent.navbar)
   const [seo, setSeo] = useState<SeoContent>(initialContent.seo)
   const [loginPanel, setLoginPanel] = useState<LoginPanelContent>(initialContent.login_panel)
+  const [stageOffer, setStageOffer] = useState<StageOfferContent>(initialContent.stage_offer)
 
   const [savingSection, setSavingSection] = useState<string | null>(null)
 
@@ -823,6 +956,7 @@ export function SiteContentTab({ initialContent }: { initialContent: SiteContent
         case 'navbar': setNavbar(initialContent.navbar); break
         case 'seo': setSeo(initialContent.seo); break
         case 'login_panel': setLoginPanel(initialContent.login_panel); break
+        case 'stage_offer': setStageOffer(initialContent.stage_offer); break
       }
       toast.success('تمت استعادة القيم الافتراضية.')
       router.refresh()
@@ -901,6 +1035,14 @@ export function SiteContentTab({ initialContent }: { initialContent: SiteContent
       editor: <LoginPanelEditor value={loginPanel} onChange={setLoginPanel} />,
       onSave: () => save('login_panel', loginPanel),
       onReset: () => reset('login_panel', null),
+    },
+    {
+      id: 'stage_offer',
+      title: 'كارد "العرض الأوفر" في صفحة المرحلة',
+      description: 'الشارة، العنوان، الوصف، المميزات الأربع، نص الزر، وضمان الاسترجاع',
+      editor: <StageOfferEditor value={stageOffer} onChange={setStageOffer} />,
+      onSave: () => save('stage_offer', stageOffer),
+      onReset: () => reset('stage_offer', null),
     },
   ]
 

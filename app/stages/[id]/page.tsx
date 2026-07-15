@@ -42,7 +42,10 @@ export default async function StagePage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const stage = await getStageBySlug(id)
+  const [stage, siteContent] = await Promise.all([
+    getStageBySlug(id),
+    getSiteContent(),
+  ])
   if (!stage) notFound()
 
   const siteUrl = getSiteUrl()
@@ -59,7 +62,7 @@ export default async function StagePage({
     <>
       <JsonLd data={breadcrumb} />
       <LandingNavbar />
-      <StageDetail stage={stage} />
+      <StageDetail stage={stage} stageOffer={siteContent.stage_offer} />
       <SiteFooter />
     </>
   )

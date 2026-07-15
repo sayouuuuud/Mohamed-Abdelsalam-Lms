@@ -38,6 +38,7 @@ export type ExamMeta = {
   duration: number
   passMark: number
   shuffle: boolean
+  stageId: string | null
   branchId: string | null
 }
 

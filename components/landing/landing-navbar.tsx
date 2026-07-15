@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Menu, X, Moon, Sun } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/components/theme-provider'
@@ -61,9 +62,19 @@ export function LandingNavbar({
         )}
       >
         <Link href="/" className="flex items-center gap-2.5">
-          <span className="grid size-9 place-items-center rounded-md bg-navy font-mono text-sm font-bold text-cream dark:bg-teal-glow dark:text-ink-base dark:shadow-[0_0_18px_oklch(0.84_0.13_184_/_0.5)]">
-            ƒ(x)
-          </span>
+          {content.logoUrl ? (
+            <Image
+              src={content.logoUrl}
+              alt={content.siteName}
+              width={36}
+              height={36}
+              className="size-9 rounded-md object-cover"
+            />
+          ) : (
+            <span className="grid size-9 place-items-center rounded-md bg-navy font-mono text-sm font-bold text-cream dark:bg-teal-glow dark:text-ink-base dark:shadow-[0_0_18px_oklch(0.84_0.13_184_/_0.5)]">
+              ƒ(x)
+            </span>
+          )}
           <span className="font-heading text-xl font-bold text-navy dark:text-ink-fg">{content.siteName}</span>
         </Link>
 

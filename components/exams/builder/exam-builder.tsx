@@ -30,6 +30,7 @@ export function ExamBuilder({ stages = [] }: { stages?: StageWithBranches[] }) {
     duration: 45,
     passMark: 50,
     shuffle: false,
+    stageId: null,
     branchId: null,
   })
   const [questions, setQuestions] = useState<Question[]>([])
@@ -93,7 +94,7 @@ export function ExamBuilder({ stages = [] }: { stages?: StageWithBranches[] }) {
     setSaving(true)
     try {
       const result = await saveExam({
-        meta,
+        meta: { ...meta },
         questions: questions.map((q) => ({
           type: q.type,
           contentMode: q.contentMode,
@@ -164,30 +165,58 @@ export function ExamBuilder({ stages = [] }: { stages?: StageWithBranches[] }) {
             </div>
 
             {stages.length > 0 && (
-              <label className="block">
-                <span className="mb-1.5 block text-sm font-medium text-foreground">
-                  فرع المادة (اختياري)
-                </span>
-                <select
-                  value={meta.branchId ?? ''}
-                  onChange={(e) => updateMeta({ branchId: e.target.value || null })}
-                  className={fieldCls}
-                >
-                  <option value="">بدون فرع محدد</option>
-                  {stages.map((stage) => (
-                    <optgroup key={stage.id} label={stage.title}>
-                      {stage.branches.map((branch) => (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-1.5 block text-sm font-medium text-foreground">
+                    السنة الدراسية (اختياري)
+                  </span>
+                  <select
+                    value={meta.stageId ?? ''}
+                    onChange={(e) => {
+                      const stageId = e.target.value || null
+                      // Clear branch when stage changes so there's no orphan selection.
+                      updateMeta({ stageId, branchId: null })
+                    }}
+                    className={fieldCls}
+                  >
+                    <option value="">كل السنوات</option>
+                    {stages.map((stage) => (
+                      <option key={stage.id} value={stage.id}>
+                        {stage.title}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="mt-1.5 block text-xs text-muted-foreground">
+                    يظهر الاختبار لطلاب هذه السنة فقط.
+                  </span>
+                </label>
+
+                <label className="block">
+                  <span className="mb-1.5 block text-sm font-medium text-foreground">
+                    الفرع (اختياري)
+                  </span>
+                  <select
+                    value={meta.branchId ?? ''}
+                    onChange={(e) => updateMeta({ branchId: e.target.value || null })}
+                    className={fieldCls}
+                    disabled={!meta.stageId}
+                  >
+                    <option value="">كل الفروع</option>
+                    {stages
+                      .find((s) => s.id === meta.stageId)
+                      ?.branches.map((branch) => (
                         <option key={branch.id} value={branch.id}>
                           {branch.title}
                         </option>
                       ))}
-                    </optgroup>
-                  ))}
-                </select>
-                <span className="mt-1.5 block text-xs text-muted-foreground">
-                  يربط درجات الاختبار بفرع المادة في تقارير مستوى الطالب.
-                </span>
-              </label>
+                  </select>
+                  <span className="mt-1.5 block text-xs text-muted-foreground">
+                    {meta.stageId
+                      ? 'يضيّق الاختبار على فرع محدد داخل السنة.'
+                      : 'اختر سنة أولاً لتحديد الفرع.'}
+                  </span>
+                </label>
+              </div>
             )}
 
             <label className="block">

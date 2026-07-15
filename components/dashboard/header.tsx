@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import {
   Bell,
@@ -18,6 +18,7 @@ import {
   Globe,
 } from 'lucide-react'
 import useSWR from 'swr'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
@@ -385,6 +386,37 @@ export function Header({
   isDark: boolean
   onToggleTheme: () => void
 }) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const [searchValue, setSearchValue] = useState('')
+
+  // Sync search input with URL param when on students page.
+  useEffect(() => {
+    if (pathname.startsWith('/admin/students')) {
+      setSearchValue(searchParams.get('q') || '')
+    } else {
+      setSearchValue('')
+    }
+  }, [pathname, searchParams])
+
+  const handleSearch = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key !== 'Enter' || e.nativeEvent.isComposing) return
+      const q = e.currentTarget.value.trim()
+      // Route to the most relevant admin section based on current page,
+      // defaulting to the students list for a global search.
+      if (pathname.startsWith('/admin/exams')) {
+        router.push(q ? `/admin/exams?q=${encodeURIComponent(q)}` : '/admin/exams')
+      } else if (pathname.startsWith('/admin/payments')) {
+        router.push(q ? `/admin/payments?q=${encodeURIComponent(q)}` : '/admin/payments')
+      } else {
+        router.push(q ? `/admin/students?q=${encodeURIComponent(q)}` : '/admin/students')
+      }
+    },
+    [router, pathname],
+  )
+
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-card/80 backdrop-blur">
       <div className="flex items-center gap-3 px-4 py-3 sm:px-6">
@@ -411,7 +443,10 @@ export function Header({
           <Search className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <input
             type="search"
-            placeholder="ابحث عن طالب، كورس، درس، دفعة..."
+            value={searchValue}
+            onChange={(e) => setSearchValue(e.target.value)}
+            onKeyDown={handleSearch}
+            placeholder="ابحث عن طالب، اختبار، دفعة... (Enter)"
             className="h-11 w-full rounded-xl border border-border bg-secondary/60 pr-10 pl-4 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:bg-card"
           />
         </div>

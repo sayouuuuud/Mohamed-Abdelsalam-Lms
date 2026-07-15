@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { Search, Trash2, Mail, Phone } from 'lucide-react'
 import { Card } from '@/components/ui/card'
@@ -27,9 +27,15 @@ const statusStyles: Record<StudentStatus, string> = {
 export function StudentsTable() {
   const { students, requestDelete } = useStudents()
   const router = useRouter()
-  const [query, setQuery] = useState('')
+  const searchParams = useSearchParams()
+  const [query, setQuery] = useState(searchParams.get('q') || '')
   const [filter, setFilter] = useState<StudentStatus | 'الكل'>('الكل')
   const [page, setPage] = useState(1)
+
+  // Sync with URL param (e.g. when navigated from admin header search).
+  useEffect(() => {
+    setQuery(searchParams.get('q') || '')
+  }, [searchParams])
 
   useEffect(() => {
     setPage(1)
@@ -43,7 +49,8 @@ export function StudentsTable() {
         q === '' ||
         student.name.toLowerCase().includes(q) ||
         student.email.toLowerCase().includes(q) ||
-        student.id.toLowerCase().includes(q)
+        student.id.toLowerCase().includes(q) ||
+        (student.phone ?? '').toLowerCase().includes(q)
       return matchesStatus && matchesQuery
     })
   }, [query, filter, students])
@@ -63,7 +70,7 @@ export function StudentsTable() {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="ابحث بالاسم أو البريد أو الرقم..."
+            placeholder="ابحث بالاسم أو البريد أو الرقم أو الهاتف..."
             className="h-11 w-full rounded-xl border border-border bg-secondary/60 pr-10 pl-4 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:bg-card"
           />
         </div>

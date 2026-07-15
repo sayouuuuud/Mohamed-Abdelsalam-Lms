@@ -12,7 +12,7 @@ import {
   Layers,
   X,
 } from 'lucide-react'
-import { countLessons, type Stage, type Branch, type Lecture, type MonthlyCourse } from '@/lib/landing-data'
+import type { Stage, Branch, Lecture, MonthlyCourse } from '@/lib/landing-data'
 import { Check } from 'lucide-react'
 import { useCart } from '@/components/cart/cart-provider'
 
@@ -232,7 +232,7 @@ function MonthlyCourseCard({ course, index, href }: { course: MonthlyCourse; ind
         </div>
         <div className="flex flex-wrap gap-2 text-xs font-bold text-navy-soft dark:text-ink-dim">
           <span className="rounded-lg bg-cream px-3 py-2 dark:bg-ink-base">{course.lectures.length} محاضرة</span>
-          <span className="rounded-lg bg-cream px-3 py-2 dark:bg-ink-base">{lessonsCount} محاضرة</span>
+          <span className="rounded-lg bg-cream px-3 py-2 dark:bg-ink-base">{lessonsCount} درس</span>
         </div>
         <Link href={href} className="flex items-center justify-between rounded-2xl border border-navy/10 bg-cream/60 px-4 py-3 text-sm font-bold text-navy transition-colors hover:bg-cream dark:border-ink-line dark:bg-ink-base dark:text-ink-fg dark:hover:bg-ink-raised">
           <span>عرض تفاصيل الكورس والمحاضرات</span><ArrowRight className="size-4 -rotate-180" />
