@@ -38,7 +38,17 @@ export default function ExamDetailsPage({
 
   return (
     <div className="space-y-6 font-sans">
-      <ExamDetailsHeader exam={exam} />
+      <ExamDetailsHeader
+        exam={{
+          code: exam.code,
+          title: exam.title,
+          status: exam.status,
+          course: exam.course,
+          duration: exam.duration,
+          createdAt: exam.createdAt,
+          submissions: exam.submissions,
+        }}
+      />
       
       <div className="flex w-full overflow-x-auto scrollbar-hide pb-2">
         <div className="flex items-center gap-1 rounded-full bg-muted/60 p-1.5 shadow-inner dark:bg-muted/20">

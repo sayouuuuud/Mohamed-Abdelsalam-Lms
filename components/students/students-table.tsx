@@ -43,7 +43,8 @@ export function StudentsTable() {
         q === '' ||
         student.name.toLowerCase().includes(q) ||
         student.email.toLowerCase().includes(q) ||
-        student.id.toLowerCase().includes(q)
+        student.id.toLowerCase().includes(q) ||
+        (student.phone ?? '').toLowerCase().includes(q)
       return matchesStatus && matchesQuery
     })
   }, [query, filter, students])
@@ -63,7 +64,7 @@ export function StudentsTable() {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="ابحث بالاسم أو البريد أو الرقم..."
+            placeholder="ابحث بالاسم أو البريد أو الرقم أو الهاتف..."
             className="h-11 w-full rounded-xl border border-border bg-secondary/60 pr-10 pl-4 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:bg-card"
           />
         </div>

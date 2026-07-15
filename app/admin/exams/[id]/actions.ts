@@ -331,3 +331,44 @@ export async function gradeSubmission(
 
   return { success: true, score, total, status }
 }
+
+// ── Update exam metadata / status ──────────────────────────────────────────────
+
+export async function updateExam(
+  examCode: string,
+  updates: {
+    title?: string
+    course?: string
+    description?: string
+    duration?: number
+    passMark?: number
+    status?: string
+  },
+) {
+  const supabase = await createClient()
+  if (!(await hasResourceAccess(supabase, 'exams', 'manage'))) {
+    return { success: false, error: 'غير مصرح لك' }
+  }
+
+  const { error } = await supabase
+    .from('exams')
+    .update({
+      ...(updates.title !== undefined && { title: updates.title.trim() }),
+      ...(updates.course !== undefined && { course: updates.course.trim() || null }),
+      ...(updates.description !== undefined && { description: updates.description.trim() || null }),
+      ...(updates.duration !== undefined && { duration: updates.duration }),
+      ...(updates.passMark !== undefined && { pass_mark: updates.passMark }),
+      ...(updates.status !== undefined && { status: updates.status }),
+    })
+    .eq('code', examCode)
+
+  if (error) {
+    console.log('[v0] updateExam error:', error.message)
+    return { success: false, error: 'تعذّر تحديث الاختبار' }
+  }
+
+  logActivity({ action: 'update', resource: 'exams', targetId: examCode, targetLabel: `تعديل اختبار: ${examCode}` }).catch(() => {})
+  revalidatePath(`/admin/exams/${examCode}`)
+  revalidatePath('/admin/exams')
+  return { success: true }
+}

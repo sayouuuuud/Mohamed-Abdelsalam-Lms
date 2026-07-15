@@ -41,6 +41,7 @@ export type SaveExamPayload = {
     duration: number
     passMark: number
     shuffle: boolean
+    stageId?: string | null
     branchId?: string | null
   }
   questions: Array<{
@@ -83,6 +84,7 @@ export async function saveExam(payload: SaveExamPayload) {
       duration: meta.duration,
       pass_mark: meta.passMark,
       shuffle: meta.shuffle,
+      stage_id: meta.stageId || null,
       branch_id: meta.branchId || null,
       questions: questions.length,
       participants: 0,

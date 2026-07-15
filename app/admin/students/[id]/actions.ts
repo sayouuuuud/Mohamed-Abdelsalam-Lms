@@ -74,7 +74,7 @@ export async function sendMessageToStudent(
     const { error } = await adminDb.from('notifications').insert({
       code,
       student_id: studentId,
-      type: 'رسالة إدارية',
+      type: 'رسالة',
       title: subject || 'رسالة من الإدارة',
       description: body,
       time_label: timeLabel,

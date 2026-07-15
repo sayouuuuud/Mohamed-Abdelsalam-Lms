@@ -590,31 +590,34 @@ export async function getStudentExams() {
   const student = await getCurrentStudent(supabase)
   if (!student) return []
 
-  // Step 1: resolve the student's enrolled branch IDs via their stage.
-  // exams.branch_id targets a specific branch; null means broadcast to all.
+  // Step 1: resolve the student's enrolled branch IDs and stageId.
   const { stageId, branchIds } = await getStudentTargeting(supabase, student)
 
-  // Step 2: fetch published exams that are either broadcast (branch_id IS NULL)
-  // or specifically aimed at one of the student's enrolled branches.
-  let query = supabase
+  // Step 2: fetch ALL published exams then filter client-side by targeting logic:
+  // An exam is visible to the student if ANY of these conditions hold:
+  //   a) broadcast: stage_id IS NULL AND branch_id IS NULL
+  //   b) stage-targeted: stage_id matches the student's stage (regardless of branch_id)
+  //   c) branch-targeted: branch_id is in the student's enrolled branches
+  const { data: exams } = await supabase
     .from('exams')
-    .select('id, code, title, course, duration, pass_mark, questions, status, created_at, branch_id')
+    .select('id, code, title, course, duration, pass_mark, questions, status, created_at, stage_id, branch_id')
     .eq('status', 'منشور')
     .order('created_at', { ascending: false })
 
-  if (branchIds.length > 0) {
-    // Show exams with no branch (broadcast) OR aimed at one of their branches.
-    query = query.or(
-      `branch_id.is.null,branch_id.in.(${branchIds.join(',')})`,
-    )
-  } else {
-    // Student has no enrolled courses yet — show only broadcast exams.
-    query = query.is('branch_id', null)
-  }
-
-  const { data: exams } = await query
-  if (!exams || exams.length === 0) return []
-  const examIds = exams.map((e: any) => e.id)
+  const branchSet = new Set(branchIds)
+  const visibleExams = (exams ?? []).filter((e: any) => {
+    const hasStageTarget = !!e.stage_id
+    const hasBranchTarget = !!e.branch_id
+    // Pure broadcast
+    if (!hasStageTarget && !hasBranchTarget) return true
+    // Stage match (shows to all students in the stage regardless of branch)
+    if (hasStageTarget && stageId && e.stage_id === stageId) return true
+    // Branch match
+    if (hasBranchTarget && branchSet.has(e.branch_id)) return true
+    return false
+  })
+  if (!visibleExams || visibleExams.length === 0) return []
+  const examIds = visibleExams.map((e: any) => e.id)
 
   // Step 3: fetch this student's own submissions for the visible exams.
   const { data: submissions } = await supabase
@@ -623,7 +626,7 @@ export async function getStudentExams() {
     .eq('student_id', student.id)
     .in('exam_id', examIds)
 
-  return exams.map((e: any) => {
+  return visibleExams.map((e: any) => {
     const sub = submissions?.find((s: any) => s.exam_id === e.id)
     const pending = sub?.grading_status === 'pending'
     const graded = sub && sub.grading_status === 'graded'
