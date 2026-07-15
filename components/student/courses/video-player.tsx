@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Maximize,
   Pause,
@@ -17,41 +17,68 @@ const SPEEDS = [0.5, 1, 1.5, 2] as const
 // Hook: يُحمّل hls.js ويوصّله بعنصر <video> لو src هو HLS manifest
 // بيرجع null للـ MP4 القديم (يعمل بـ <source> عادي)
 // ---------------------------------------------------------------
-function useHls(src: string | undefined, videoEl: React.RefObject<HTMLVideoElement | null>) {
+function useHls(
+  src: string | undefined,
+  videoEl: React.RefObject<HTMLVideoElement | null>,
+  retryKey: number,
+  onFatalError: () => void,
+) {
   const hlsRef = useRef<import('hls.js').default | null>(null)
-  const isHls  = !!src && (src.includes('/api/hls/') || src.endsWith('.m3u8'))
+  const isHls = !!src && (src.includes('/api/hls/') || src.endsWith('.m3u8'))
 
   useEffect(() => {
     const video = videoEl.current
     if (!video || !src) return
 
-    // تنظيف instance قديم
     if (hlsRef.current) {
       hlsRef.current.destroy()
       hlsRef.current = null
     }
 
-    if (!isHls) return   // MP4: <source> في JSX بيكفي
+    if (!isHls) return
 
-    // Safari يدعم HLS بشكل native
+    // Safari supports HLS natively; assigning again also performs a full retry.
     if (video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = src
+      video.load()
       return
     }
 
-    // باقي المتصفحات: hls.js
     let cancelled = false
     import('hls.js').then(({ default: Hls }) => {
       if (cancelled || !videoEl.current) return
-      if (!Hls.isSupported()) return   // fallback: المتصفح سيعرض رسالة عدم الدعم
+      if (!Hls.isSupported()) {
+        onFatalError()
+        return
+      }
 
       const hls = new Hls({
-        enableWorker:      true,
-        lowLatencyMode:    false,
-        maxBufferLength:   30,
-        maxMaxBufferLength:60,
-        startLevel:        -1,   // ABR تلقائي
+        enableWorker: true,
+        lowLatencyMode: false,
+        maxBufferLength: 30,
+        maxMaxBufferLength: 60,
+        startLevel: -1,
       })
+      let recoveredNetwork = false
+      let recoveredMedia = false
+
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (!data.fatal) return
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR && !recoveredNetwork) {
+          recoveredNetwork = true
+          hls.startLoad()
+          return
+        }
+        if (data.type === Hls.ErrorTypes.MEDIA_ERROR && !recoveredMedia) {
+          recoveredMedia = true
+          hls.recoverMediaError()
+          return
+        }
+        hls.destroy()
+        if (hlsRef.current === hls) hlsRef.current = null
+        onFatalError()
+      })
+
       hlsRef.current = hls
       hls.loadSource(src)
       hls.attachMedia(videoEl.current)
@@ -64,8 +91,7 @@ function useHls(src: string | undefined, videoEl: React.RefObject<HTMLVideoEleme
         hlsRef.current = null
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [src])
+  }, [src, isHls, retryKey, videoEl, onFatalError])
 
   return { isHls }
 }
@@ -89,8 +115,6 @@ export function VideoPlayer({
   const containerRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
 
-  const { isHls } = useHls(src, videoRef)
-
   const [playing, setPlaying] = useState(false)
   const [muted, setMuted] = useState(false)
   const [current, setCurrent] = useState(0)
@@ -98,6 +122,9 @@ export function VideoPlayer({
   const [speed, setSpeed] = useState<number>(1)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [error, setError] = useState(false)
+  const [retryKey, setRetryKey] = useState(0)
+  const onFatalHlsError = useCallback(() => setError(true), [])
+  const { isHls } = useHls(src, videoRef, retryKey, onFatalHlsError)
 
   const isYoutube = src && (src.includes('youtube.com/') || src.includes('youtu.be/'))
   const getYoutubeId = (url: string) => {
@@ -216,8 +243,11 @@ export function VideoPlayer({
             type="button"
             onClick={() => {
               setError(false)
+              // Bump retryKey to force useHls to re-initialise hls.js from scratch;
+              // also reload the native <video> for plain MP4 sources.
+              setRetryKey((k) => k + 1)
               const v = videoRef.current
-              if (v) { v.load() }
+              if (v && !isHls) v.load()
             }}
             className="rounded-lg bg-white/15 px-4 py-2 text-sm transition-colors hover:bg-white/25"
           >
