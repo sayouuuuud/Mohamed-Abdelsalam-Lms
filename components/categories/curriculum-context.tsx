@@ -117,6 +117,11 @@ export function CurriculumProvider({
   const [courseBranchId, setCourseBranchId] = useState<string | null>(null)
   const [deletingCourse, setDeletingCourse] = useState<AdminMonthlyCourse | null>(null)
 
+  const [termFormOpen, setTermFormOpen] = useState(false)
+  const [editingTerm, setEditingTerm] = useState<AdminTerm | null>(null)
+  const [termStageId, setTermStageId] = useState<string | null>(null)
+  const [deletingTerm, setDeletingTerm] = useState<AdminTerm | null>(null)
+
   const value = useMemo<CurriculumContextValue>(
     () => ({
       stages: initialStages,
@@ -151,6 +156,19 @@ export function CurriculumProvider({
         setCourseFormOpen(true)
       },
       requestDeleteCourse: (course) => setDeletingCourse(course),
+
+      // term actions
+      openCreateTerm: (stageId) => {
+        setEditingTerm(null)
+        setTermStageId(stageId)
+        setTermFormOpen(true)
+      },
+      openEditTerm: (term) => {
+        setEditingTerm(term)
+        setTermStageId(term.stageId)
+        setTermFormOpen(true)
+      },
+      requestDeleteTerm: (term) => setDeletingTerm(term),
 
       stageFormOpen,
       editingStage,
@@ -254,6 +272,41 @@ export function CurriculumProvider({
           router.refresh()
         }
       },
+
+      termFormOpen,
+      editingTerm,
+      termStageId,
+      closeTermForm: () => setTermFormOpen(false),
+      submitTermForm: async (values) => {
+        const isEdit = !!editingTerm
+        const id = editingTerm?.id
+        const stageId = termStageId
+        setTermFormOpen(false)
+        setEditingTerm(null)
+        const res = isEdit
+          ? await updateTerm(id!, values)
+          : await createTerm({ ...values, stageId: stageId! })
+        if (res.error) {
+          toast.error(res.error)
+        } else {
+          toast.success(isEdit ? 'تم تحديث الترم' : 'تمت إضافة الترم')
+          router.refresh()
+        }
+      },
+      deletingTerm,
+      closeDeleteTerm: () => setDeletingTerm(null),
+      confirmDeleteTerm: async () => {
+        if (!deletingTerm) return
+        const id = deletingTerm.id
+        setDeletingTerm(null)
+        const res = await deleteTerm(id)
+        if (res.error) {
+          toast.error(res.error)
+        } else {
+          toast.success('تم حذف الترم')
+          router.refresh()
+        }
+      },
     }),
     [
       initialStages,
@@ -268,6 +321,10 @@ export function CurriculumProvider({
       editingCourse,
       courseBranchId,
       deletingCourse,
+      termFormOpen,
+      editingTerm,
+      termStageId,
+      deletingTerm,
       router,
     ],
   )

@@ -39,6 +39,14 @@ export function CurriculumFormModals() {
     deletingCourse,
     closeDeleteCourse,
     confirmDeleteCourse,
+    termFormOpen,
+    editingTerm,
+    termStageId,
+    closeTermForm,
+    submitTermForm,
+    deletingTerm,
+    closeDeleteTerm,
+    confirmDeleteTerm,
   } = useCurriculum()
 
   // ── Stage form state ──
@@ -112,6 +120,17 @@ export function CurriculumFormModals() {
   const [cPublished, setCPublished] = useState(false)
   const [cBranchId, setCBranchId] = useState('')
   const [cIsFree, setCIsFree] = useState(false)
+  const [cTermId, setCTermId] = useState<string>('')
+
+  // Terms available for the branch's parent stage.
+  const courseStageTerms = (() => {
+    const branchId = courseBranchId || cBranchId
+    if (!branchId) return []
+    for (const stage of stages) {
+      if (stage.branches.some((b) => b.id === branchId)) return stage.terms ?? []
+    }
+    return []
+  })()
 
   useEffect(() => {
     if (courseFormOpen) {
@@ -125,6 +144,7 @@ export function CurriculumFormModals() {
       setCBadge(editingCourse?.badge ?? '')
       setCPublished(editingCourse?.isPublished ?? false)
       setCBranchId(courseBranchId || (stages[0]?.branches[0]?.id ?? ''))
+      setCTermId(editingCourse?.termId ?? '')
     }
   }, [courseFormOpen, editingCourse, courseBranchId, stages])
 
@@ -140,6 +160,30 @@ export function CurriculumFormModals() {
       badge: cBadge.trim(),
       isPublished: cPublished,
       branchId: courseBranchId || cBranchId,
+      termId: cTermId || null,
+    })
+  }
+
+  // ── Term form state ──
+  const [tTitle, setTTitle] = useState('')
+  const [tPrice, setTPrice] = useState('')
+  const [tOldPrice, setTOldPrice] = useState('')
+
+  useEffect(() => {
+    if (termFormOpen) {
+      setTTitle(editingTerm?.title ?? '')
+      setTPrice(editingTerm?.price ? String(editingTerm.price) : '')
+      setTOldPrice(editingTerm?.oldPrice ? String(editingTerm.oldPrice) : '')
+    }
+  }, [termFormOpen, editingTerm])
+
+  const handleTermSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!tTitle.trim()) return
+    submitTermForm({
+      title: tTitle.trim(),
+      price: Number(tPrice) || 0,
+      oldPrice: tOldPrice.trim() ? Number(tOldPrice) : null,
     })
   }
 
@@ -360,6 +404,22 @@ export function CurriculumFormModals() {
               </Field>
             </div>
           )}
+          {courseStageTerms.length > 0 && (
+            <Field label="ينتمي لترم" hint="الطالب المشترك في الترم يوصل لهذا الكورس تلقائياً">
+              <select
+                value={cTermId}
+                onChange={(e) => setCTermId(e.target.value)}
+                className="w-full rounded-xl border border-border bg-secondary/60 px-4 py-2.5 text-sm text-foreground outline-none transition-colors focus:border-primary focus:bg-card"
+              >
+                <option value="">— بدون ترم —</option>
+                {courseStageTerms.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.title}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-1">
             <Field label="الشارة (اختياري)">
               <Input
@@ -395,6 +455,53 @@ export function CurriculumFormModals() {
         </form>
       </Modal>
 
+      {/* Term form */}
+      <Modal
+        open={termFormOpen}
+        onClose={closeTermForm}
+        title={editingTerm ? 'تعديل الترم' : 'إضافة ترم جديد'}
+        description="الترم يجمع كورسات المرحلة — الطالب المشترك يوصل لكل كورساته الحالية والقادمة"
+      >
+        <form onSubmit={handleTermSubmit} className="space-y-4">
+          <Field label="اسم الترم (مثال: ترم أول، ترم تاني)">
+            <Input
+              value={tTitle}
+              onChange={(e) => setTTitle(e.target.value)}
+              placeholder="مثال: ترم أول"
+              autoFocus
+            />
+          </Field>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="سعر الترم (ج.م)">
+              <Input
+                type="number"
+                inputMode="numeric"
+                value={tPrice}
+                onChange={(e) => setTPrice(e.target.value)}
+                placeholder="مثال: 1500"
+              />
+            </Field>
+            <Field label="السعر قبل الخصم (اختياري)">
+              <Input
+                type="number"
+                inputMode="numeric"
+                value={tOldPrice}
+                onChange={(e) => setTOldPrice(e.target.value)}
+                placeholder="مثال: 2000"
+              />
+            </Field>
+          </div>
+          <div className="flex justify-start gap-2 pt-2">
+            <Button type="submit">
+              {editingTerm ? 'حفظ التغييرات' : 'إضافة الترم'}
+            </Button>
+            <Button type="button" variant="outline" onClick={closeTermForm}>
+              إلغاء
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
       {/* Delete confirmations */}
       <ConfirmDialog
         open={!!deletingStage}
@@ -416,6 +523,13 @@ export function CurriculumFormModals() {
         onConfirm={confirmDeleteCourse}
         title="حذف الكورس"
         description={`هل أنت متأكد من حذف كورس "${deletingCourse?.title}"؟ المحاضرات التابعة له مش هتتحذف، بس هيتفك ارتباطها بالكورس وترجع محاضرات مستقلة.`}
+      />
+      <ConfirmDialog
+        open={!!deletingTerm}
+        onClose={closeDeleteTerm}
+        onConfirm={confirmDeleteTerm}
+        title="حذف الترم"
+        description={`هل أنت متأكد من حذف ترم "${deletingTerm?.title}"؟ الكورسات المرتبطة به مش هتتحذف، بس هيتفك ارتباطها بالترم. الطلاب المشتركين في الترم مش هيتأثروا.`}
       />
     </>
   )

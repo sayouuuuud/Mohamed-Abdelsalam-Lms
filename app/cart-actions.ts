@@ -7,7 +7,8 @@ import { computeCoupon } from '@/app/coupon-actions'
 export type CartItem = {
   lectureId: string | null
   monthlyCourseId: string | null
-  itemType: 'lecture' | 'course_bundle'
+  termId: string | null
+  itemType: 'lecture' | 'course_bundle' | 'term_bundle'
   title: string
   branchTitle: string
   stageTitle: string
@@ -26,7 +27,7 @@ export async function getCartItems(): Promise<CartItem[] | null> {
   const { data, error } = await supabase
     .from('cart_items')
     .select(
-      `lecture_id, monthly_course_id,
+      `lecture_id, monthly_course_id, term_id,
        lectures:lecture_id (
          title, price,
          branches:branch_id ( title, stages:stage_id ( title ) )
@@ -34,6 +35,10 @@ export async function getCartItems(): Promise<CartItem[] | null> {
        monthly_courses:monthly_course_id (
          title, price,
          branches:branch_id ( title, stages:stage_id ( title ) )
+       ),
+       terms:term_id (
+         title, price,
+         stages:stage_id ( title )
        )`,
     )
     .eq('student_id', user.id)
@@ -42,10 +47,24 @@ export async function getCartItems(): Promise<CartItem[] | null> {
   if (error || !data) return []
 
   return data.map((row: any) => {
+    if (row.term_id) {
+      const term = row.terms
+      return {
+        lectureId: null,
+        monthlyCourseId: null,
+        termId: row.term_id,
+        itemType: 'term_bundle' as const,
+        title: term?.title ?? '',
+        branchTitle: '',
+        stageTitle: (term?.stages as any)?.title ?? '',
+        price: Number(term?.price ?? 0),
+      }
+    }
     const product = row.lectures ?? row.monthly_courses
     return {
       lectureId: row.lecture_id,
       monthlyCourseId: row.monthly_course_id,
+      termId: null,
       itemType: row.monthly_course_id ? 'course_bundle' as const : 'lecture' as const,
       title: product?.title ?? '',
       branchTitle: product?.branches?.title ?? '',
@@ -198,6 +217,45 @@ export async function addCourseToCart(monthlyCourseId: string) {
   return { success: true }
 }
 
+export async function addTermToCart(termId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'unauthenticated' as const }
+
+  // Remove any individual courses from same term already in the cart.
+  const { data: termCourses } = await supabase
+    .from('monthly_courses')
+    .select('id')
+    .eq('term_id', termId)
+  const courseIds = (termCourses ?? []).map((c: any) => c.id)
+  if (courseIds.length > 0) {
+    await supabase
+      .from('cart_items')
+      .delete()
+      .eq('student_id', user.id)
+      .in('monthly_course_id', courseIds)
+  }
+
+  const { error } = await supabase.from('cart_items').insert({
+    student_id: user.id,
+    term_id: termId,
+    lecture_id: null,
+    monthly_course_id: null,
+  })
+  if (error && error.code !== '23505') return { error: error.message }
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
+export async function removeTermFromCart(termId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'unauthenticated' as const }
+  await supabase.from('cart_items').delete().eq('student_id', user.id).eq('term_id', termId)
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
 export async function removeCourseFromCart(monthlyCourseId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -318,29 +376,45 @@ export async function createOrder(input: {
   // bundle's lectures (current and future) is derived dynamically at read time
   // in getPurchasedLectureIds, so we intentionally do NOT freeze a per-lecture
   // snapshot here.
-  const orderItemRows = items.map((item) =>
-    item.monthlyCourseId
-      ? {
-          order_id: order.id,
-          lecture_id: null,
-          monthly_course_id: item.monthlyCourseId,
-          item_type: 'course_bundle',
-          lecture_title: item.title,
-          branch_title: item.branchTitle,
-          stage_title: item.stageTitle,
-          price: item.price,
-        }
-      : {
-          order_id: order.id,
-          lecture_id: item.lectureId,
-          monthly_course_id: null,
-          item_type: 'lecture',
-          lecture_title: item.title,
-          branch_title: item.branchTitle,
-          stage_title: item.stageTitle,
-          price: item.price,
-        },
-  )
+  const orderItemRows = items.map((item) => {
+    if (item.itemType === 'term_bundle') {
+      return {
+        order_id: order.id,
+        lecture_id: null,
+        monthly_course_id: null,
+        term_id: item.termId,
+        item_type: 'term_bundle',
+        lecture_title: item.title,
+        branch_title: '',
+        stage_title: item.stageTitle,
+        price: item.price,
+      }
+    }
+    if (item.monthlyCourseId) {
+      return {
+        order_id: order.id,
+        lecture_id: null,
+        monthly_course_id: item.monthlyCourseId,
+        term_id: null,
+        item_type: 'course_bundle',
+        lecture_title: item.title,
+        branch_title: item.branchTitle,
+        stage_title: item.stageTitle,
+        price: item.price,
+      }
+    }
+    return {
+      order_id: order.id,
+      lecture_id: item.lectureId,
+      monthly_course_id: null,
+      term_id: null,
+      item_type: 'lecture',
+      lecture_title: item.title,
+      branch_title: item.branchTitle,
+      stage_title: item.stageTitle,
+      price: item.price,
+    }
+  })
 
   const { error: itemsErr } = await supabase.from('order_items').insert(orderItemRows)
   if (itemsErr) return { error: itemsErr.message }

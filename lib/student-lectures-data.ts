@@ -312,13 +312,15 @@ async function getProgress(
 // A purchased single lecture unlocks that lecture. A purchased course bundle
 // unlocks every lecture *currently* linked to that course — including lectures
 // the teacher adds to the course later, so access stays dynamic.
+// A purchased term bundle unlocks every lecture in every course linked to that
+// term — including courses added to the term after the subscription date.
 async function getPurchasedLectureIds(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
 ): Promise<string[]> {
   const { data, error } = await supabase
     .from('orders')
-    .select('status, order_items ( lecture_id, monthly_course_id, item_type )')
+    .select('status, order_items ( lecture_id, monthly_course_id, term_id, item_type )')
     .eq('student_id', userId)
     .eq('status', 'approved')
 
@@ -326,13 +328,29 @@ async function getPurchasedLectureIds(
 
   const ids = new Set<string>()
   const courseIds = new Set<string>()
+  const termIds = new Set<string>()
+
   for (const order of data as any[]) {
     for (const item of order.order_items ?? []) {
-      if (item.item_type === 'course_bundle' && item.monthly_course_id) {
+      if (item.item_type === 'term_bundle' && item.term_id) {
+        termIds.add(item.term_id)
+      } else if (item.item_type === 'course_bundle' && item.monthly_course_id) {
         courseIds.add(item.monthly_course_id)
       } else if (item.lecture_id) {
         ids.add(item.lecture_id)
       }
+    }
+  }
+
+  // Expand term bundles: get all courses currently linked to the term,
+  // then add them to courseIds so the next step resolves their lectures.
+  if (termIds.size > 0) {
+    const { data: termCourses } = await supabase
+      .from('monthly_courses')
+      .select('id')
+      .in('term_id', [...termIds])
+    for (const row of termCourses ?? []) {
+      if (row.id) courseIds.add(row.id)
     }
   }
 
@@ -350,27 +368,43 @@ async function getPurchasedLectureIds(
   return [...ids]
 }
 
-// Distinct monthly-course ids the student has purchased as a bundle.
+// Distinct monthly-course ids the student has purchased as a bundle,
+// including all courses belonging to a subscribed term.
 async function getPurchasedCourseIds(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
 ): Promise<string[]> {
   const { data, error } = await supabase
     .from('orders')
-    .select('status, order_items ( monthly_course_id, item_type )')
+    .select('status, order_items ( monthly_course_id, term_id, item_type )')
     .eq('student_id', userId)
     .eq('status', 'approved')
 
   if (error || !data) return []
 
   const courseIds = new Set<string>()
+  const termIds = new Set<string>()
   for (const order of data as any[]) {
     for (const item of order.order_items ?? []) {
-      if (item.item_type === 'course_bundle' && item.monthly_course_id) {
+      if (item.item_type === 'term_bundle' && item.term_id) {
+        termIds.add(item.term_id)
+      } else if (item.item_type === 'course_bundle' && item.monthly_course_id) {
         courseIds.add(item.monthly_course_id)
       }
     }
   }
+
+  // Expand terms into their current courses.
+  if (termIds.size > 0) {
+    const { data: termCourses } = await supabase
+      .from('monthly_courses')
+      .select('id')
+      .in('term_id', [...termIds])
+    for (const row of termCourses ?? []) {
+      if (row.id) courseIds.add(row.id)
+    }
+  }
+
   return [...courseIds]
 }
 
