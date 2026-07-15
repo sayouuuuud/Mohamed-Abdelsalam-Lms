@@ -46,8 +46,9 @@ export function CurriculumFormModals() {
   const [subtitle, setSubtitle] = useState('')
   const [idx, setIdx] = useState('')
   const [rows, setRows] = useState('')
-
   const [stageImage, setStageImage] = useState('')
+  const [termPrice, setTermPrice] = useState('')
+  const [termOldPrice, setTermOldPrice] = useState('')
 
   useEffect(() => {
     if (stageFormOpen) {
@@ -56,6 +57,8 @@ export function CurriculumFormModals() {
       setIdx(editingStage?.idx ?? '')
       setRows((editingStage?.rows ?? []).join('\n'))
       setStageImage(editingStage?.image ?? '')
+      setTermPrice(editingStage?.termPrice ? String(editingStage.termPrice) : '')
+      setTermOldPrice(editingStage?.termOldPrice ? String(editingStage.termOldPrice) : '')
     }
   }, [stageFormOpen, editingStage])
 
@@ -68,6 +71,8 @@ export function CurriculumFormModals() {
       idx: idx.trim(),
       rows: rows.split('\n').map((r) => r.trim()).filter(Boolean),
       image: stageImage,
+      termPrice: Number(termPrice) || 0,
+      termOldPrice: termOldPrice.trim() ? Number(termOldPrice) : null,
     })
   }
 
@@ -189,6 +194,27 @@ export function CurriculumFormModals() {
           </Field>
 
 
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="سعر الترم كامل (ج.م)">
+              <Input
+                type="number"
+                inputMode="numeric"
+                value={termPrice}
+                onChange={(e) => setTermPrice(e.target.value)}
+                placeholder="مثال: 1500"
+              />
+            </Field>
+            <Field label="السعر قبل الخصم (اختياري)">
+              <Input
+                type="number"
+                inputMode="numeric"
+                value={termOldPrice}
+                onChange={(e) => setTermOldPrice(e.target.value)}
+                placeholder="مثال: 2000"
+              />
+            </Field>
+          </div>
 
           <ImageUploadField
             label="صورة التصنيف"

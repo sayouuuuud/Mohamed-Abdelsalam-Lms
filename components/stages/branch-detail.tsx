@@ -231,7 +231,7 @@ function MonthlyCourseCard({ course, index, href }: { course: MonthlyCourse; ind
           <p className="text-pretty text-sm leading-relaxed text-navy-soft dark:text-ink-dim">{course.description}</p>
         </div>
         <div className="flex flex-wrap gap-2 text-xs font-bold text-navy-soft dark:text-ink-dim">
-          <span className="rounded-lg bg-cream px-3 py-2 dark:bg-ink-base">{course.lectures.length} محاضرة</span>
+          <span className="rounded-lg bg-cream px-3 py-2 dark:bg-ink-base">{course.lectures.length} كورس</span>
           <span className="rounded-lg bg-cream px-3 py-2 dark:bg-ink-base">{lessonsCount} محاضرة</span>
         </div>
         <Link href={href} className="flex items-center justify-between rounded-2xl border border-navy/10 bg-cream/60 px-4 py-3 text-sm font-bold text-navy transition-colors hover:bg-cream dark:border-ink-line dark:bg-ink-base dark:text-ink-fg dark:hover:bg-ink-raised">
