@@ -5,17 +5,21 @@ import { ArrowRight, Loader2, ShoppingCart } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { useCart } from '@/components/cart/cart-provider'
+import { addTermToCart } from '@/app/cart-actions'
 
 /**
- * "Subscribe to the whole stage/branch" button. For logged-in students it adds
- * every lecture id to the cart and opens it; for visitors it links to register.
+ * Subscribe button — supports three modes:
+ *  - termId provided   → subscribe to a whole term bundle
+ *  - lectureIds array  → add individual lectures (legacy / fallback)
  */
 export function SubscribeButton({
-  lectureIds,
+  termId,
+  lectureIds = [],
   label,
   className,
 }: {
-  lectureIds: string[]
+  termId?: string
+  lectureIds?: string[]
   label: string
   className?: string
 }) {
@@ -32,16 +36,38 @@ export function SubscribeButton({
   }
 
   const handleClick = async () => {
+    setBusy(true)
+
+    if (termId) {
+      // Term bundle — single server action call.
+      const already = items.some((i) => i.termId === termId)
+      if (already) {
+        setOpen(true)
+        toast.info('باقة الترم موجودة في السلة بالفعل')
+        setBusy(false)
+        return
+      }
+      const res = await addTermToCart(termId)
+      setBusy(false)
+      if ('error' in res) {
+        toast.error('تعذّر إضافة الترم للسلة')
+        return
+      }
+      setOpen(true)
+      toast.success('تمت إضافة باقة الترم للسلة')
+      return
+    }
+
+    // Fallback: add individual lectures.
     const inCartIds = new Set(items.map((i) => i.lectureId))
     const toAdd = lectureIds.filter((id) => id && !inCartIds.has(id))
     if (toAdd.length === 0 && lectureIds.length > 0) {
       setOpen(true)
       toast.info('كل المحاضرات موجودة في السلة بالفعل')
+      setBusy(false)
       return
     }
-    setBusy(true)
     for (const id of toAdd) {
-      // add() is idempotent server-side (ignores duplicates)
       await add(id)
     }
     setBusy(false)

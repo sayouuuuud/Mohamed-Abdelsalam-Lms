@@ -251,34 +251,72 @@ export function StageDetail({
               </ul>
             </div>
 
-            {/* right: price card */}
-            <div className="rounded-[1.75rem] border border-white/10 bg-navy-deep/50 p-7 backdrop-blur">
-              <p className="text-sm font-semibold text-cream/60">{offer.priceLabel}</p>
-              <div className="mt-2 flex items-end gap-2">
-                {stage.termOldPrice && (
-                  <span className="text-xl text-cream/40 line-through">
-                    {formatEGP(stage.termOldPrice)}
-                  </span>
-                )}
-                <span className="font-heading text-5xl font-extrabold text-gold">
-                  {formatEGP(stage.termPrice)}
-                </span>
-                <span className="pb-2 text-sm font-bold text-cream/70">ج.م</span>
-              </div>
-              {stage.termOldPrice && (
-                <p className="mt-2 inline-flex rounded-lg bg-emerald-brand/15 px-3 py-1 text-sm font-bold text-emerald-brand">
-                  وفّر {formatEGP(stage.termOldPrice - stage.termPrice)} ج.م
-                </p>
+            {/* right: term cards (or legacy single price) */}
+            <div className="flex flex-col gap-4">
+              {(stage.terms ?? []).length > 0 ? (
+                // ── Structured term cards ──────────────────────────────
+                (stage.terms ?? []).map((term) => (
+                  <div
+                    key={term.id}
+                    className="rounded-[1.75rem] border border-white/10 bg-navy-deep/50 p-7 backdrop-blur"
+                  >
+                    <p className="text-sm font-semibold text-cream/60">{term.title}</p>
+                    <div className="mt-2 flex items-end gap-2">
+                      {term.oldPrice && (
+                        <span className="text-xl text-cream/40 line-through">
+                          {formatEGP(term.oldPrice)}
+                        </span>
+                      )}
+                      <span className="font-heading text-5xl font-extrabold text-gold">
+                        {formatEGP(term.price)}
+                      </span>
+                      <span className="pb-2 text-sm font-bold text-cream/70">ج.م</span>
+                    </div>
+                    {term.oldPrice && (
+                      <p className="mt-2 inline-flex rounded-lg bg-emerald-brand/15 px-3 py-1 text-sm font-bold text-emerald-brand">
+                        وفّر {formatEGP(term.oldPrice - term.price)} ج.م
+                      </p>
+                    )}
+                    <SubscribeButton
+                      termId={term.id}
+                      label={`اشترك في ${term.title}`}
+                      className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full bg-gold px-6 py-4 text-base font-bold text-navy-deep transition-transform duration-200 hover:-translate-y-0.5 disabled:opacity-70 dark:bg-violet-glow dark:text-white dark:shadow-[0_0_24px_oklch(0.66_0.2_292_/_0.4)]"
+                    />
+                    <p className="mt-3 text-center text-xs text-cream/50">
+                      {offer.guaranteeText}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                // ── Legacy single-price card (fallback) ────────────────
+                <div className="rounded-[1.75rem] border border-white/10 bg-navy-deep/50 p-7 backdrop-blur">
+                  <p className="text-sm font-semibold text-cream/60">{offer.priceLabel}</p>
+                  <div className="mt-2 flex items-end gap-2">
+                    {stage.termOldPrice && (
+                      <span className="text-xl text-cream/40 line-through">
+                        {formatEGP(stage.termOldPrice)}
+                      </span>
+                    )}
+                    <span className="font-heading text-5xl font-extrabold text-gold">
+                      {formatEGP(stage.termPrice)}
+                    </span>
+                    <span className="pb-2 text-sm font-bold text-cream/70">ج.م</span>
+                  </div>
+                  {stage.termOldPrice && (
+                    <p className="mt-2 inline-flex rounded-lg bg-emerald-brand/15 px-3 py-1 text-sm font-bold text-emerald-brand">
+                      وفّر {formatEGP(stage.termOldPrice - stage.termPrice)} ج.م
+                    </p>
+                  )}
+                  <SubscribeButton
+                    lectureIds={stageLectureIds}
+                    label={offer.buttonText}
+                    className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full bg-gold px-6 py-4 text-base font-bold text-navy-deep transition-transform duration-200 hover:-translate-y-0.5 disabled:opacity-70 dark:bg-violet-glow dark:text-white dark:shadow-[0_0_24px_oklch(0.66_0.2_292_/_0.4)]"
+                  />
+                  <p className="mt-3 text-center text-xs text-cream/50">
+                    {offer.guaranteeText}
+                  </p>
+                </div>
               )}
-
-              <SubscribeButton
-                lectureIds={stageLectureIds}
-                label={offer.buttonText}
-                className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full bg-gold px-6 py-4 text-base font-bold text-navy-deep transition-transform duration-200 hover:-translate-y-0.5 disabled:opacity-70 dark:bg-violet-glow dark:text-white dark:shadow-[0_0_24px_oklch(0.66_0.2_292_/_0.4)]"
-              />
-              <p className="mt-3 text-center text-xs text-cream/50">
-                {offer.guaranteeText}
-              </p>
             </div>
           </div>
         </div>

@@ -34,6 +34,7 @@ export type AdminMonthlyCourse = {
   badge: string
   isPublished: boolean
   sortOrder: number
+  termId: string | null
   lectureCount: number
   lectures: AdminCourseLecture[]
   sections: AdminCourseSection[]
@@ -51,6 +52,22 @@ export type AdminBranch = {
   courses: AdminMonthlyCourse[]
 }
 
+export type AdminTerm = {
+  id: string
+  stageId: string
+  title: string
+  price: number
+  oldPrice: number | null
+  sortOrder: number
+}
+
+export type TermInput = {
+  stageId: string
+  title: string
+  price: number
+  oldPrice: number | null
+}
+
 export type AdminStage = {
   id: string
   slug: string
@@ -62,6 +79,7 @@ export type AdminStage = {
   sortOrder: number
   termPrice: number
   termOldPrice: number | null
+  terms: AdminTerm[]
   branches: AdminBranch[]
 }
 
@@ -92,6 +110,7 @@ export type MonthlyCourseInput = {
   oldPrice: number | null
   badge: string
   isPublished: boolean
+  termId: string | null
 }
 
 function slugify(input: string) {
@@ -108,7 +127,7 @@ function slugify(input: string) {
 export async function getCurriculumAdmin(): Promise<AdminStage[]> {
   const supabase = await createClient()
 
-  const [stagesRes, branchesRes, coursesRes, lecturesRes, sectionsRes] = await Promise.all([
+  const [stagesRes, branchesRes, coursesRes, lecturesRes, sectionsRes, termsRes] = await Promise.all([
     supabase
       .from('stages')
       .select('id, slug, idx, title, subtitle, rows, image, sort_order, term_price, term_old_price')
@@ -119,7 +138,7 @@ export async function getCurriculumAdmin(): Promise<AdminStage[]> {
       .order('sort_order', { ascending: true }),
     supabase
       .from('monthly_courses')
-      .select('id, branch_id, slug, title, description, image, price, old_price, badge, is_published, sort_order')
+      .select('id, branch_id, slug, title, description, image, price, old_price, badge, is_published, sort_order, term_id')
       .order('sort_order', { ascending: true }),
     supabase
       .from('lectures')
@@ -129,11 +148,30 @@ export async function getCurriculumAdmin(): Promise<AdminStage[]> {
       .from('monthly_course_sections')
       .select('id, monthly_course_id, title, sort_order')
       .order('sort_order', { ascending: true }),
+    supabase
+      .from('terms')
+      .select('id, stage_id, title, price, old_price, sort_order')
+      .order('sort_order', { ascending: true }),
   ])
 
   if (stagesRes.error || !stagesRes.data) {
     console.log('[v0] getCurriculumAdmin error:', stagesRes.error?.message)
     return []
+  }
+
+  // Terms grouped by stage.
+  const termsByStage = new Map<string, AdminTerm[]>()
+  for (const row of termsRes.data ?? []) {
+    const list = termsByStage.get(row.stage_id) ?? []
+    list.push({
+      id: row.id,
+      stageId: row.stage_id,
+      title: row.title,
+      price: Number(row.price ?? 0),
+      oldPrice: row.old_price != null ? Number(row.old_price) : null,
+      sortOrder: row.sort_order ?? 1,
+    })
+    termsByStage.set(row.stage_id, list)
   }
 
   // Sections grouped per course (best-effort: table may not exist pre-migration).
@@ -194,6 +232,7 @@ export async function getCurriculumAdmin(): Promise<AdminStage[]> {
       badge: row.badge ?? '',
       isPublished: !!row.is_published,
       sortOrder: row.sort_order,
+      termId: (row as any).term_id ?? null,
       lectureCount: lectureCountByCourse.get(row.id) ?? 0,
       lectures: lecturesByCourse.get(row.id) ?? [],
       sections: sectionsByCourse.get(row.id) ?? [],
@@ -229,6 +268,7 @@ export async function getCurriculumAdmin(): Promise<AdminStage[]> {
     sortOrder: row.sort_order,
     termPrice: Number((row as any).term_price ?? 0),
     termOldPrice: (row as any).term_old_price != null ? Number((row as any).term_old_price) : null,
+    terms: termsByStage.get(row.id) ?? [],
     branches: branchesByStage.get(row.id) ?? [],
   }))
 }
@@ -402,6 +442,7 @@ export async function createMonthlyCourse(input: MonthlyCourseInput) {
     badge: input.badge || null,
     is_published: input.isPublished,
     sort_order: sortOrder,
+    term_id: input.termId ?? null,
   })
 
   if (error) {
@@ -431,6 +472,7 @@ export async function updateMonthlyCourse(
       old_price: input.oldPrice,
       badge: input.badge || null,
       is_published: input.isPublished,
+      term_id: input.termId ?? null,
       updated_at: new Date().toISOString(),
     })
     .eq('id', id)
@@ -462,6 +504,60 @@ export async function deleteMonthlyCourse(id: string) {
   revalidatePath('/')
   return { success: true }
   }
+
+// ── Term CRUD ─────────────────────────────────────────────────────
+export async function createTerm(input: TermInput) {
+  const supabase = await createClient()
+  if (!(await hasResourceAccess(supabase, 'categories', 'manage'))) return { error: 'غير مسموح.' }
+
+  const { count } = await supabase
+    .from('terms')
+    .select('id', { count: 'exact', head: true })
+    .eq('stage_id', input.stageId)
+
+  const { error } = await supabase.from('terms').insert({
+    stage_id: input.stageId,
+    title: input.title.trim(),
+    price: input.price,
+    old_price: input.oldPrice ?? null,
+    sort_order: (count ?? 0) + 1,
+  })
+
+  if (error) return { error: 'تعذّر إضافة الترم.' }
+  logActivity({ action: 'create', resource: 'categories', targetLabel: `ترم: ${input.title}` }).catch(() => {})
+  revalidatePath('/admin/categories')
+  return { success: true }
+}
+
+export async function updateTerm(id: string, input: Omit<TermInput, 'stageId'>) {
+  const supabase = await createClient()
+  if (!(await hasResourceAccess(supabase, 'categories', 'manage'))) return { error: 'غير مسموح.' }
+
+  const { error } = await supabase.from('terms').update({
+    title: input.title.trim(),
+    price: input.price,
+    old_price: input.oldPrice ?? null,
+  }).eq('id', id)
+
+  if (error) return { error: 'تعذّر تحديث الترم.' }
+  logActivity({ action: 'update', resource: 'categories', targetId: id, targetLabel: `ترم: ${input.title}` }).catch(() => {})
+  revalidatePath('/admin/categories')
+  return { success: true }
+}
+
+export async function deleteTerm(id: string) {
+  const supabase = await createClient()
+  if (!(await hasResourceAccess(supabase, 'categories', 'manage'))) return { error: 'غير مسموح.' }
+
+  // Unlink courses from this term first.
+  await supabase.from('monthly_courses').update({ term_id: null }).eq('term_id', id)
+
+  const { error } = await supabase.from('terms').delete().eq('id', id)
+  if (error) return { error: 'تعذّر حذف الترم.' }
+  logActivity({ action: 'delete', resource: 'categories', targetId: id }).catch(() => {})
+  revalidatePath('/admin/categories')
+  return { success: true }
+}
 
 // ── Course sections CRUD (تصنيفات داخل الكورس) ────────────────────
 export type CourseSectionInput = {

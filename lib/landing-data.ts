@@ -59,6 +59,14 @@ export type Branch = {
   monthlyCourses?: MonthlyCourse[]
 }
 
+// A purchasable term that bundles all courses in a stage (ترم أول / ترم تاني)
+export type Term = {
+  id: string          // DB uuid
+  title: string       // e.g. "ترم أول"
+  price: number
+  oldPrice?: number
+}
+
 export type Stage = {
   id: string
   index: string
@@ -68,9 +76,10 @@ export type Stage = {
   formula: string
   image: string
   accent: 'gold' | 'emerald'
-  // full-term price for the whole grade (subscribe to everything)
+  // full-term price for the whole grade (subscribe to everything) — legacy
   termPrice: number
   termOldPrice?: number
+  terms?: Term[]      // structured terms (ترم أول, ترم تاني…)
   branches: Branch[]
 }
 
@@ -362,7 +371,7 @@ export const stages: Stage[] = [
             description: 'التفاضل والتكامل المتقدّم وتطبيقاته في الامتحان.',
             price: 180,
             lessons: [
-              { id: 'l1', title: 'التفاضل المتقدّم', duration: '20:00' },
+              { id: 'l1', title: 'الت��اضل المتقدّم', duration: '20:00' },
               { id: 'l2', title: 'التكامل وتطبيقاته', duration: '21:30' },
             ],
           },

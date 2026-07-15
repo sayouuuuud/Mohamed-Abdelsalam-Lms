@@ -13,9 +13,11 @@ import {
   type AdminStage,
   type AdminBranch,
   type AdminMonthlyCourse,
+  type AdminTerm,
   type StageInput,
   type BranchInput,
   type MonthlyCourseInput,
+  type TermInput,
   createStage,
   updateStage,
   deleteStage,
@@ -25,6 +27,9 @@ import {
   createMonthlyCourse,
   updateMonthlyCourse,
   deleteMonthlyCourse,
+  createTerm,
+  updateTerm,
+  deleteTerm,
 } from '@/app/admin/categories/actions'
 
 type CurriculumContextValue = {
@@ -41,6 +46,10 @@ type CurriculumContextValue = {
   openCreateCourse: (branchId?: string) => void
   openEditCourse: (course: AdminMonthlyCourse) => void
   requestDeleteCourse: (course: AdminMonthlyCourse) => void
+  // term actions
+  openCreateTerm: (stageId: string) => void
+  openEditTerm: (term: AdminTerm) => void
+  requestDeleteTerm: (term: AdminTerm) => void
   // stage modal state
   stageFormOpen: boolean
   editingStage: AdminStage | null
@@ -67,6 +76,15 @@ type CurriculumContextValue = {
   deletingCourse: AdminMonthlyCourse | null
   closeDeleteCourse: () => void
   confirmDeleteCourse: () => void
+  // term modal state
+  termFormOpen: boolean
+  editingTerm: AdminTerm | null
+  termStageId: string | null
+  closeTermForm: () => void
+  submitTermForm: (values: Omit<TermInput, 'stageId'>) => void
+  deletingTerm: AdminTerm | null
+  closeDeleteTerm: () => void
+  confirmDeleteTerm: () => void
 }
 
 const CurriculumContext = createContext<CurriculumContextValue | null>(null)
@@ -98,6 +116,11 @@ export function CurriculumProvider({
   const [editingCourse, setEditingCourse] = useState<AdminMonthlyCourse | null>(null)
   const [courseBranchId, setCourseBranchId] = useState<string | null>(null)
   const [deletingCourse, setDeletingCourse] = useState<AdminMonthlyCourse | null>(null)
+
+  const [termFormOpen, setTermFormOpen] = useState(false)
+  const [editingTerm, setEditingTerm] = useState<AdminTerm | null>(null)
+  const [termStageId, setTermStageId] = useState<string | null>(null)
+  const [deletingTerm, setDeletingTerm] = useState<AdminTerm | null>(null)
 
   const value = useMemo<CurriculumContextValue>(
     () => ({
@@ -133,6 +156,19 @@ export function CurriculumProvider({
         setCourseFormOpen(true)
       },
       requestDeleteCourse: (course) => setDeletingCourse(course),
+
+      // term actions
+      openCreateTerm: (stageId) => {
+        setEditingTerm(null)
+        setTermStageId(stageId)
+        setTermFormOpen(true)
+      },
+      openEditTerm: (term) => {
+        setEditingTerm(term)
+        setTermStageId(term.stageId)
+        setTermFormOpen(true)
+      },
+      requestDeleteTerm: (term) => setDeletingTerm(term),
 
       stageFormOpen,
       editingStage,
@@ -236,6 +272,41 @@ export function CurriculumProvider({
           router.refresh()
         }
       },
+
+      termFormOpen,
+      editingTerm,
+      termStageId,
+      closeTermForm: () => setTermFormOpen(false),
+      submitTermForm: async (values) => {
+        const isEdit = !!editingTerm
+        const id = editingTerm?.id
+        const stageId = termStageId
+        setTermFormOpen(false)
+        setEditingTerm(null)
+        const res = isEdit
+          ? await updateTerm(id!, values)
+          : await createTerm({ ...values, stageId: stageId! })
+        if (res.error) {
+          toast.error(res.error)
+        } else {
+          toast.success(isEdit ? 'تم تحديث الترم' : 'تمت إضافة الترم')
+          router.refresh()
+        }
+      },
+      deletingTerm,
+      closeDeleteTerm: () => setDeletingTerm(null),
+      confirmDeleteTerm: async () => {
+        if (!deletingTerm) return
+        const id = deletingTerm.id
+        setDeletingTerm(null)
+        const res = await deleteTerm(id)
+        if (res.error) {
+          toast.error(res.error)
+        } else {
+          toast.success('تم حذف الترم')
+          router.refresh()
+        }
+      },
     }),
     [
       initialStages,
@@ -250,6 +321,10 @@ export function CurriculumProvider({
       editingCourse,
       courseBranchId,
       deletingCourse,
+      termFormOpen,
+      editingTerm,
+      termStageId,
+      deletingTerm,
       router,
     ],
   )

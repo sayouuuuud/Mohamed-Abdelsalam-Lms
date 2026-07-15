@@ -43,6 +43,7 @@ export function CartModal() {
     count,
     remove,
     removeCourse,
+    removeTerm,
     coupon,
     couponLoading,
     applyCoupon,
@@ -212,13 +213,18 @@ export function CartModal() {
             ) : (
               <ul className="divide-y divide-border">
                 {items.map((item) => (
-                  <li key={item.lectureId ?? item.monthlyCourseId} className="flex items-start gap-3 px-6 py-4">
+                  <li key={item.termId ?? item.monthlyCourseId ?? item.lectureId} className="flex items-start gap-3 px-6 py-4">
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-bold text-foreground">
                         {item.title}
                       </p>
                       <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                        {item.stageTitle} · {item.branchTitle}
+                        {item.stageTitle}{item.branchTitle ? ` · ${item.branchTitle}` : ''}
+                        {item.itemType === 'term_bundle' && (
+                          <span className="ml-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+                            باقة ترم
+                          </span>
+                        )}
                       </p>
                       <p className="mt-1 text-sm font-bold text-primary">
                         {formatEGP(item.price)} ج.م
@@ -226,7 +232,11 @@ export function CartModal() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => item.monthlyCourseId ? removeCourse(item.monthlyCourseId) : item.lectureId && remove(item.lectureId)}
+                      onClick={() => {
+                        if (item.termId) return removeTerm(item.termId)
+                        if (item.monthlyCourseId) return removeCourse(item.monthlyCourseId)
+                        if (item.lectureId) return remove(item.lectureId)
+                      }}
                       className="grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                       aria-label={`إزالة ${item.title}`}
                     >

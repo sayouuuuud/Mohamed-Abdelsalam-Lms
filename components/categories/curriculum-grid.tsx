@@ -9,6 +9,7 @@ import {
   GitBranch,
   BookOpen,
   Layers,
+  CalendarDays,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -27,6 +28,9 @@ export function CurriculumGrid() {
     openEditBranch,
     requestDeleteBranch,
     openCreateCourse,
+    openCreateTerm,
+    openEditTerm,
+    requestDeleteTerm,
   } = useCurriculum()
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
@@ -95,12 +99,58 @@ export function CurriculumGrid() {
                       </span>
                       محاضرة
                     </span>
-
+                    <span className="flex items-center gap-1.5">
+                      <CalendarDays className="size-3.5" />
+                      <span className="font-medium text-foreground">
+                        {(stage.terms ?? []).length}
+                      </span>
+                      ترم
+                    </span>
                   </div>
+                  {/* Terms chips */}
+                  {(stage.terms ?? []).length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {stage.terms.map((term) => (
+                        <span
+                          key={term.id}
+                          className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-3 py-1 text-xs"
+                        >
+                          <CalendarDays className="size-3 text-primary" />
+                          <span className="font-medium text-foreground">{term.title}</span>
+                          <span className="text-muted-foreground">{term.price.toLocaleString('ar-EG')} ج.م</span>
+                          <button
+                            type="button"
+                            onClick={() => openEditTerm(term)}
+                            className="text-muted-foreground hover:text-foreground"
+                            aria-label="تعديل الترم"
+                          >
+                            <Pencil className="size-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => requestDeleteTerm(term)}
+                            className="text-rose-400 hover:text-rose-600"
+                            aria-label="حذف الترم"
+                          >
+                            <Trash2 className="size-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div className="flex shrink-0 gap-2">
+              <div className="flex shrink-0 flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8"
+                  onClick={() => openCreateTerm(stage.id)}
+                >
+                  <Plus className="size-4" />
+                  ترم
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"

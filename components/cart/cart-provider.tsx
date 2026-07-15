@@ -16,6 +16,7 @@ import {
   removeFromCart as removeFromCartAction,
   addCourseToCart,
   removeCourseFromCart,
+  removeTermFromCart,
   type CartItem,
 } from '@/app/cart-actions'
 import { applyCoupon as applyCouponAction, type AppliedCoupon } from '@/app/coupon-actions'
@@ -29,10 +30,12 @@ type CartContextValue = {
   setOpen: (open: boolean) => void
   inCart: (lectureId: string) => boolean
   courseInCart: (courseId: string) => boolean
+  termInCart: (termId: string) => boolean
   add: (lectureId: string, title?: string) => Promise<void>
   addCourse: (courseId: string, title?: string) => Promise<void>
   remove: (lectureId: string) => Promise<void>
   removeCourse: (courseId: string) => Promise<void>
+  removeTerm: (termId: string) => Promise<void>
   refresh: () => Promise<void>
   // coupon
   coupon: AppliedCoupon | null
@@ -77,6 +80,20 @@ export function CartProvider({ children }: { children: ReactNode }) {
     (courseId: string) => items.some((item) => item.monthlyCourseId === courseId),
     [items],
   )
+
+  const termInCart = useCallback(
+    (termId: string) => items.some((item) => item.termId === termId),
+    [items],
+  )
+
+  const removeTerm = useCallback(async (termId: string) => {
+    setItems((prev) => prev.filter((i) => i.termId !== termId))
+    const res = await removeTermFromCart(termId)
+    if (res?.error) {
+      toast.error(res.error)
+      await refresh()
+    }
+  }, [refresh])
 
   const addCourse = useCallback(async (courseId: string, title?: string) => {
     const res = await addCourseToCart(courseId)
@@ -192,10 +209,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
         setOpen,
         inCart,
         courseInCart,
+        termInCart,
         add,
         addCourse,
         remove,
         removeCourse,
+        removeTerm,
         refresh,
         coupon,
         couponLoading,
