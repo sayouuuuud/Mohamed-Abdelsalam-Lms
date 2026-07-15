@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import type { Stage, Branch, Lecture, Lesson, MonthlyCourse } from '@/lib/landing-data'
+import type { Stage, Branch, Lecture, Lesson, MonthlyCourse, Term } from '@/lib/landing-data'
 
 // ── Row shapes coming back from Supabase ───────────────────────────
 type StageRow = {
@@ -89,7 +89,7 @@ export async function getCurriculum(includeUnpublished = false): Promise<Stage[]
     coursesQuery = coursesQuery.eq('is_published', true)
   }
 
-  const [stagesRes, branchesRes, monthlyCoursesRes, lecturesRes, lessonsRes, sectionsRes] = await Promise.all([
+  const [stagesRes, branchesRes, monthlyCoursesRes, lecturesRes, lessonsRes, sectionsRes, termsRes] = await Promise.all([
     supabase
       .from('stages')
       .select('id, slug, idx, title, subtitle, rows, formula, image, accent, term_price, term_old_price')
@@ -110,6 +110,10 @@ export async function getCurriculum(includeUnpublished = false): Promise<Stage[]
     supabase
       .from('monthly_course_sections')
       .select('id, monthly_course_id, title, sort_order')
+      .order('sort_order', { ascending: true }),
+    supabase
+      .from('terms')
+      .select('id, stage_id, title, price, old_price')
       .order('sort_order', { ascending: true }),
   ])
 
@@ -179,6 +183,18 @@ export async function getCurriculum(includeUnpublished = false): Promise<Stage[]
     monthlyCoursesByBranch.set(row.branch_id, list)
   }
 
+  const termsByStage = new Map<string, Term[]>()
+  for (const row of (termsRes.data ?? []) as any[]) {
+    const list = termsByStage.get(row.stage_id) ?? []
+    list.push({
+      id: row.id,
+      title: row.title,
+      price: Number(row.price ?? 0),
+      oldPrice: row.old_price != null ? Number(row.old_price) : undefined,
+    })
+    termsByStage.set(row.stage_id, list)
+  }
+
   const branchesByStage = new Map<string, Branch[]>()
   for (const row of (branchesRes.data as BranchRow[]) ?? []) {
     const list = branchesByStage.get(row.stage_id) ?? []
@@ -205,6 +221,7 @@ export async function getCurriculum(includeUnpublished = false): Promise<Stage[]
     accent: (row.accent as Stage['accent']) ?? 'emerald',
     termPrice: Number(row.term_price),
     termOldPrice: row.term_old_price != null ? Number(row.term_old_price) : undefined,
+    terms: termsByStage.get(row.id) ?? [],
     branches: branchesByStage.get(row.id) ?? [],
   }))
 }
