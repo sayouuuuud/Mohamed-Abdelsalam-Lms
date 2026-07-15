@@ -46,27 +46,29 @@ export type StudentExam = {
   } | null
 }
 
-// Loads a published exam for the student to take or review. Correct answers /
-// model answers are ONLY included in the review payload after submission.
-// Also enforces branch targeting: student must belong to the exam's branch
-// (or the exam is a broadcast with branch_id = null).
-export async function getStudentExam(code: string): Promise<StudentExam | null> {
-  const supabase = await createClient()
-  const student = await getCurrentStudent(supabase)
-  if (!student) return null
+// Shared targeting rule — MUST stay in sync with getStudentExams() in
+// app/student/actions.ts. An exam is accessible to a student if ANY holds:
+//   a) broadcast: stage_id IS NULL AND branch_id IS NULL
+//   b) stage-targeted: exam.stage_id === student.stage_id (regardless of branch)
+//   c) branch-targeted: student purchased a lecture in exam.branch_id
+// Previously the open/submit path required branch purchase even for
+// stage-targeted exams, so exams that showed in the list failed to open.
+async function studentCanAccessExam(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  student: any,
+  exam: { stage_id?: string | null; branch_id?: string | null },
+): Promise<boolean> {
+  const hasStage = !!exam.stage_id
+  const hasBranch = !!exam.branch_id
 
-  // Support both UUID id and alphanumeric code in the URL param.
-  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(code)
-  const { data: exam } = await supabase
-    .from('exams')
-    .select('id, code, title, course, description, duration, pass_mark, status, branch_id')
-    .eq(isUuid ? 'id' : 'code', code)
-    .single()
+  // Broadcast — visible to everyone.
+  if (!hasStage && !hasBranch) return true
 
-  if (!exam || exam.status !== 'منشور') return null
+  // Stage match — visible to all students in the stage.
+  if (hasStage && student.stage_id && exam.stage_id === student.stage_id) return true
 
-  // Enforce branch targeting using orders (the real purchase record).
-  if (exam.branch_id) {
+  // Branch match — student must have purchased a lecture in that branch.
+  if (hasBranch) {
     const { data: orders } = await supabase
       .from('orders')
       .select('order_items(lecture_id)')
@@ -80,17 +82,37 @@ export async function getStudentExam(code: string): Promise<StudentExam | null> 
       }
     }
 
-    let enrolled = false
     if (purchasedLectureIds.length > 0) {
       const { data: lectures } = await supabase
         .from('lectures')
         .select('branch_id')
         .in('id', purchasedLectureIds)
         .eq('branch_id', exam.branch_id)
-      enrolled = (lectures ?? []).length > 0
+      if ((lectures ?? []).length > 0) return true
     }
-    if (!enrolled) return null
   }
+
+  return false
+}
+
+// Loads a published exam for the student to take or review. Correct answers /
+// model answers are ONLY included in the review payload after submission.
+export async function getStudentExam(code: string): Promise<StudentExam | null> {
+  const supabase = await createClient()
+  const student = await getCurrentStudent(supabase)
+  if (!student) return null
+
+  // Support both UUID id and alphanumeric code in the URL param.
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(code)
+  const { data: exam } = await supabase
+    .from('exams')
+    .select('id, code, title, course, description, duration, pass_mark, status, stage_id, branch_id')
+    .eq(isUuid ? 'id' : 'code', code)
+    .single()
+
+  if (!exam || exam.status !== 'منشور') return null
+
+  if (!(await studentCanAccessExam(supabase, student, exam))) return null
 
   const { data: questions } = await supabase
     .from('exam_questions')
@@ -185,7 +207,7 @@ export async function submitExam(code: string, answers: SubmitAnswer[]) {
 
   const { data: exam } = await supabase
     .from('exams')
-    .select('id, code, pass_mark, status, branch_id')
+    .select('id, code, pass_mark, status, stage_id, branch_id')
     .eq('code', code)
     .single()
 
@@ -193,31 +215,9 @@ export async function submitExam(code: string, answers: SubmitAnswer[]) {
     return { success: false, error: 'الاختبار غير متاح.' }
   }
 
-  // Enforce branch targeting using orders (the real purchase record).
-  if (exam.branch_id) {
-    const { data: orders } = await supabase
-      .from('orders')
-      .select('order_items(lecture_id)')
-      .eq('student_id', student.id)
-      .eq('status', 'approved')
-
-    const purchasedLectureIds: string[] = []
-    for (const o of orders ?? []) {
-      for (const item of (o.order_items as any[]) ?? []) {
-        if (item.lecture_id) purchasedLectureIds.push(item.lecture_id)
-      }
-    }
-
-    let enrolled = false
-    if (purchasedLectureIds.length > 0) {
-      const { data: lectures } = await supabase
-        .from('lectures')
-        .select('branch_id')
-        .in('id', purchasedLectureIds)
-        .eq('branch_id', exam.branch_id)
-      enrolled = (lectures ?? []).length > 0
-    }
-    if (!enrolled) return { success: false, error: 'غير مسموح لك بتسليم هذا الاختبار.' }
+  // Same targeting rule as the list and the open path.
+  if (!(await studentCanAccessExam(supabase, student, exam))) {
+    return { success: false, error: 'غير مسموح لك بتسليم هذا الاختبار.' }
   }
 
   // Prevent duplicate submissions.

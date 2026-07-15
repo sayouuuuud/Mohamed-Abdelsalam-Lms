@@ -37,18 +37,44 @@ async function generateStudentCode(admin: AdminClient): Promise<string> {
 // the admin panel. The DB trigger only creates the `profiles` row, so without
 // this a student who signs up never appears in the students list. Safe to call
 // more than once — it no-ops if a row already exists for the user.
+// Resolves the selected grade (which is the stage *slug*, e.g. "sec-2") into
+// the matching stages.id. Without this the student's stage_id stays NULL and
+// stage-targeted exams/announcements never appear for them.
+async function resolveStageId(
+  admin: AdminClient,
+  grade: string,
+): Promise<string | null> {
+  const slug = grade?.trim()
+  if (!slug) return null
+  const { data } = await admin
+    .from('stages')
+    .select('id')
+    .eq('slug', slug)
+    .maybeSingle()
+  return data?.id ?? null
+}
+
 async function ensureStudentRow(
   admin: AdminClient,
   userId: string,
   email: string,
-  metadata: { full_name: string; phone: string },
+  metadata: { full_name: string; phone: string; grade: string },
 ) {
   const { data: existing } = await admin
     .from('students')
-    .select('id')
+    .select('id, stage_id')
     .eq('user_id', userId)
     .maybeSingle()
-  if (existing) return
+
+  const stageId = await resolveStageId(admin, metadata.grade)
+
+  if (existing) {
+    // Backfill stage_id if the row exists but is missing its stage.
+    if (!existing.stage_id && stageId) {
+      await admin.from('students').update({ stage_id: stageId }).eq('id', existing.id)
+    }
+    return
+  }
 
   const code = await generateStudentCode(admin)
   const { error } = await admin.from('students').insert({
@@ -57,6 +83,7 @@ async function ensureStudentRow(
     name: metadata.full_name || email.split('@')[0],
     email,
     phone: metadata.phone || null,
+    stage_id: stageId,
   })
   if (error) {
     console.log('[v0] ensureStudentRow error:', error.message)
