@@ -328,7 +328,10 @@ function CourseDetailsModal({ course, inCart, onAddCourse, onClose, purchasedCou
               )}
               {group.lectures.map((lecture, index) => {
                 const isOpen = expanded[lecture.dbId ?? lecture.slug] ?? false
-                const isLectureFree = lecture.isFree || course.price === 0
+                // A lecture is free only when explicitly marked isFree.
+                // course.price === 0 means the whole bundle is free to purchase,
+                // not that individual lectures inside it are free to preview.
+                const isLectureFree = lecture.isFree
                 const isFreeAccess = isLectureFree || isCoursePurchased
                 
                 return (
@@ -518,7 +521,7 @@ function LectureDetailsModal({
             </h3>
             <ul className="space-y-1">
               {lecture.lessons.map((lesson, i) => {
-                const isFreeAccess = lesson.isFree || lecture.price === 0
+                const isFreeAccess = !!lesson.isFree
                 return (
                   <li
                     key={lesson.id}

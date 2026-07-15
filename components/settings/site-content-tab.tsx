@@ -658,9 +658,70 @@ function FooterEditor({ value, onChange }: { value: FooterContent; onChange: (v:
 
 function NavbarEditor({ value, onChange }: { value: NavbarContent; onChange: (v: NavbarContent) => void }) {
   const set = <K extends keyof NavbarContent>(k: K, v: NavbarContent[K]) => onChange({ ...value, [k]: v })
+  const logoInputRef = useRef<HTMLInputElement>(null)
+  const [uploadingLogo, startLogoUpload] = useTransition()
+
+  function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    startLogoUpload(async () => {
+      const url = await uploadToStorage(file, 'logos')
+      if (url) set('logoUrl', url)
+    })
+  }
+
   return (
     <div className="space-y-4">
-      <Field label="اسم الموقع ف�� الشريط"><Input value={value.siteName} onChange={(e) => set('siteName', e.target.value)} className="text-right" /></Field>
+      {/* Logo upload */}
+      <div>
+        <FieldLabel hint="الصورة تظهر بدلاً من أيقونة ƒ(x) الافتراضية في شريط التنقل">
+          لوجو الموقع
+        </FieldLabel>
+        <div className="mt-2 flex items-center gap-4">
+          <div className="relative size-14 shrink-0 overflow-hidden rounded-xl border border-border bg-secondary">
+            {value.logoUrl ? (
+              <img src={value.logoUrl} alt="logo" className="size-full object-cover" />
+            ) : (
+              <span className="grid size-full place-items-center font-mono text-lg font-bold text-muted-foreground">
+                ƒ(x)
+              </span>
+            )}
+          </div>
+          <div className="flex flex-col gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={uploadingLogo}
+              onClick={() => logoInputRef.current?.click()}
+              className="gap-2"
+            >
+              {uploadingLogo ? <Loader2 className="size-4 animate-spin" /> : <Camera className="size-4" />}
+              {uploadingLogo ? 'جاري الرفع...' : 'رفع لوجو'}
+            </Button>
+            {value.logoUrl && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => set('logoUrl', '')}
+                className="text-destructive hover:text-destructive"
+              >
+                إزالة اللوجو
+              </Button>
+            )}
+          </div>
+          <input
+            ref={logoInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleLogoChange}
+          />
+        </div>
+      </div>
+
+      <Field label="اسم الموقع في الشريط"><Input value={value.siteName} onChange={(e) => set('siteName', e.target.value)} className="text-right" /></Field>
       <LinksEditor label="روابط القائمة" links={value.links} onChange={(v) => set('links', v)} />
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label="نص 'تسجيل الدخول'"><Input value={value.ctaLoginText} onChange={(e) => set('ctaLoginText', e.target.value)} className="text-right" /></Field>

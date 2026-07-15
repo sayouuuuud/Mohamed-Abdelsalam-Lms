@@ -106,6 +106,7 @@ export type FooterContent = {
 
 export type NavbarContent = {
   siteName: string
+  logoUrl: string
   links: FooterLink[]
   ctaLoginText: string
   ctaRegisterText: string
@@ -330,6 +331,7 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
 
   navbar: {
     siteName: 'عبد السلام',
+    logoUrl: '',
     links: [
       { label: 'المنهج', href: '#features' },
       { label: 'المراحل', href: '#stages' },
