@@ -4,28 +4,16 @@ import {
   ArrowRight,
   PlayCircle,
   Check,
-  Sparkles,
-  ShieldCheck,
-  Infinity as InfinityIcon,
   Layers,
+  Sparkles,
 } from 'lucide-react'
 import type { Stage } from '@/lib/landing-data'
-import { SubscribeButton } from './subscribe-button'
-import { DEFAULT_SITE_CONTENT, type StageOfferContent } from '@/lib/site-content-defaults'
-
-function formatEGP(value: number) {
-  return new Intl.NumberFormat('ar-EG').format(value)
-}
 
 export function StageDetail({
   stage,
-  stageOffer,
 }: {
   stage: Stage
-  stageOffer?: StageOfferContent
 }) {
-  const offer = stageOffer ?? DEFAULT_SITE_CONTENT.stage_offer
-
   // Total courses = sum of monthly courses across all branches
   const totalCourses = stage.branches.reduce(
     (sum, b) => sum + (b.monthlyCourses ?? []).length,
@@ -42,12 +30,6 @@ export function StageDetail({
       ),
     0,
   )
-
-  // All lecture db ids in this stage (for "subscribe to the whole stage").
-  const stageLectureIds = stage.branches
-    .flatMap((b) => b.lectures)
-    .map((l) => l.dbId)
-    .filter((id): id is string => Boolean(id))
 
   return (
     <main className="min-h-screen bg-cream dark:bg-ink-base">
@@ -211,116 +193,7 @@ export function StageDetail({
         </div>
       </section>
 
-      {/* ── Full term banner ──────────────────────────────────────────── */}
-      <section className="mx-auto max-w-7xl px-5 pb-20 md:px-8 md:pb-28">
-        <div className="relative overflow-hidden rounded-[2.5rem] bg-navy p-8 text-cream shadow-2xl shadow-navy/20 md:p-12 dark:bg-ink-raised">
-          <div
-            className="graph-paper-light pointer-events-none absolute inset-0 opacity-40"
-            aria-hidden="true"
-          />
-          <div
-            className="pointer-events-none absolute -left-20 -top-20 h-72 w-72 rounded-full bg-gold/15 blur-3xl"
-            aria-hidden="true"
-          />
 
-          <div className="relative grid items-center gap-10 lg:grid-cols-[1.4fr_1fr]">
-            {/* left: offer + features */}
-            <div>
-              <span className="inline-flex items-center gap-2 rounded-full bg-gold/20 px-3 py-1 text-xs font-bold text-gold">
-                <Sparkles className="size-3.5" />
-                {offer.badgeText}
-              </span>
-              <h3 className="mt-4 text-balance font-heading text-3xl font-extrabold text-cream md:text-4xl">
-                {offer.headingTemplate.replace('{stageName}', stage.title)}
-              </h3>
-              <p className="mt-3 max-w-xl text-pretty leading-relaxed text-cream/70">
-                {offer.description}
-              </p>
-
-              <ul className="mt-6 grid gap-3 sm:grid-cols-2">
-                {offer.featureItems.map((text, i) => {
-                  const icons = [PlayCircle, InfinityIcon, Check, ShieldCheck]
-                  const Icon = icons[i % icons.length]
-                  return (
-                    <li key={i} className="flex items-center gap-3 text-sm text-cream/85">
-                      <Icon className="size-5 shrink-0 text-emerald-brand" />
-                      {text}
-                    </li>
-                  )
-                })}
-              </ul>
-            </div>
-
-            {/* right: term cards (or legacy single price) */}
-            <div className="flex flex-col gap-4">
-              {(stage.terms ?? []).length > 0 ? (
-                // ── Structured term cards ──────────────────────────────
-                (stage.terms ?? []).map((term) => (
-                  <div
-                    key={term.id}
-                    className="rounded-[1.75rem] border border-white/10 bg-navy-deep/50 p-7 backdrop-blur"
-                  >
-                    <p className="text-sm font-semibold text-cream/60">{term.title}</p>
-                    <div className="mt-2 flex items-end gap-2">
-                      {term.oldPrice && (
-                        <span className="text-xl text-cream/40 line-through">
-                          {formatEGP(term.oldPrice)}
-                        </span>
-                      )}
-                      <span className="font-heading text-5xl font-extrabold text-gold">
-                        {formatEGP(term.price)}
-                      </span>
-                      <span className="pb-2 text-sm font-bold text-cream/70">ج.م</span>
-                    </div>
-                    {term.oldPrice && (
-                      <p className="mt-2 inline-flex rounded-lg bg-emerald-brand/15 px-3 py-1 text-sm font-bold text-emerald-brand">
-                        وفّر {formatEGP(term.oldPrice - term.price)} ج.م
-                      </p>
-                    )}
-                    <SubscribeButton
-                      termId={term.id}
-                      label={`اشترك في ${term.title}`}
-                      className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full bg-gold px-6 py-4 text-base font-bold text-navy-deep transition-transform duration-200 hover:-translate-y-0.5 disabled:opacity-70 dark:bg-violet-glow dark:text-white dark:shadow-[0_0_24px_oklch(0.66_0.2_292_/_0.4)]"
-                    />
-                    <p className="mt-3 text-center text-xs text-cream/50">
-                      {offer.guaranteeText}
-                    </p>
-                  </div>
-                ))
-              ) : (
-                // ── Legacy single-price card (fallback) ────────────────
-                <div className="rounded-[1.75rem] border border-white/10 bg-navy-deep/50 p-7 backdrop-blur">
-                  <p className="text-sm font-semibold text-cream/60">{offer.priceLabel}</p>
-                  <div className="mt-2 flex items-end gap-2">
-                    {stage.termOldPrice && (
-                      <span className="text-xl text-cream/40 line-through">
-                        {formatEGP(stage.termOldPrice)}
-                      </span>
-                    )}
-                    <span className="font-heading text-5xl font-extrabold text-gold">
-                      {formatEGP(stage.termPrice)}
-                    </span>
-                    <span className="pb-2 text-sm font-bold text-cream/70">ج.م</span>
-                  </div>
-                  {stage.termOldPrice && (
-                    <p className="mt-2 inline-flex rounded-lg bg-emerald-brand/15 px-3 py-1 text-sm font-bold text-emerald-brand">
-                      وفّر {formatEGP(stage.termOldPrice - stage.termPrice)} ج.م
-                    </p>
-                  )}
-                  <SubscribeButton
-                    lectureIds={stageLectureIds}
-                    label={offer.buttonText}
-                    className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full bg-gold px-6 py-4 text-base font-bold text-navy-deep transition-transform duration-200 hover:-translate-y-0.5 disabled:opacity-70 dark:bg-violet-glow dark:text-white dark:shadow-[0_0_24px_oklch(0.66_0.2_292_/_0.4)]"
-                  />
-                  <p className="mt-3 text-center text-xs text-cream/50">
-                    {offer.guaranteeText}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
     </main>
   )
 }

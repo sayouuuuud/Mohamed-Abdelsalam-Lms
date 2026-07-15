@@ -42,7 +42,6 @@ import type {
   SeoContent,
   LoginPanelContent,
   LoginPanelStat,
-  StageOfferContent,
 } from '@/lib/site-content-defaults'
 
 // ── Shared primitives ──────────────────────────────────────────────────────
@@ -786,6 +785,16 @@ function LoginPanelEditor({ value, onChange }: { value: LoginPanelContent; onCha
   }
   return (
     <div className="space-y-4">
+      <Field label="اسم المنصة / المدرس" hint="يظهر في صفحة تسجيل الدخول بدلاً من الاسم الثابت">
+        <Input value={value.brandName ?? ''} onChange={(e) => set('brandName', e.target.value)} className="text-right" placeholder="مثال: عبد السلام" />
+      </Field>
+      <ImageField
+        label="شعار المنصة (اختياري)"
+        hint="يظهر بجانب الاسم في صفحة تسجيل الدخول — 40×40 بكسل على الأقل"
+        value={value.logoUrl ?? ''}
+        onChange={(v) => set('logoUrl', v)}
+      />
+      <Separator />
       <Field label="البادج (النص الصغير فوق العنوان)" hint="مثال: منصة الرياضيات الأولى للثانوية العامة">
         <Input value={value.badge} onChange={(e) => set('badge', e.target.value)} className="text-right" />
       </Field>
@@ -835,76 +844,6 @@ function LoginPanelEditor({ value, onChange }: { value: LoginPanelContent; onCha
   )
 }
 
-// ── Stage Offer Editor ─────────────────────────────────────────────────────
-
-function StageOfferEditor({
-  value,
-  onChange,
-}: {
-  value: StageOfferContent
-  onChange: (v: StageOfferContent) => void
-}) {
-  const set = <K extends keyof StageOfferContent>(k: K, v: StageOfferContent[K]) =>
-    onChange({ ...value, [k]: v })
-
-  function updateFeature(i: number, text: string) {
-    const updated = [...value.featureItems]
-    updated[i] = text
-    set('featureItems', updated)
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="نص الشارة" hint='مثال: "العرض الأوفر"'>
-          <Input value={value.badgeText} onChange={(e) => set('badgeText', e.target.value)} className="text-right" />
-        </Field>
-        <Field label="نص الزر">
-          <Input value={value.buttonText} onChange={(e) => set('buttonText', e.target.value)} className="text-right" />
-        </Field>
-      </div>
-
-      <Field
-        label="قالب العنوان"
-        hint='استخدم {stageName} وسيستبدل باسم المرحلة تلقائياً — مثال: "اشترك في {stageName} كاملة"'
-      >
-        <Input value={value.headingTemplate} onChange={(e) => set('headingTemplate', e.target.value)} className="text-right" />
-      </Field>
-
-      <Field label="الوصف">
-        <Textarea value={value.description} onChange={(v) => set('description', v)} rows={2} />
-      </Field>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="تسمية السعر" hint='مثال: "سعر الترم كامل"'>
-          <Input value={value.priceLabel} onChange={(e) => set('priceLabel', e.target.value)} className="text-right" />
-        </Field>
-        <Field label="نص ضمان الاسترجاع">
-          <Input value={value.guaranteeText} onChange={(e) => set('guaranteeText', e.target.value)} className="text-right" />
-        </Field>
-      </div>
-
-      <div>
-        <FieldLabel hint="4 نقاط تظهر في قائمة مميزات الكارد">المميزات الأربع</FieldLabel>
-        <div className="mt-2 space-y-2">
-          {value.featureItems.map((item, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <span className="grid size-6 shrink-0 place-items-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
-                {i + 1}
-              </span>
-              <Input
-                value={item}
-                onChange={(e) => updateFeature(i, e.target.value)}
-                className="text-right"
-              />
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ── Main export ────────────────────────────────────────────────────────────
 
 export function SiteContentTab({ initialContent }: { initialContent: SiteContent }) {
@@ -922,7 +861,6 @@ export function SiteContentTab({ initialContent }: { initialContent: SiteContent
   const [navbar, setNavbar] = useState<NavbarContent>(initialContent.navbar)
   const [seo, setSeo] = useState<SeoContent>(initialContent.seo)
   const [loginPanel, setLoginPanel] = useState<LoginPanelContent>(initialContent.login_panel)
-  const [stageOffer, setStageOffer] = useState<StageOfferContent>(initialContent.stage_offer)
 
   const [savingSection, setSavingSection] = useState<string | null>(null)
 
@@ -956,7 +894,6 @@ export function SiteContentTab({ initialContent }: { initialContent: SiteContent
         case 'navbar': setNavbar(initialContent.navbar); break
         case 'seo': setSeo(initialContent.seo); break
         case 'login_panel': setLoginPanel(initialContent.login_panel); break
-        case 'stage_offer': setStageOffer(initialContent.stage_offer); break
       }
       toast.success('تمت استعادة القيم الافتراضية.')
       router.refresh()
@@ -1006,7 +943,7 @@ export function SiteContentTab({ initialContent }: { initialContent: SiteContent
     },
     {
       id: 'footer',
-      title: 'الفوتر (ذيل الصفحة)',
+      title: 'ا��فوتر (ذيل الصفحة)',
       description: 'الاسم، الوصف، الروابط السريعة، بيانات التواصل',
       editor: <FooterEditor value={footer} onChange={setFooter} />,
       onSave: () => save('footer', footer),
@@ -1036,14 +973,7 @@ export function SiteContentTab({ initialContent }: { initialContent: SiteContent
       onSave: () => save('login_panel', loginPanel),
       onReset: () => reset('login_panel', null),
     },
-    {
-      id: 'stage_offer',
-      title: 'كارد "العرض الأوفر" في صفحة المرحلة',
-      description: 'الشارة، العنوان، الوصف، المميزات الأربع، نص الزر، وضمان الاسترجاع',
-      editor: <StageOfferEditor value={stageOffer} onChange={setStageOffer} />,
-      onSave: () => save('stage_offer', stageOffer),
-      onReset: () => reset('stage_offer', null),
-    },
+
   ]
 
   return (

@@ -391,9 +391,9 @@ export function Header({
   const searchParams = useSearchParams()
   const [searchValue, setSearchValue] = useState('')
 
-  // Sync search input with URL param when on students page.
+  // Sync search input with the URL when on the global search page.
   useEffect(() => {
-    if (pathname.startsWith('/admin/students')) {
+    if (pathname.startsWith('/admin/search')) {
       setSearchValue(searchParams.get('q') || '')
     } else {
       setSearchValue('')
@@ -402,19 +402,14 @@ export function Header({
 
   const handleSearch = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key !== 'Enter' || e.nativeEvent.isComposing) return
+      if (e.key !== 'Enter') return
+      // Ignore while IME composition is in progress (CJK & Arabic).
+      if (e.nativeEvent.isComposing || e.keyCode === 229) return
       const q = e.currentTarget.value.trim()
-      // Route to the most relevant admin section based on current page,
-      // defaulting to the students list for a global search.
-      if (pathname.startsWith('/admin/exams')) {
-        router.push(q ? `/admin/exams?q=${encodeURIComponent(q)}` : '/admin/exams')
-      } else if (pathname.startsWith('/admin/payments')) {
-        router.push(q ? `/admin/payments?q=${encodeURIComponent(q)}` : '/admin/payments')
-      } else {
-        router.push(q ? `/admin/students?q=${encodeURIComponent(q)}` : '/admin/students')
-      }
+      if (!q) return
+      router.push(`/admin/search?q=${encodeURIComponent(q)}`)
     },
-    [router, pathname],
+    [router],
   )
 
   return (
@@ -446,7 +441,7 @@ export function Header({
             value={searchValue}
             onChange={(e) => setSearchValue(e.target.value)}
             onKeyDown={handleSearch}
-            placeholder="ابحث عن طالب، اختبار، دفعة... (Enter)"
+            placeholder="بحث شامل — طالب، محاضرة، كورس، اختبار... (Enter)"
             className="h-11 w-full rounded-xl border border-border bg-secondary/60 pr-10 pl-4 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:bg-card"
           />
         </div>
