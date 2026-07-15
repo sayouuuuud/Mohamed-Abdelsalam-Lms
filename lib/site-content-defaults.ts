@@ -134,6 +134,8 @@ export type LoginPanelContent = {
   headline: string
   perks: string[]
   stats: LoginPanelStat[]
+  brandName: string   // displayed name in the auth panel header
+  logoUrl: string     // optional uploaded logo image URL
 }
 
 export type StageOfferContent = {
@@ -393,6 +395,8 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
       { value: '98%', label: 'نسبة رضا' },
       { value: '+25', label: 'سنة خبرة' },
     ],
+    brandName: 'عبد السلام',
+    logoUrl: '',
   },
 }
 

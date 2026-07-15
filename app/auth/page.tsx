@@ -1,5 +1,6 @@
 import { Fragment } from 'react'
 import type { Metadata } from 'next'
+import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowLeft, Check } from 'lucide-react'
 import { AuthForm } from '@/components/auth/auth-form'
@@ -56,10 +57,20 @@ export default async function AuthPage({
         <div className="graph-paper-light pointer-events-none absolute inset-0" aria-hidden="true" />
         <div className="relative flex h-full flex-col justify-between p-12">
           <Link href="/" className="flex items-center gap-2.5">
-            <span className="grid size-10 place-items-center rounded-md bg-cream font-mono text-sm font-bold text-navy">
-              ƒ(x)
-            </span>
-            <span className="font-heading text-2xl font-bold text-cream">عبد السلام</span>
+            {panel.logoUrl ? (
+              <Image
+                src={panel.logoUrl}
+                alt={panel.brandName}
+                width={40}
+                height={40}
+                className="size-10 rounded-md object-contain"
+              />
+            ) : (
+              <span className="grid size-10 place-items-center rounded-md bg-cream font-mono text-sm font-bold text-navy">
+                ƒ(x)
+              </span>
+            )}
+            <span className="font-heading text-2xl font-bold text-cream">{panel.brandName}</span>
           </Link>
 
           <div className="max-w-md">
@@ -105,10 +116,20 @@ export default async function AuthPage({
           </Link>
           {/* mobile-only logo */}
           <Link href="/" className="flex items-center gap-2 lg:hidden">
-            <span className="grid size-8 place-items-center rounded-md bg-navy font-mono text-xs font-bold text-cream dark:bg-violet-glow dark:text-white">
-              ƒ(x)
-            </span>
-            <span className="font-heading text-lg font-bold text-navy dark:text-ink-fg">عبد السلام</span>
+            {panel.logoUrl ? (
+              <Image
+                src={panel.logoUrl}
+                alt={panel.brandName}
+                width={32}
+                height={32}
+                className="size-8 rounded-md object-contain"
+              />
+            ) : (
+              <span className="grid size-8 place-items-center rounded-md bg-navy font-mono text-xs font-bold text-cream dark:bg-violet-glow dark:text-white">
+                ƒ(x)
+              </span>
+            )}
+            <span className="font-heading text-lg font-bold text-navy dark:text-ink-fg">{panel.brandName}</span>
           </Link>
         </div>
 

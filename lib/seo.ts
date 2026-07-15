@@ -40,9 +40,9 @@ export function buildStageDescription(opts: {
   stageTitle: string
   subtitle: string | null | undefined
   branchCount: number
-  siteName: string
+  siteName?: string
 }): string {
-  const { stageTitle, subtitle, branchCount, siteName } = opts
+  const { stageTitle, subtitle, branchCount, siteName = 'المنصة' } = opts
   if (subtitle && subtitle.length > 20) {
     return subtitle.slice(0, 155)
   }

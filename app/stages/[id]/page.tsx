@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { getStageBySlug } from '@/lib/curriculum'
-import { getSiteContent } from '@/lib/site-content'
 import { buildStageDescription, getSiteUrl } from '@/lib/seo'
 import { JsonLd } from '@/components/seo/json-ld'
 import { LandingNavbar } from '@/components/landing/landing-navbar'
@@ -14,13 +13,12 @@ export async function generateMetadata({
   params: Promise<{ id: string }>
 }): Promise<Metadata> {
   const { id } = await params
-  const [stage, { seo }] = await Promise.all([getStageBySlug(id), getSiteContent()])
+  const stage = await getStageBySlug(id)
   if (!stage) return { title: 'المرحلة غير موجودة' }
   const description = buildStageDescription({
     stageTitle: stage.title,
     subtitle: stage.subtitle,
     branchCount: stage.branches.length,
-    siteName: seo.title,
   })
   return {
     title: stage.title,
@@ -42,10 +40,7 @@ export default async function StagePage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const [stage, siteContent] = await Promise.all([
-    getStageBySlug(id),
-    getSiteContent(),
-  ])
+  const stage = await getStageBySlug(id)
   if (!stage) notFound()
 
   const siteUrl = getSiteUrl()
@@ -62,7 +57,7 @@ export default async function StagePage({
     <>
       <JsonLd data={breadcrumb} />
       <LandingNavbar />
-      <StageDetail stage={stage} stageOffer={siteContent.stage_offer} />
+      <StageDetail stage={stage} />
       <SiteFooter />
     </>
   )
