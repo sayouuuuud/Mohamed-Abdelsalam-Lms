@@ -243,8 +243,11 @@ export function VideoPlayer({
             type="button"
             onClick={() => {
               setError(false)
+              // Bump retryKey to force useHls to re-initialise hls.js from scratch;
+              // also reload the native <video> for plain MP4 sources.
+              setRetryKey((k) => k + 1)
               const v = videoRef.current
-              if (v) { v.load() }
+              if (v && !isHls) v.load()
             }}
             className="rounded-lg bg-white/15 px-4 py-2 text-sm transition-colors hover:bg-white/25"
           >

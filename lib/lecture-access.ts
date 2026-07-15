@@ -12,46 +12,55 @@ type OrderItem = {
 }
 
 /**
- * Checks whether an authenticated user can watch a lecture through any
- * approved purchase mode: the lecture itself, its monthly course, or its term.
+ * Returns true if the auth user (userId = auth.users.id) has an approved
+ * purchase that covers the given lectureId via any of three paths:
+ *   1. Direct lecture purchase  (item_type = 'lecture',       lecture_id = lectureId)
+ *   2. Course bundle            (item_type = 'course_bundle', monthly_course_id = lecture.monthly_course_id)
+ *   3. Term bundle              (item_type = 'term_bundle',   term_id = monthly_course.term_id)
  *
- * This must use the auth user id because orders.student_id stores auth.users.id
- * in the current schema. The service-role client is safe here because every
- * query remains explicitly scoped to that user id.
+ * orders.student_id stores auth.users.id directly, so userId must be the
+ * auth uid, not students.id.
  */
 export async function userCanAccessLecture(
   admin: AdminClient,
   userId: string,
   lectureId: string,
 ): Promise<boolean> {
-  const { data: lecture, error: lectureError } = await admin
+  // Step 1: resolve the lecture's course & term IDs (two plain queries — no nested select).
+  const { data: lecture } = await admin
     .from('lectures')
-    .select('id, monthly_course_id, monthly_courses(term_id)')
+    .select('id, monthly_course_id')
     .eq('id', lectureId)
     .maybeSingle()
 
-  if (lectureError || !lecture) return false
+  if (!lecture) return false
+  const courseId: string | null = lecture.monthly_course_id ?? null
 
-  const courseId = lecture.monthly_course_id as string | null
-  const relation = lecture.monthly_courses as unknown as
-    | { term_id: string | null }
-    | { term_id: string | null }[]
-    | null
-  const termId = Array.isArray(relation)
-    ? relation[0]?.term_id ?? null
-    : relation?.term_id ?? null
+  let termId: string | null = null
+  if (courseId) {
+    const { data: course } = await admin
+      .from('monthly_courses')
+      .select('term_id')
+      .eq('id', courseId)
+      .maybeSingle()
+    termId = course?.term_id ?? null
+  }
 
-  const { data: orders, error: ordersError } = await admin
+  // Step 2: fetch all approved order items for this user.
+  const { data: orders } = await admin
     .from('orders')
     .select('order_items(lecture_id, monthly_course_id, term_id, item_type)')
     .eq('student_id', userId)
     .eq('status', 'approved')
 
-  if (ordersError || !orders) return false
+  if (!orders) return false
 
   for (const order of orders) {
     for (const item of (order.order_items ?? []) as OrderItem[]) {
+      // Direct lecture purchase.
       if (item.lecture_id === lectureId) return true
+
+      // Course bundle covers this lecture.
       if (
         courseId &&
         item.item_type === 'course_bundle' &&
@@ -59,6 +68,8 @@ export async function userCanAccessLecture(
       ) {
         return true
       }
+
+      // Term bundle covers the course that contains this lecture.
       if (
         termId &&
         item.item_type === 'term_bundle' &&
