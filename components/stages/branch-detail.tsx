@@ -12,7 +12,7 @@ import {
   Layers,
   X,
 } from 'lucide-react'
-import { countLessons, type Stage, type Branch, type Lecture, type MonthlyCourse } from '@/lib/landing-data'
+import type { Stage, Branch, Lecture, MonthlyCourse } from '@/lib/landing-data'
 import { Check } from 'lucide-react'
 import { useCart } from '@/components/cart/cart-provider'
 

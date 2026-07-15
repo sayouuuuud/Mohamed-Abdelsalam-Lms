@@ -9,7 +9,7 @@ import {
   Infinity as InfinityIcon,
   Layers,
 } from 'lucide-react'
-import { countLessons, type Stage } from '@/lib/landing-data'
+import type { Stage } from '@/lib/landing-data'
 import { SubscribeButton } from './subscribe-button'
 import { DEFAULT_SITE_CONTENT, type StageOfferContent } from '@/lib/site-content-defaults'
 
@@ -25,8 +25,24 @@ export function StageDetail({
   stageOffer?: StageOfferContent
 }) {
   const offer = stageOffer ?? DEFAULT_SITE_CONTENT.stage_offer
-  const totalLessons = stage.branches.reduce((sum, b) => sum + countLessons(b), 0)
-  const totalLectures = stage.branches.reduce((sum, b) => sum + b.lectures.length, 0)
+
+  // Total courses = sum of monthly courses across all branches
+  const totalCourses = stage.branches.reduce(
+    (sum, b) => sum + (b.monthlyCourses ?? []).length,
+    0,
+  )
+  // Total lessons = lessons from all lectures inside all monthly courses
+  const totalLessons = stage.branches.reduce(
+    (sum, b) =>
+      sum +
+      (b.monthlyCourses ?? []).reduce(
+        (cs, c) =>
+          cs + c.lectures.reduce((ls, l) => ls + l.lessons.length, 0),
+        0,
+      ),
+    0,
+  )
+
   // All lecture db ids in this stage (for "subscribe to the whole stage").
   const stageLectureIds = stage.branches
     .flatMap((b) => b.lectures)
@@ -75,7 +91,7 @@ export function StageDetail({
                 </span>
                 <span className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-navy-deep/40 px-4 py-2.5 text-sm text-cream/90">
                   <Layers className="size-4 text-emerald-brand" />
-                  {totalLectures} كورس
+                  {totalCourses} كورس
                 </span>
                 <span className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-navy-deep/40 px-4 py-2.5 text-sm text-cream/90">
                   <PlayCircle className="size-4 text-emerald-brand" />
@@ -159,11 +175,15 @@ export function StageDetail({
                 <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-navy-soft dark:text-ink-dim">
                   <span className="inline-flex items-center gap-1.5">
                     <Layers className="size-4 text-emerald-deep" />
-                    {branch.lectures.length} كورس
+                    {(branch.monthlyCourses ?? []).length} كورس
                   </span>
                   <span className="inline-flex items-center gap-1.5">
                     <PlayCircle className="size-4 text-emerald-deep" />
-                    {countLessons(branch)} محاضرة
+                    {(branch.monthlyCourses ?? []).reduce(
+                      (sum, c) =>
+                        sum + c.lectures.reduce((ls, l) => ls + l.lessons.length, 0),
+                      0,
+                    )} محاضرة
                   </span>
                 </div>
 
