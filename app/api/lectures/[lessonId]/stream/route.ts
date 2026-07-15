@@ -2,8 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { verifyVideoToken, isLatestSession } from '@/lib/video-token'
 
-// Edge runtime: we only verify auth then redirect — no body streaming needed.
-export const runtime = 'edge'
+// Node runtime: video-token.ts uses node:crypto which is unavailable in Edge.
+export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 function deny(status: number) {
