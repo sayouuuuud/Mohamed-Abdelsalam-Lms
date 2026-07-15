@@ -44,7 +44,9 @@ export default function ExamDetailsPage({
           title: exam.title,
           status: exam.status,
           course: exam.course,
+          description: exam.description,
           duration: exam.duration,
+          passMark: exam.passMark,
           createdAt: exam.createdAt,
           submissions: exam.submissions,
         }}

@@ -120,7 +120,9 @@ export async function getExamDetails(code: string): Promise<ExamDetailsData | nu
     code: exam.code,
     title: exam.title,
     course: exam.course,
+    description: exam.description ?? '',
     duration: exam.duration,
+    passMark: exam.pass_mark ?? 50,
     questionsCount: questions.length > 0 ? questions.length : exam.questions,
     participants: actualParticipants > 0 ? actualParticipants : exam.participants,
     avgScore,
@@ -363,7 +365,6 @@ export async function updateExam(
     .eq('code', examCode)
 
   if (error) {
-    console.log('[v0] updateExam error:', error.message)
     return { success: false, error: 'تعذّر تحديث الاختبار' }
   }
 
