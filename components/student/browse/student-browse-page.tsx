@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import {
   BookOpen,
@@ -99,6 +99,11 @@ export function StudentBrowsePage({
   const { add, addCourse, inCart, courseInCart, setOpen, count } = useCart()
   const [query, setQuery] = useState(searchParams.get('q') || '')
   const [stageFilter, setStageFilter] = useState<string>('all')
+
+  // Keep local query in sync when the URL param changes (e.g. search from header).
+  useEffect(() => {
+    setQuery(searchParams.get('q') || '')
+  }, [searchParams])
   const [courseDetails, setCourseDetails] = useState<FlatCourse | null>(null)
 
   // Flatten the curriculum tree into a searchable list of monthly courses.
@@ -150,15 +155,20 @@ export function StudentBrowsePage({
   }, [stages])
 
   const filteredCourses = useMemo(() => {
-    const q = query.trim()
+    const q = query.trim().toLowerCase()
     return courses.filter((course) => {
       if (stageFilter !== 'all' && course.stageTitle !== stageFilter) return false
       if (!q) return true
-      return (
-        course.title.includes(q) ||
-        course.branchTitle.includes(q) ||
-        course.stageTitle.includes(q)
+      const matchesCourse =
+        course.title.toLowerCase().includes(q) ||
+        course.branchTitle.toLowerCase().includes(q) ||
+        course.stageTitle.toLowerCase().includes(q) ||
+        (course.description ?? '').toLowerCase().includes(q)
+      const matchesLecture = course.lectures.some((l) =>
+        l.title.toLowerCase().includes(q) ||
+        (l.description ?? '').toLowerCase().includes(q),
       )
+      return matchesCourse || matchesLecture
     })
   }, [courses, query, stageFilter])
 
