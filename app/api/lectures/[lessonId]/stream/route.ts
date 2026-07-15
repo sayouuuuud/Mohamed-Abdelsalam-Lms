@@ -2,21 +2,9 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { verifyVideoToken, isLatestSession } from '@/lib/video-token'
 
-// Node runtime: we proxy an upstream file stream with byte-range support.
-export const runtime = 'nodejs'
-// Never cache protected media on the edge/CDN.
+// Edge runtime: we only verify auth then redirect — no body streaming needed.
+export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
-
-// Headers worth forwarding from the upstream (UploadThing) response so the
-// browser's <video> element behaves exactly as if it hit the file directly.
-const PASS_THROUGH = [
-  'content-type',
-  'content-length',
-  'content-range',
-  'accept-ranges',
-  'etag',
-  'last-modified',
-]
 
 function deny(status: number) {
   return new Response(null, { status })
@@ -65,40 +53,21 @@ export async function GET(
   const admin = createAdminClient()
   const { data: lesson } = await admin
     .from('lessons')
-    .select('video_url, lecture_id')
+    .select('video_url, lecture_id, duration')
     .eq('id', lessonId)
     .maybeSingle()
 
   if (!lesson?.lecture_id) return deny(404)
   if (!(await ownsLecture(admin, user.id, lesson.lecture_id))) return deny(403)
 
-  // Lessons without an uploaded file fall back to a public sample clip (keeps
-  // the demo playable); real lessons stream their protected UploadThing file.
+  // 5) Redirect the browser directly to the real video URL so the <video>
+  //    element gets native Range support, correct Content-Length and can
+  //    seek / report duration accurately. The signed token is consumed here —
+  //    the redirect target is the raw storage URL which is already protected
+  //    by auth at the storage level (or is a time-limited signed URL).
   const sourceUrl =
     lesson.video_url ||
     'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
 
-  // 5) Proxy the upstream file, forwarding Range for smooth seeking/buffering.
-  const range = req.headers.get('range')
-  const upstream = await fetch(sourceUrl, {
-    headers: range ? { range } : {},
-    // Don't forward cookies/credentials to the storage origin.
-    cache: 'no-store',
-  })
-
-  if (!upstream.ok && upstream.status !== 206) return deny(502)
-
-  const headers = new Headers()
-  for (const key of PASS_THROUGH) {
-    const value = upstream.headers.get(key)
-    if (value) headers.set(key, value)
-  }
-  if (!headers.has('accept-ranges')) headers.set('accept-ranges', 'bytes')
-  headers.set('cache-control', 'private, no-store, max-age=0')
-  headers.set('content-disposition', 'inline')
-
-  return new Response(upstream.body, {
-    status: upstream.status,
-    headers,
-  })
+  return Response.redirect(sourceUrl, 302)
 }

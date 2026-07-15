@@ -97,6 +97,7 @@ export function VideoPlayer({
   const [duration, setDuration] = useState(0)
   const [speed, setSpeed] = useState<number>(1)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [error, setError] = useState(false)
 
   const isYoutube = src && (src.includes('youtube.com/') || src.includes('youtu.be/'))
   const getYoutubeId = (url: string) => {
@@ -104,6 +105,14 @@ export function VideoPlayer({
     const match = url.match(regExp)
     return match && match[2].length === 11 ? match[2] : null
   }
+
+  // Reset state when video source changes.
+  useEffect(() => {
+    setPlaying(false)
+    setCurrent(0)
+    setDuration(0)
+    setError(false)
+  }, [src])
 
   // مزامنة سرعة التشغيل مع عنصر الفيديو
   useEffect(() => {
@@ -174,6 +183,7 @@ export function VideoPlayer({
         poster={poster}
         className="absolute inset-0 size-full object-contain"
         preload="metadata"
+        crossOrigin="anonymous"
         controlsList="nodownload noremoteplayback nofullscreen"
         disablePictureInPicture
         disableRemotePlayback
@@ -182,13 +192,39 @@ export function VideoPlayer({
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onTimeUpdate={(e) => setCurrent(e.currentTarget.currentTime)}
-        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
+        onLoadedMetadata={(e) => {
+          const d = e.currentTarget.duration
+          if (Number.isFinite(d) && d > 0) setDuration(d)
+        }}
+        onDurationChange={(e) => {
+          const d = e.currentTarget.duration
+          if (Number.isFinite(d) && d > 0) setDuration(d)
+        }}
         onVolumeChange={(e) => setMuted(e.currentTarget.muted)}
+        onError={() => setError(true)}
       >
         {/* HLS: src يُعيَّن بواسطة useHls hook — لا نضع <source> هنا */}
         {src && !isHls ? <source src={src} type="video/mp4" /> : null}
         متصفحك لا يدعم تشغيل الفيديو.
       </video>
+
+      {/* Error overlay */}
+      {error && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/80 text-white">
+          <p className="text-sm font-medium">تعذّر تحميل الفيديو</p>
+          <button
+            type="button"
+            onClick={() => {
+              setError(false)
+              const v = videoRef.current
+              if (v) { v.load() }
+            }}
+            className="rounded-lg bg-white/15 px-4 py-2 text-sm transition-colors hover:bg-white/25"
+          >
+            إعادة المحاولة
+          </button>
+        </div>
+      )}
 
       {/* Settings menu */}
       {settingsOpen && (
