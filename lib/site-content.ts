@@ -13,6 +13,7 @@ import {
   type NavbarContent,
   type SeoContent,
   type LoginPanelContent,
+  type StageOfferContent,
 } from '@/lib/site-content-defaults'
 
 // Re-export for server-side consumers (app/page.tsx, app/layout.tsx, actions).
@@ -30,6 +31,7 @@ export type {
   SeoContent,
   LoginPanelContent,
   LoginPanelStat,
+  StageOfferContent,
   FeatureItem,
   StatItem,
   TestimonialItem,
@@ -71,6 +73,7 @@ export async function getSiteContent(): Promise<SiteContent> {
       navbar:       deepMerge(DEFAULT_SITE_CONTENT.navbar,       (dbMap.navbar       ?? {}) as Partial<NavbarContent>),
       seo:          deepMerge(DEFAULT_SITE_CONTENT.seo,          (dbMap.seo          ?? {}) as Partial<SeoContent>),
       login_panel:  deepMerge(DEFAULT_SITE_CONTENT.login_panel,  (dbMap.login_panel  ?? {}) as Partial<LoginPanelContent>),
+      stage_offer:  deepMerge(DEFAULT_SITE_CONTENT.stage_offer,  (dbMap.stage_offer  ?? {}) as Partial<StageOfferContent>),
     }
   } catch (err) {
     // Re-throw Next.js control-flow signals (e.g. DYNAMIC_SERVER_USAGE raised by
