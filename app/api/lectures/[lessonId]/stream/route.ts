@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { verifyVideoToken, isLatestSession } from '@/lib/video-token'
+import { userCanAccessLecture } from '@/lib/lecture-access'
 
 // Node runtime: video-token.ts uses node:crypto which is unavailable in Edge.
 export const runtime = 'nodejs'
@@ -8,22 +9,6 @@ export const dynamic = 'force-dynamic'
 
 function deny(status: number) {
   return new Response(null, { status })
-}
-
-// Confirms the student still owns the lecture the lesson belongs to.
-async function ownsLecture(
-  admin: ReturnType<typeof createAdminClient>,
-  userId: string,
-  lectureId: string,
-): Promise<boolean> {
-  const { data } = await admin
-    .from('orders')
-    .select('status, order_items!inner ( lecture_id )')
-    .eq('student_id', userId)
-    .eq('status', 'approved')
-    .eq('order_items.lecture_id', lectureId)
-    .limit(1)
-  return !!data && data.length > 0
 }
 
 export async function GET(
@@ -57,17 +42,15 @@ export async function GET(
     .eq('id', lessonId)
     .maybeSingle()
 
-  if (!lesson?.lecture_id) return deny(404)
-  if (!(await ownsLecture(admin, user.id, lesson.lecture_id))) return deny(403)
+  if (!lesson?.lecture_id || !lesson.video_url) return deny(404)
+  if (!(await userCanAccessLecture(admin, user.id, lesson.lecture_id))) {
+    return deny(403)
+  }
 
   // 5) Redirect the browser directly to the real video URL so the <video>
   //    element gets native Range support, correct Content-Length and can
   //    seek / report duration accurately. The signed token is consumed here —
   //    the redirect target is the raw storage URL which is already protected
   //    by auth at the storage level (or is a time-limited signed URL).
-  const sourceUrl =
-    lesson.video_url ||
-    'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
-
-  return Response.redirect(sourceUrl, 302)
+  return Response.redirect(lesson.video_url, 302)
 }
