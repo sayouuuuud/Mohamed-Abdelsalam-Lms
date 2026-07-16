@@ -55,12 +55,21 @@ function LectureRow({
   index: number
   watchHref: string
 }) {
+  const { add, inCart, setOpen: setCartOpen } = useCart()
   // A lecture is "free to watch" if explicitly flagged OR its price is 0.
   // Don't show "مجانية" badge when the lecture has a price > 0 even if isFree
   // is set, because isFree just means "preview" in that context.
   const freeAccess = !!lecture.isFree
   const free = freeAccess && (lecture.price === 0 || lecture.price == null)
   const lessonsCount = lecture.lessons.length
+  const lectureInCart = lecture.dbId ? inCart(lecture.dbId) : false
+
+  // Buys ONLY this lecture (lecture_id), never the whole course bundle.
+  async function handleBuyLecture() {
+    if (!lecture.dbId) return
+    if (!lectureInCart) await add(lecture.dbId, lecture.title)
+    setCartOpen(true)
+  }
 
   return (
     <div className="flex items-center gap-4 rounded-2xl border border-navy/10 bg-white p-4 transition-colors hover:bg-cream/60 dark:border-ink-line dark:bg-ink-raised dark:hover:bg-ink-base/60">
@@ -95,10 +104,37 @@ function LectureRow({
           شاهد الآن
         </Link>
       ) : (
-        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-navy/15 px-4 py-2.5 text-sm font-bold text-navy-soft dark:border-ink-line dark:text-ink-dim">
-          <Lock className="size-3.5" />
-          بالاشتراك
-        </span>
+        <div className="flex shrink-0 items-center gap-3">
+          <div className="hidden flex-col items-end sm:flex">
+            {lecture.oldPrice ? (
+              <span className="text-xs text-navy-soft/60 line-through dark:text-ink-dim/60">
+                {formatEGP(lecture.oldPrice)}
+              </span>
+            ) : null}
+            <span className="font-heading text-base font-extrabold text-navy dark:text-ink-fg">
+              {formatEGP(lecture.price)}
+              <span className="mr-1 text-xs font-bold text-gold-deep dark:text-teal-glow">ج.م</span>
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handleBuyLecture}
+            disabled={!lecture.dbId}
+            className="inline-flex items-center gap-1.5 rounded-full bg-navy px-4 py-2.5 text-sm font-bold text-cream transition-colors hover:bg-navy-deep disabled:cursor-not-allowed disabled:opacity-50 dark:bg-violet-glow dark:text-white dark:hover:bg-violet-deep"
+          >
+            {lectureInCart ? (
+              <>
+                <Check className="size-4" />
+                أكمل الشراء
+              </>
+            ) : (
+              <>
+                <Lock className="size-3.5" />
+                اشترِ المحاضرة
+              </>
+            )}
+          </button>
+        </div>
       )}
     </div>
   )
