@@ -21,7 +21,9 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
-import { saveStreamingSettings } from '@/lib/video-actions'
+import { saveStreamingSettings, testR2Connection } from '@/lib/video-actions'
+import { migrateStorageDryRun, runStorageMigration, type MigrationDryRunResult, type MigrationProgress } from '@/lib/media-migrate'
+import { ArrowRightLeft } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -191,6 +193,44 @@ export function StreamingTab({
 
   const [jobsExpanded,   setJobsExpanded]   = useState(true)
   const [videosExpanded, setVideosExpanded] = useState(false)
+  const [r2Testing,      setR2Testing]      = useState(false)
+  const [r2TestResult,   setR2TestResult]   = useState<{ ok: boolean; message: string } | null>(null)
+
+  // Migration state
+  const [migDryRun,    setMigDryRun]    = useState<MigrationDryRunResult | null>(null)
+  const [migRunning,   setMigRunning]   = useState(false)
+  const [migResult,    setMigResult]    = useState<MigrationProgress | null>(null)
+  const [migLogOpen,   setMigLogOpen]   = useState(false)
+
+  const handleDryRun = async () => {
+    setMigDryRun(null)
+    setMigResult(null)
+    const result = await migrateStorageDryRun()
+    setMigDryRun(result)
+  }
+
+  const handleMigrate = async () => {
+    if (!migDryRun) return
+    setMigRunning(true)
+    setMigResult(null)
+    try {
+      const result = await runStorageMigration()
+      setMigResult(result)
+    } finally {
+      setMigRunning(false)
+    }
+  }
+
+  const handleTestR2 = async () => {
+    setR2Testing(true)
+    setR2TestResult(null)
+    try {
+      const result = await testR2Connection()
+      setR2TestResult(result)
+    } finally {
+      setR2Testing(false)
+    }
+  }
 
   const totalVideos    = videos.length
   const readyVideos    = videos.filter((v) => v.status === 'ready').length
@@ -232,19 +272,47 @@ export function StreamingTab({
         </Button>
       </div>
 
-      {/* R2 not configured banner */}
-      {!r2Configured && (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
-          <AlertCircle className="mt-0.5 size-5 shrink-0" />
-          <div className="space-y-1">
-            <p className="font-semibold">التخزين السحابي (Cloudflare R2) غير مهيّأ بعد</p>
-            <p className="text-amber-700 dark:text-amber-400/90">
-              نظام الـ HLS Streaming معطّل مؤقتاً، والرفع يتم حالياً بالطريقة العادية (UploadThing / MP4 مباشر).
-              لتفعيل الـ streaming: اضبط متغيرات <code className="font-mono">R2_*</code> في إعدادات المشروع، ثم انشر الوركر، وبعدها فعّل النظام من هنا.
+      {/* R2 status banner + diagnostic button */}
+      <div className={`flex flex-col gap-3 rounded-xl border p-4 text-sm ${r2Configured ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300' : 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300'}`}>
+        <div className="flex items-start gap-3">
+          {r2Configured
+            ? <CheckCircle2 className="mt-0.5 size-5 shrink-0" />
+            : <AlertCircle className="mt-0.5 size-5 shrink-0" />
+          }
+          <div className="flex-1 space-y-1">
+            <p className="font-semibold">
+              {r2Configured ? 'Cloudflare R2 مهيّأ' : 'التخزين السحابي (Cloudflare R2) غير مهيّأ بعد'}
             </p>
+            {!r2Configured && (
+              <p className="text-amber-700 dark:text-amber-400/90">
+                نظام الـ HLS Streaming معطّل مؤقتاً، والرفع يتم بالطريقة العادية (MP4 مباشر).
+                لتفعيل الـ streaming: اضبط متغيرات <code className="font-mono">R2_*</code> في إعدادات المشروع (Vars)، ثم انشر الوركر.
+              </p>
+            )}
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleTestR2}
+            disabled={r2Testing}
+            className="shrink-0"
+          >
+            {r2Testing ? <Loader2 className="size-4 animate-spin" /> : <Zap className="size-4" />}
+            اختبار الاتصال
+          </Button>
         </div>
-      )}
+
+        {/* Test result */}
+        {r2TestResult && (
+          <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${r2TestResult.ok ? 'border-emerald-200 bg-white/60 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/5 dark:text-emerald-400' : 'border-red-200 bg-white/60 text-red-700 dark:border-red-500/30 dark:bg-red-500/5 dark:text-red-400'}`}>
+            {r2TestResult.ok
+              ? <CheckCircle2 className="size-4 shrink-0" />
+              : <AlertCircle className="size-4 shrink-0" />
+            }
+            {r2TestResult.message}
+          </div>
+        )}
+      </div>
 
       {/* Stats row */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -493,6 +561,94 @@ export function StreamingTab({
                   ))}
                 </tbody>
               </table>
+            )}
+          </div>
+        )}
+      </Card>
+
+      {/* Storage Migration Tool */}
+      <Card className="p-6">
+        <div className="mb-4 flex items-center gap-2">
+          <ArrowRightLeft className="size-5 text-primary" />
+          <h3 className="text-lg font-bold text-foreground">أداة نقل الصور (Supabase → UploadThing)</h3>
+        </div>
+        <p className="mb-4 text-sm text-muted-foreground">
+          تفحص قاعدة البيانات بحثاً عن روابط Supabase Storage القديمة وتنقلها تلقائياً إلى UploadThing.
+          استخدم &quot;فحص&quot; أولاً لمعرفة العدد، ثم &quot;نقل الآن&quot; للتنفيذ.
+        </p>
+
+        <div className="flex flex-wrap gap-3">
+          <Button variant="outline" onClick={handleDryRun} disabled={migRunning}>
+            فحص (Dry Run)
+          </Button>
+          {migDryRun && migDryRun.total > 0 && !migResult && (
+            <Button onClick={handleMigrate} disabled={migRunning}>
+              {migRunning ? <Loader2 className="size-4 animate-spin" /> : null}
+              نقل {migDryRun.total} ملف الآن
+            </Button>
+          )}
+          {migDryRun && migDryRun.total === 0 && (
+            <span className="flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400">
+              <CheckCircle2 className="size-4" />
+              لا توجد ملفات تحتاج نقل
+            </span>
+          )}
+        </div>
+
+        {/* Dry run results */}
+        {migDryRun && migDryRun.total > 0 && !migResult && (
+          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-500/30 dark:bg-amber-500/10">
+            <p className="mb-2 font-semibold text-amber-800 dark:text-amber-300">
+              يوجد {migDryRun.total} ملف لنقله:
+            </p>
+            <ul className="space-y-1 text-amber-700 dark:text-amber-400">
+              {migDryRun.tables.map((t) => (
+                <li key={`${t.table}-${t.column}`} className="flex justify-between font-mono text-xs">
+                  <span>{t.table}.{t.column}</span>
+                  <span>{t.count} ملف</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Migration results */}
+        {migResult && (
+          <div className="mt-4 space-y-3">
+            <div className={cn(
+              'flex items-center gap-3 rounded-xl border p-4 text-sm',
+              migResult.failed === 0
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300'
+                : 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300',
+            )}>
+              {migResult.failed === 0
+                ? <CheckCircle2 className="size-5 shrink-0" />
+                : <AlertCircle className="size-5 shrink-0" />
+              }
+              <span>
+                نُقل {migResult.migrated} من أصل {migResult.total}
+                {migResult.failed > 0 && ` — فشل ${migResult.failed}`}
+              </span>
+            </div>
+
+            {migResult.log.length > 0 && (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setMigLogOpen((v) => !v)}
+                  className="flex items-center gap-1 text-xs text-muted-foreground underline"
+                >
+                  {migLogOpen ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
+                  {migLogOpen ? 'إخفاء السجل' : 'عرض السجل'}
+                </button>
+                {migLogOpen && (
+                  <div className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-border bg-secondary/40 p-3 font-mono text-[11px] text-muted-foreground">
+                    {migResult.log.map((line, i) => (
+                      <p key={i}>{line}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}

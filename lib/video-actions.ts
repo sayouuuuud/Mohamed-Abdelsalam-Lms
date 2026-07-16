@@ -11,7 +11,14 @@
  */
 
 import { createClient as createAdminClient } from '@/lib/supabase/server'
-import { createR2UploadUrl, r2Keys, isR2Configured } from '@/lib/r2'
+import { createR2UploadUrl, r2Keys, isR2Configured, checkR2Connection } from '@/lib/r2'
+
+// ---------------------------------------------------------------
+// R2 Diagnostic — يُستدعى من زر "اختبار الاتصال" في إعدادات الـ Streaming
+// ---------------------------------------------------------------
+export async function testR2Connection(): Promise<{ ok: boolean; message: string }> {
+  return checkR2Connection()
+}
 
 // ---------------------------------------------------------------
 // Types

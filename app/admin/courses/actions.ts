@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { hasResourceAccess } from '@/lib/auth-guard'
 import { createNotification } from '@/lib/notify'
 import { logActivity } from '@/lib/audit-log'
+import { cleanupLectureMedia, cleanupLessonMedia } from '@/lib/media-cleanup'
 
 // ── Types ─────────────────────────────────────────────────────────
 export type LessonAttachment = {
@@ -508,6 +509,9 @@ export async function deleteLecture(id: string) {
   const supabase = await createClient()
   if (!(await hasResourceAccess(supabase, 'courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
+  // Clean up all media (image + lesson videos/attachments/R2 HLS) before DB delete.
+  await cleanupLectureMedia(id).catch((e) => console.log('[v0] cleanupLectureMedia error:', e))
+
   const { error } = await supabase.from('lectures').delete().eq('id', id)
   if (error) {
     console.log('[v0] deleteLecture error:', error.message)
@@ -580,6 +584,9 @@ export async function updateLesson(id: string, input: LessonInput) {
 export async function deleteLesson(id: string) {
   const supabase = await createClient()
   if (!(await hasResourceAccess(supabase, 'courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+
+  // Clean up video, attachments, and any R2 HLS data before DB delete.
+  await cleanupLessonMedia(id).catch((e) => console.log('[v0] cleanupLessonMedia error:', e))
 
   const { error } = await supabase.from('lessons').delete().eq('id', id)
   if (error) {

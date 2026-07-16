@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertCircle, CheckCircle2, Film, Loader2, RefreshCw, Upload, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { uploadToStorageWithProgress } from '@/lib/storage-upload'
+import { useUploadThing } from '@/lib/uploadthing'
 import { cn } from '@/lib/utils'
 import {
   getVideoUploadUrl,
@@ -65,10 +65,28 @@ export function VideoUploadField({
   lessonId?: string
   onDurationDetected?: (formatted: string) => void
 }) {
-  // حالة الرفع العادي (Supabase Storage)
-  const [uploading, setUploading]         = useState(false)
+  // حالة الرفع العادي (UploadThing lessonVideo)
+  const [uploading, setUploading]           = useState(false)
   const [legacyProgress, setLegacyProgress] = useState(0)   // 0-100
-  const inputRef                           = useRef<HTMLInputElement>(null)
+  const inputRef                            = useRef<HTMLInputElement>(null)
+
+  const { startUpload: startLegacyUpload } = useUploadThing('lessonVideo', {
+    onUploadProgress: (p) => setLegacyProgress(p),
+    onClientUploadComplete: (res) => {
+      const url = res?.[0]?.url
+      if (url) {
+        onChange(url)
+        toast.success('تم رفع الفيديو')
+      }
+      setUploading(false)
+      setLegacyProgress(0)
+    },
+    onUploadError: (err) => {
+      toast.error(`فشل الرفع: ${err.message}`)
+      setUploading(false)
+      setLegacyProgress(0)
+    },
+  })
 
   // حالة R2 streaming
   const [uploadProgress, setUploadProgress] = useState(0)          // 0-100
@@ -195,7 +213,7 @@ export function VideoUploadField({
   }
 
   // ---------------------------------------------------------------
-  // Legacy UploadThing Upload
+  // Legacy Upload (UploadThing lessonVideo endpoint — fallback when R2 disabled)
   // ---------------------------------------------------------------
   async function handleLegacyFile(file: File | undefined) {
     if (!file) return
@@ -205,16 +223,7 @@ export function VideoUploadField({
     }
     setUploading(true)
     setLegacyProgress(0)
-    try {
-      const url = await uploadToStorageWithProgress(file, 'videos', setLegacyProgress)
-      onChange(url)
-      toast.success('تم رفع الفيديو')
-    } catch (e) {
-      toast.error(`فشل الرفع: ${e instanceof Error ? e.message : 'خطأ غير معروف'}`)
-    } finally {
-      setUploading(false)
-      setLegacyProgress(0)
-    }
+    await startLegacyUpload([file])
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -390,7 +399,7 @@ export function VideoUploadField({
             <span className="text-xs text-muted-foreground">
               {isStreaming
                 ? 'MP4 أو MOV — سيتم تحويله تلقائياً إلى HLS'
-                : 'MP4 أو MOV أو WebM (أقل من 500 MB)'}
+                : 'MP4 أو MOV أ�� WebM (أقل من 500 MB)'}
             </span>
           </button>
         </>
