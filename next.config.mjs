@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Standalone build for Docker/Coolify: emits .next/standalone with a minimal
+  // server + only the traced node_modules, avoiding OOM/crash on the 8GB VPS.
+  output: 'standalone',
   typescript: {
     ignoreBuildErrors: true,
   },
