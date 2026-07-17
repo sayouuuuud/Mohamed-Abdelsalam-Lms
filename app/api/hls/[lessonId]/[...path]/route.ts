@@ -17,7 +17,10 @@ type AuthorizationResult =
   | { ok: false; status: 401 | 403 | 404 }
 
 function gatewayBase(req: NextRequest, lessonId: string): string {
-  return `${req.nextUrl.origin}/api/hls/${lessonId}`
+  const host = req.headers.get('x-forwarded-host') || req.headers.get('host')
+  const proto = req.headers.get('x-forwarded-proto') || (req.nextUrl.protocol.replace(':', ''))
+  const origin = host ? `${proto}://${host}` : req.nextUrl.origin
+  return `${origin}/api/hls/${lessonId}`
 }
 
 function cleanPrefix(prefix: string): string {
