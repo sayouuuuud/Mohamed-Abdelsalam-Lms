@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
 import { getFreeLectureBySlug } from '@/lib/curriculum'
 import type { Stage, Branch, MonthlyCourse } from '@/lib/landing-data'
 
@@ -22,9 +22,6 @@ export type FreeLectureWatch = {
   lessons: FreeWatchLesson[]
 }
 
-// Loads a free lecture and its playable lessons for the public watch page.
-// Returns undefined unless the lecture exists and is marked free — so paid
-// lectures can never be watched through this route.
 export async function getFreeLectureWatch(
   stageSlug: string,
   branchSlug: string,
@@ -34,36 +31,35 @@ export async function getFreeLectureWatch(
   const result = await getFreeLectureBySlug(stageSlug, branchSlug, courseSlug, lectureSlug)
   if (!result || !result.lecture.dbId) return undefined
 
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('lessons')
-    .select('id, slug, title, duration, description, video_url, attachments, sort_order')
-    .eq('lecture_id', result.lecture.dbId)
-    .order('sort_order', { ascending: true })
+  try {
+    const data = await prisma.lessons.findMany({
+      where: { lecture_id: result.lecture.dbId },
+      select: { id: true, slug: true, title: true, duration: true, description: true, video_url: true, attachments: true, sort_order: true },
+      orderBy: { sort_order: 'asc' }
+    })
 
-  if (error) {
+    const lessons: FreeWatchLesson[] = data.map((row) => ({
+      id: row.slug ?? '',
+      title: row.title ?? '',
+      duration: row.duration ?? '',
+      description: row.description ?? null,
+      videoUrl: row.video_url || FALLBACK_VIDEO,
+      attachments: Array.isArray(row.attachments) ? (row.attachments as any[]) : [],
+    }))
+
+    return {
+      stage: result.stage,
+      branch: result.branch,
+      course: result.course,
+      lecture: {
+        id: result.lecture.id,
+        title: result.lecture.title,
+        description: result.lecture.description,
+      },
+      lessons,
+    }
+  } catch (error: any) {
     console.log('[v0] getFreeLectureWatch lessons error:', error.message)
     return undefined
-  }
-
-  const lessons: FreeWatchLesson[] = (data ?? []).map((row: any) => ({
-    id: row.slug,
-    title: row.title,
-    duration: row.duration ?? '',
-    description: row.description ?? null,
-    videoUrl: row.video_url || FALLBACK_VIDEO,
-    attachments: Array.isArray(row.attachments) ? row.attachments : [],
-  }))
-
-  return {
-    stage: result.stage,
-    branch: result.branch,
-    course: result.course,
-    lecture: {
-      id: result.lecture.id,
-      title: result.lecture.title,
-      description: result.lecture.description,
-    },
-    lessons,
   }
 }

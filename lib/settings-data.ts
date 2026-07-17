@@ -1,5 +1,5 @@
 import 'server-only'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { prisma } from '@/lib/prisma'
 
 // Shape of the platform-wide settings stored under settings.key = 'global'.
 // Only the keys we actually read in server code are typed; the admin panel
@@ -21,12 +21,10 @@ export type GlobalSettings = {
 // RLS would otherwise hide the admin-only settings row.
 export async function getGlobalSettings(): Promise<GlobalSettings> {
   try {
-    const supabase = createAdminClient()
-    const { data } = await supabase
-      .from('settings')
-      .select('value')
-      .eq('key', 'global')
-      .single()
+    const data = await prisma.settings.findUnique({
+      where: { key: 'global' },
+      select: { value: true }
+    })
     return (data?.value as GlobalSettings) ?? {}
   } catch {
     return {}

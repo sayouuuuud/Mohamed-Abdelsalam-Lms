@@ -1,12 +1,11 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
 import { hasResourceAccess } from '@/lib/auth-guard'
 import { logActivity } from '@/lib/audit-log'
 import { revalidatePath } from 'next/cache'
 import { getSiteContent } from '@/lib/site-content'
-
-// ── Site Content (public CMS) ──────────────────────────────────────────────
+import { auth } from '@/auth'
 
 export async function getSiteContentForAdmin() {
   return getSiteContent()
@@ -16,8 +15,7 @@ export async function updateSiteContentSection(
   section: string,
   value: unknown,
 ): Promise<{ success?: true; error?: string }> {
-  const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'settings', 'manage'))) {
+  if (!(await hasResourceAccess('settings', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
@@ -25,59 +23,50 @@ export async function updateSiteContentSection(
     return { error: 'القسم غير صالح.' }
   }
 
-  const { error } = await supabase
-    .from('site_content')
-    .upsert(
-      { section, value, updated_at: new Date().toISOString() },
-      { onConflict: 'section' },
-    )
+  try {
+    await prisma.site_content.upsert({
+      where: { section },
+      update: { value: value as any, updated_at: new Date() },
+      create: { section, value: value as any, updated_at: new Date() }
+    })
 
-  if (error) {
-    console.log('[v0] updateSiteContentSection error:', error.message)
+    logActivity({ action: 'update', resource: 'settings', targetLabel: `محتوى الموقع — قسم: ${section}` }).catch(() => {})
+    revalidatePath('/', 'layout')
+    return { success: true }
+  } catch (error: any) {
     return { error: 'تعذّر حفظ القسم. حاول تاني.' }
   }
-
-  logActivity({ action: 'update', resource: 'settings', targetLabel: `محتوى الموقع — قسم: ${section}` }).catch(() => {})
-  revalidatePath('/', 'layout')
-  return { success: true }
 }
 
 export async function resetSiteContentSection(
   section: string,
 ): Promise<{ success?: true; error?: string }> {
-  const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'settings', 'manage'))) {
+  if (!(await hasResourceAccess('settings', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
-  const { error } = await supabase
-    .from('site_content')
-    .delete()
-    .eq('section', section)
+  try {
+    await prisma.site_content.delete({
+      where: { section }
+    })
 
-  if (error) {
-    console.log('[v0] resetSiteContentSection error:', error.message)
+    logActivity({ action: 'delete', resource: 'settings', targetLabel: `إعادة ضبط قسم: ${section}` }).catch(() => {})
+    revalidatePath('/', 'layout')
+    return { success: true }
+  } catch (error: any) {
     return { error: 'تعذّر استعادة الافتراضي. حاول تاني.' }
   }
-
-  logActivity({ action: 'delete', resource: 'settings', targetLabel: `إعادة ضبط قسم: ${section}` }).catch(() => {})
-  revalidatePath('/', 'layout')
-  return { success: true }
 }
 
-// Loads the currently signed-in admin's profile for the settings page/header.
 export async function getAdminProfile() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const session = await auth()
+  const user = session?.user
   if (!user) return null
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('full_name, email, phone, avatar_url, role')
-    .eq('id', user.id)
-    .single()
+  const profile = await prisma.profiles.findUnique({
+    where: { id: user.id },
+    select: { full_name: true, email: true, phone: true, avatar_url: true, role: true }
+  })
 
   const fullName = profile?.full_name || ''
   return {
@@ -90,181 +79,165 @@ export async function getAdminProfile() {
   }
 }
 
-// Updates the signed-in admin's profile (name, phone, bio) and avatar picture.
 export async function updateAdminProfile(input: {
   fullName: string
   phone: string
   avatarUrl?: string | null
 }) {
-  const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'settings', 'manage'))) {
+  if (!(await hasResourceAccess('settings', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const session = await auth()
+  const user = session?.user
   if (!user) return { error: 'لازم تسجّل دخول.' }
 
   const fullName = input.fullName.trim()
   if (!fullName) return { error: 'الاسم مطلوب.' }
 
-  const { error } = await supabase
-    .from('profiles')
-    .update({
-      full_name: fullName,
-      phone: input.phone.trim(),
-      avatar_url: input.avatarUrl || null,
+  try {
+    await prisma.profiles.update({
+      where: { id: user.id },
+      data: {
+        full_name: fullName,
+        phone: input.phone.trim(),
+        avatar_url: input.avatarUrl || null,
+      }
     })
-    .eq('id', user.id)
 
-  if (error) {
-    console.log('[v0] updateAdminProfile error:', error.message)
+    logActivity({ action: 'update', resource: 'settings', targetLabel: `الملف الشخصي: ${fullName}` }).catch(() => {})
+    revalidatePath('/admin', 'layout')
+    return { success: true }
+  } catch (error: any) {
     return { error: 'تعذّر حفظ الملف الشخصي. حاول تاني.' }
   }
-
-  logActivity({ action: 'update', resource: 'settings', targetLabel: `الملف الشخصي: ${fullName}` }).catch(() => {})
-  revalidatePath('/admin', 'layout')
-  return { success: true }
 }
 
 export async function getSettings() {
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('settings')
-    .select('value')
-    .eq('key', 'global')
-    .single()
+  const data = await prisma.settings.findUnique({
+    where: { key: 'global' },
+    select: { value: true }
+  })
 
-  if (error || !data) return null
-  return data.value
+  return data?.value || null
 }
 
-// Reads the site-wide accent color from the PUBLIC theme table. Unlike
-// `getSettings` (admin-only RLS), this works for any visitor / device, so the
-// chosen color stays consistent everywhere — even when logged out.
 export async function getSiteColor(): Promise<string> {
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('site_theme')
-    .select('active_color')
-    .eq('id', true)
-    .single()
+  const data = await prisma.site_theme.findUnique({
+    where: { id: true },
+    select: { active_color: true }
+  })
 
-  if (error || !data?.active_color) return 'navy'
-  return data.active_color
+  return data?.active_color || 'navy'
 }
 
-// Reads the site-wide dark-mode neon accent preset from the PUBLIC theme table.
-// Works for any visitor / device (same public-read policy as `getSiteColor`).
 export async function getSiteNeon(): Promise<string> {
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('site_theme')
-    .select('neon_preset')
-    .eq('id', true)
-    .single()
+  const data = await prisma.site_theme.findUnique({
+    where: { id: true },
+    select: { neon_preset: true }
+  })
 
-  if (error || !data?.neon_preset) return 'teal-violet'
-  return data.neon_preset
+  return data?.neon_preset || 'teal-violet'
 }
 
-// Reads the site-wide light mode preset from the PUBLIC theme table.
 export async function getSiteLightPreset(): Promise<string> {
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('site_theme')
-    .select('light_preset')
-    .eq('id', true)
-    .single()
+  const data = await prisma.site_theme.findUnique({
+    where: { id: true },
+    select: { light_preset: true }
+  })
 
-  if (error || !data?.light_preset) return 'navy-gold'
-  return data.light_preset
+  return data?.light_preset || 'navy-gold'
 }
 
 export async function updateSettings(newSettings: any) {
-  const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'settings', 'manage'))) {
+  if (!(await hasResourceAccess('settings', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
-  // Update the existing row; upsert (insert-if-missing) so a fresh project with
-  // no settings row still saves. The unique `key` makes upsert idempotent.
-  const { data, error } = await supabase
-    .from('settings')
-    .upsert(
-      { key: 'global', value: newSettings, updated_at: new Date().toISOString() },
-      { onConflict: 'key' },
-    )
-    .select('id')
+  try {
+    await prisma.settings.upsert({
+      where: { key: 'global' },
+      update: { value: newSettings, updated_at: new Date() },
+      create: { key: 'global', value: newSettings, updated_at: new Date() }
+    })
 
-  if (error) {
-    console.log('[v0] updateSettings error:', error.message)
+    const activeColor = newSettings?.preferences?.activeColor
+    const neonPreset = newSettings?.preferences?.neonPreset
+    const lightPreset = newSettings?.preferences?.lightPreset
+
+    if (activeColor || neonPreset || lightPreset) {
+      const themeData: any = { updated_at: new Date() }
+      if (activeColor) themeData.active_color = activeColor
+      if (neonPreset) themeData.neon_preset = neonPreset
+      if (lightPreset) themeData.light_preset = lightPreset
+
+      await prisma.site_theme.upsert({
+        where: { id: true },
+        update: themeData,
+        create: { id: true, ...themeData }
+      }).catch(() => {})
+    }
+
+    logActivity({ action: 'update', resource: 'settings', targetLabel: 'إعدادات النظام العامة' }).catch(() => {})
+    revalidatePath('/', 'layout')
+    return { success: true }
+  } catch (error: any) {
     return { error: 'تعذّر حفظ الإعدادات. حاول تاني.' }
   }
-  if (!data || data.length === 0) {
-    console.log('[v0] updateSettings: no row affected')
-    return { error: 'تعذّر حفظ الإعدادات (لا يوجد صف).' }
-  }
-
-  // Mirror the accent color AND the dark-mode neon preset into the
-  // publicly-readable theme table so both apply on every device for every
-  // visitor (the settings table is admin-only). Keep going even if this fails.
-  const activeColor = newSettings?.preferences?.activeColor
-  const neonPreset = newSettings?.preferences?.neonPreset
-  const lightPreset = newSettings?.preferences?.lightPreset
-  if (activeColor || neonPreset || lightPreset) {
-    const themeRow: Record<string, unknown> = {
-      id: true,
-      updated_at: new Date().toISOString(),
-    }
-    if (activeColor) themeRow.active_color = activeColor
-    if (neonPreset) themeRow.neon_preset = neonPreset
-    if (lightPreset) themeRow.light_preset = lightPreset
-
-    const { error: themeError } = await supabase
-      .from('site_theme')
-      .upsert(themeRow, { onConflict: 'id' })
-    if (themeError) {
-      console.log('[v0] updateSettings site_theme error:', themeError.message)
-    }
-  }
-
-  logActivity({ action: 'update', resource: 'settings', targetLabel: 'إعدادات النظام العامة' }).catch(() => {})
-  // Revalidate the whole app so the root layout re-reads the new color.
-  revalidatePath('/', 'layout')
-  return { success: true }
 }
 
-// ── Platform Settings ──────────────────────────────────────────────────────
-
 export async function getPlatformSettings() {
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('platform_settings')
-    .select('is_streaming_enabled')
-    .eq('id', 1)
-    .single()
+  const data = await prisma.platform_settings.findUnique({
+    where: { id: 1 },
+    select: { is_streaming_enabled: true }
+  })
 
-  if (error || !data) return { is_streaming_enabled: false }
-  return data
+  return data || { is_streaming_enabled: false }
 }
 
 export async function updatePlatformSettings(input: { is_streaming_enabled: boolean }) {
-  const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'settings', 'manage'))) {
+  if (!(await hasResourceAccess('settings', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
-  const { error } = await supabase
-    .from('platform_settings')
-    .upsert({ id: 1, is_streaming_enabled: input.is_streaming_enabled, updated_at: new Date().toISOString() })
+  try {
+    await prisma.platform_settings.upsert({
+      where: { id: 1 },
+      update: { is_streaming_enabled: input.is_streaming_enabled, updated_at: new Date() },
+      create: { id: 1, is_streaming_enabled: input.is_streaming_enabled, updated_at: new Date() }
+    })
 
-  if (error) {
-    console.log('[v0] updatePlatformSettings error:', error.message)
+    logActivity({ action: 'update', resource: 'settings', targetLabel: `إعدادات المنصة - الاستريمنج: ${input.is_streaming_enabled}` }).catch(() => {})
+    revalidatePath('/', 'layout')
+    return { success: true }
+  } catch (error: any) {
     return { error: 'تعذّر حفظ إعدادات المنصة.' }
   }
+}
 
-  logActivity({ action: 'update', resource: 'settings', targetLabel: `إعدادات المنصة - الاستريمنج: ${input.is_streaming_enabled}` }).catch(() => {})
-  revalidatePath('/', 'layout')
-  return { success: true }
+import bcrypt from 'bcryptjs'
+
+export async function updateAdminPassword(newPassword: string) {
+  if (!(await hasResourceAccess('settings', 'manage'))) {
+    return { error: 'غير مسموح. لازم تكون أدمن.' }
+  }
+  const session = await auth()
+  const user = session?.user
+  if (!user) return { error: 'لازم تسجّل دخول.' }
+
+  if (!newPassword || newPassword.length < 6) {
+    return { error: 'كلمة المرور يجب أن تكون 6 أحرف على الأقل' }
+  }
+
+  const hashedPassword = await bcrypt.hash(newPassword, 10)
+
+  try {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { encrypted_password: hashedPassword }
+    })
+    logActivity({ action: 'update', resource: 'settings', targetLabel: 'تغيير كلمة المرور' }).catch(() => {})
+    return { success: true }
+  } catch (err: any) {
+    return { error: 'تعذّر تحديث كلمة المرور' }
+  }
 }

@@ -1,12 +1,7 @@
-import { createAdminClient } from '@/lib/supabase/admin'
 import { sendActivationCode } from '@/lib/email'
 import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
 
-/**
- * Re-sends a fresh 6-digit activation code to an already-registered but
- * unconfirmed user, delivered via our own SMTP. Uses generateLink without a
- * password (the user already exists) which mints a new OTP each call.
- */
 export async function POST(request: NextRequest) {
   let email: string | undefined
   try {
@@ -22,20 +17,19 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const supabase = createAdminClient()
+  const code = Math.floor(100000 + Math.random() * 900000).toString()
 
-  const { data, error } = await supabase.auth.admin.generateLink({
-    type: 'signup',
-    email,
-  } as any)
+  await prisma.verificationToken.deleteMany({
+    where: { identifier: email }
+  })
 
-  const code = data?.properties?.email_otp
-  if (error || !code) {
-    return NextResponse.json(
-      { error: 'مقدرناش نبعت الكود تاني دلوقتي. حاول مرة كمان.' },
-      { status: 400 },
-    )
-  }
+  await prisma.verificationToken.create({
+    data: {
+      identifier: email,
+      token: code,
+      expires: new Date(Date.now() + 10 * 60 * 1000)
+    }
+  })
 
   try {
     await sendActivationCode(email, code)

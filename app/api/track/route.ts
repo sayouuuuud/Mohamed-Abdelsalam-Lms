@@ -1,4 +1,4 @@
-import { createAdminClient } from '@/lib/supabase/admin'
+import { prisma } from '@/lib/prisma'
 import { cookies } from 'next/headers'
 import { randomUUID } from 'crypto'
 
@@ -55,12 +55,10 @@ export async function POST(request: Request) {
     const ua = request.headers.get('user-agent') || ''
     const device = classifyDevice(ua)
 
-    const admin = createAdminClient()
-    await admin.from('page_views').insert({
-      path: rawPath.slice(0, 512),
-      visitor_id: visitorId,
-      device,
-    })
+    await prisma.$executeRaw`
+      INSERT INTO page_views (path, visitor_id, device, created_at)
+      VALUES (${rawPath.slice(0, 512)}, ${visitorId}, ${device}, NOW())
+    `
 
     const res = Response.json({ ok: true })
     if (isNewVisitor) {

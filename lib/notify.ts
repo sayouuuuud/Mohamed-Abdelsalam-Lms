@@ -1,5 +1,5 @@
 import 'server-only'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { prisma } from '@/lib/prisma'
 import type { NotificationType } from '@/lib/notifications-data'
 
 // Server-side helper for creating notifications. Uses the service-role client
@@ -28,7 +28,6 @@ function genCode() {
 
 export async function createNotification(input: NotifyInput) {
   try {
-    const admin = createAdminClient()
     const row: Record<string, any> = {
       code: genCode(),
       type: input.type,
@@ -38,29 +37,13 @@ export async function createNotification(input: NotifyInput) {
       time_label: 'الآن',
     }
     if (input.studentId) row.student_id = input.studentId
-    // grade column is optional (added by the migration); include only when set
-    // so the insert still works before the migration runs.
     if (input.grade) row.grade = input.grade
     if (input.stageId) row.stage_id = input.stageId
     if (input.branchId) row.branch_id = input.branchId
     if (input.lectureId) row.lecture_id = input.lectureId
 
-    let { error } = await admin.from('notifications').insert(row)
+    await prisma.notifications.create({ data: row })
 
-    // If an optional targeting column doesn't exist yet (migration not run),
-    // retry without the optional columns so the notification is still delivered.
-    if (error && /(grade|stage_id|branch_id|lecture_id)/.test(error.message)) {
-      delete row.grade
-      delete row.stage_id
-      delete row.branch_id
-      delete row.lecture_id
-      ;({ error } = await admin.from('notifications').insert(row))
-    }
-
-    if (error) {
-      console.log('[v0] createNotification error:', error.message)
-      return { error: error.message }
-    }
     return { success: true }
   } catch (e: any) {
     console.log('[v0] createNotification threw:', e?.message)

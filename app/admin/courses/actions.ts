@@ -1,13 +1,12 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
 import { hasResourceAccess } from '@/lib/auth-guard'
 import { createNotification } from '@/lib/notify'
 import { logActivity } from '@/lib/audit-log'
 import { cleanupLectureMedia, cleanupLessonMedia } from '@/lib/media-cleanup'
 
-// ── Types ─────────────────────────────────────────────────────────
 export type LessonAttachment = {
   name: string
   url: string
@@ -98,63 +97,40 @@ function slugify(input: string) {
   return `${base ? base.slice(0, 24) : 'item'}-${suffix}`
 }
 
-// The next sort_order placing a new item at the end of a lecture's unified
-// content list (lessons + assignments share one ordering space).
-async function nextContentOrder(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  lectureId: string,
-): Promise<number> {
+async function nextContentOrder(lectureId: string): Promise<number> {
   const [lessonsRes, assignmentsRes] = await Promise.all([
-    supabase
-      .from('lessons')
-      .select('sort_order')
-      .eq('lecture_id', lectureId)
-      .order('sort_order', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    supabase
-      .from('assignments')
-      .select('sort_order')
-      .eq('lecture_id', lectureId)
-      .order('sort_order', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+    prisma.lessons.findFirst({
+      where: { lecture_id: lectureId },
+      orderBy: { sort_order: 'desc' },
+      select: { sort_order: true }
+    }),
+    prisma.assignments.findFirst({
+      where: { lecture_id: lectureId },
+      orderBy: { sort_order: 'desc' },
+      select: { sort_order: true }
+    })
   ])
-  const maxLesson = lessonsRes.data?.sort_order ?? 0
-  const maxAssignment = assignmentsRes.data?.sort_order ?? 0
+  const maxLesson = lessonsRes?.sort_order ?? 0
+  const maxAssignment = assignmentsRes?.sort_order ?? 0
   return Math.max(maxLesson, maxAssignment) + 1
 }
 
-// ── Read ──────────────────────────────────────────────────────────
 export async function getLecturesAdmin(): Promise<AdminLecture[]> {
-  const supabase = await createClient()
-
-  const [stagesRes, branchesRes, lecturesRes, lessonsRes] = await Promise.all([
-    supabase.from('stages').select('id, title, sort_order'),
-    supabase.from('branches').select('id, stage_id, title, sort_order'),
-    supabase
-      .from('lectures')
-      .select('*')
-      .order('sort_order', { ascending: true }),
-    supabase
-      .from('lessons')
-      .select('id, lecture_id, slug, title, duration, is_free, sort_order, video_url, description, content_type, attachments')
-      .order('sort_order', { ascending: true }),
+  const [stages, branches, lectures, lessons] = await Promise.all([
+    prisma.stages.findMany({ select: { id: true, title: true, sort_order: true } }),
+    prisma.branches.findMany({ select: { id: true, stage_id: true, title: true, sort_order: true } }),
+    prisma.lectures.findMany({ orderBy: { sort_order: 'asc' } }),
+    prisma.lessons.findMany({
+      select: { id: true, lecture_id: true, slug: true, title: true, duration: true, is_free: true, sort_order: true, video_url: true, description: true, content_type: true, attachments: true },
+      orderBy: { sort_order: 'asc' }
+    })
   ])
 
-  if (lecturesRes.error) {
-    console.log('[v0] getLecturesAdmin error:', lecturesRes.error.message)
-    return []
-  }
-
   const stageById = new Map<string, { title: string }>()
-  for (const s of stagesRes.data ?? []) stageById.set(s.id, { title: s.title })
+  for (const s of stages) stageById.set(s.id, { title: s.title })
 
-  const branchById = new Map<
-    string,
-    { title: string; stageId: string; stageTitle: string }
-  >()
-  for (const b of branchesRes.data ?? []) {
+  const branchById = new Map<string, { title: string; stageId: string; stageTitle: string }>()
+  for (const b of branches) {
     branchById.set(b.id, {
       title: b.title,
       stageId: b.stage_id,
@@ -163,7 +139,7 @@ export async function getLecturesAdmin(): Promise<AdminLecture[]> {
   }
 
   const lessonsByLecture = new Map<string, AdminLesson[]>()
-  for (const row of lessonsRes.data ?? []) {
+  for (const row of lessons) {
     const list = lessonsByLecture.get(row.lecture_id) ?? []
     const ct = row.content_type
     list.push({
@@ -171,71 +147,74 @@ export async function getLecturesAdmin(): Promise<AdminLecture[]> {
       slug: row.slug,
       title: row.title,
       duration: row.duration,
-      isFree: row.is_free,
+      isFree: !!row.is_free,
       contentType: (ct === 'مقال' || ct === 'تمرين' ? ct : 'فيديو') as AdminLesson['contentType'],
       sortOrder: row.sort_order,
       videoUrl: row.video_url ?? null,
       description: row.description ?? null,
-      attachments: Array.isArray(row.attachments) ? row.attachments : [],
+      attachments: Array.isArray(row.attachments) ? (row.attachments as LessonAttachment[]) : [],
     })
     lessonsByLecture.set(row.lecture_id, list)
   }
 
-  return (lecturesRes.data ?? []).map((row) => {
+  return lectures.map((row) => {
     const branch = branchById.get(row.branch_id)
     return {
       id: row.id,
       slug: row.slug,
       title: row.title,
-      description: row.description,
-      instructor: (row as any).instructor ?? null,
+      description: row.description ?? '',
+      instructor: row.instructor ?? null,
       price: Number(row.price),
       oldPrice: row.old_price != null ? Number(row.old_price) : null,
       badge: row.badge,
-      image: (row as any).image ?? null,
+      image: row.image ?? null,
       sortOrder: row.sort_order,
       releaseDate: row.release_date ?? null,
       branchId: row.branch_id,
       monthlyCourseId: row.monthly_course_id ?? null,
-      courseSectionId: (row as any).monthly_course_section_id ?? null,
+      courseSectionId: row.monthly_course_section_id ?? null,
       branchTitle: branch?.title ?? '',
       stageId: branch?.stageId ?? '',
       stageTitle: branch?.stageTitle ?? '',
       lessons: lessonsByLecture.get(row.id) ?? [],
-      whatYouLearn: (row as any).what_you_learn ?? null,
-      isFree: (row as any).is_free ?? false,
+      whatYouLearn: Array.isArray(row.what_you_learn) ? (row.what_you_learn as string[]) : null,
+      isFree: !!row.is_free,
     }
   })
 }
 
 export async function getBranchOptions(): Promise<BranchOption[]> {
-  const supabase = await createClient()
-  const [stagesRes, branchesRes] = await Promise.all([
-    supabase.from('stages').select('id, title, sort_order').order('sort_order'),
-    supabase
-      .from('branches')
-      .select('id, stage_id, title, sort_order, monthly_courses(id, title, sort_order, monthly_course_sections(id, title, sort_order))')
-      .order('sort_order'),
+  const [stages, branches] = await Promise.all([
+    prisma.stages.findMany({ select: { id: true, title: true, sort_order: true }, orderBy: { sort_order: 'asc' } }),
+    prisma.branches.findMany({
+      select: {
+        id: true, stage_id: true, title: true, sort_order: true,
+        monthly_courses: {
+          select: { id: true, title: true, sort_order: true, monthly_course_sections: { select: { id: true, title: true, sort_order: true } } }
+        }
+      },
+      orderBy: { sort_order: 'asc' }
+    }),
   ])
 
   const stageById = new Map<string, { title: string; order: number }>()
-  for (const s of stagesRes.data ?? [])
-    stageById.set(s.id, { title: s.title, order: s.sort_order })
+  for (const s of stages) stageById.set(s.id, { title: s.title, order: s.sort_order })
 
-  return (branchesRes.data ?? [])
+  return branches
     .map((b) => ({
       id: b.id,
       title: b.title,
       stageId: b.stage_id,
       stageTitle: stageById.get(b.stage_id)?.title ?? '',
-      monthlyCourses: [...((b as any).monthly_courses ?? [])]
+      monthlyCourses: b.monthly_courses
         .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-        .map((course: any) => ({
+        .map((course) => ({
           id: course.id,
           title: course.title,
-          sections: [...(course.monthly_course_sections ?? [])]
-            .sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-            .map((section: any) => ({ id: section.id, title: section.title })),
+          sections: course.monthly_course_sections
+            .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+            .map((section) => ({ id: section.id, title: section.title })),
         })),
       _stageOrder: stageById.get(b.stage_id)?.order ?? 0,
     }))
@@ -243,235 +222,71 @@ export async function getBranchOptions(): Promise<BranchOption[]> {
     .map(({ _stageOrder, ...rest }) => rest)
 }
 
-// Quick-create a monthly course from inside the lecture form. Returns the new
-// course id so the caller can immediately select it for the lecture.
 export async function createMonthlyCourseQuick(input: {
   branchId: string
   title: string
 }): Promise<{ id: string; title: string } | { error: string }> {
-  const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess('courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
   const title = input.title.trim()
   if (!title || !input.branchId) return { error: 'اكتب اسم الكورس واختر الفرع.' }
 
-  const { count } = await supabase
-    .from('monthly_courses')
-    .select('id', { count: 'exact', head: true })
-    .eq('branch_id', input.branchId)
+  const count = await prisma.monthly_courses.count({ where: { branch_id: input.branchId } })
 
-  const { data, error } = await supabase
-    .from('monthly_courses')
-    .insert({
-      branch_id: input.branchId,
-      slug: slugify(title),
-      title,
-      is_published: true,
-      sort_order: (count ?? 0) + 1,
+  try {
+    const data = await prisma.monthly_courses.create({
+      data: {
+        branch_id: input.branchId,
+        slug: slugify(title),
+        title,
+        is_published: true,
+        sort_order: count + 1,
+      },
+      select: { id: true, title: true }
     })
-    .select('id, title')
-    .single()
 
-  if (error || !data) {
-    console.log('[v0] createMonthlyCourseQuick error:', error?.message)
+    logActivity({ action: 'create', resource: 'categories', targetLabel: `كورس: ${title}` }).catch(() => {})
+    revalidatePath('/admin/courses')
+    revalidatePath('/admin/categories')
+    revalidatePath('/categories')
+    revalidatePath('/')
+    return { id: data.id, title: data.title }
+  } catch (error: any) {
     return { error: 'تعذّر إنشاء الكورس.' }
   }
-
-  logActivity({ action: 'create', resource: 'categories', targetLabel: `كورس: ${title}` }).catch(() => {})
-  revalidatePath('/admin/courses')
-  revalidatePath('/admin/categories')
-  revalidatePath('/categories')
-  revalidatePath('/')
-  return { id: data.id, title: data.title }
 }
 
-// ── Lecture CRUD ──────────────────────────────────────────────────
 export async function createLecture(input: LectureInput) {
-  const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess('courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
-  const { count } = await supabase
-    .from('lectures')
-    .select('id', { count: 'exact', head: true })
-    .eq('branch_id', input.branchId)
+  const count = await prisma.lectures.count({ where: { branch_id: input.branchId } })
 
-  const row: Record<string, any> = {
-    branch_id: input.branchId,
-    monthly_course_id: input.monthlyCourseId || null,
-    monthly_course_section_id: input.monthlyCourseId ? input.courseSectionId || null : null,
-    slug: slugify(input.title),
-    title: input.title,
-    description: input.description,
-    instructor: input.instructor?.trim() || null,
-    price: input.price,
-    old_price: input.oldPrice,
-    badge: input.badge,
-    sort_order: (count ?? 0) + 1,
-    release_date: input.releaseDate || null,
-    what_you_learn: input.whatYouLearn || null,
-    is_free: input.isFree ?? false,
-  }
-  if (input.image) row.image = input.image
-
-  let { error } = await supabase.from('lectures').insert(row)
-  // Retry without `monthly_course_section_id` if that column doesn't exist yet.
-  if (error && /monthly_course_section_id/.test(error.message) && 'monthly_course_section_id' in row) {
-    delete row.monthly_course_section_id
-    ;({ error } = await supabase.from('lectures').insert(row))
-  }
-  // Retry without `is_free` if that column doesn't exist yet (migration pending).
-  if (error && /is_free/.test(error.message) && 'is_free' in row) {
-    delete row.is_free
-    ;({ error } = await supabase.from('lectures').insert(row))
-  }
-  // Retry without `image` if that column doesn't exist yet (migration pending).
-  if (error && /image/.test(error.message) && 'image' in row) {
-    delete row.image
-    ;({ error } = await supabase.from('lectures').insert(row))
-  }
-
-  if (error) {
-    console.log('[v0] createLecture error:', error.message)
-    return { error: 'تعذّر إضافة المحاضرة.' }
-  }
-
-  // Notify the students of this lecture's grade that a new lecture is available.
-  await notifyLectureGrade(supabase, input.branchId, input.title)
-
-  // Sync with calendar if a release date is provided
-  if (input.releaseDate) {
-    // Generate a unique code for the event
-    const { data: latest } = await supabase.from('calendar_events').select('code').order('code', { ascending: false }).limit(1).single()
-    let nextNum = 1
-    if (latest && latest.code.startsWith('EVT-')) {
-      const num = parseInt(latest.code.replace('EVT-', ''), 10)
-      if (!isNaN(num)) nextNum = num + 1
-    }
-    const code = `EVT-${String(nextNum).padStart(2, '0')}`
-
-    // Parse date and time from the input.releaseDate (which is a full ISO or datetime string)
-    // Actually, if it's coming from an input type="datetime-local", it might be "YYYY-MM-DDTHH:mm"
-    const parsedDate = new Date(input.releaseDate)
-    const d = parsedDate.toISOString().slice(0, 10)
-    const t = parsedDate.toTimeString().slice(0, 5)
-
-    const { data: branch } = await supabase.from('branches').select('stage_id').eq('id', input.branchId).single()
-
-    // Assuming we can get the newly created lecture ID using supabase logic or by fetching it.
-    // However, insert(row) without select() doesn't return data.
-    // Let's refactor the insert above to return the ID, or we fetch it.
-    const { data: newLecture } = await supabase.from('lectures').select('id').eq('branch_id', input.branchId).eq('slug', row.slug).single()
-
-    if (newLecture) {
-      await supabase.from('calendar_events').insert({
-        code,
-        title: `موعد نزول: ${input.title}`,
-        event_date: d,
-        event_time: t,
-        type: 'محاضرة',
-        course: input.title,
-        description: input.description,
-        custom: false,
-        lecture_id: newLecture.id,
-        branch_id: input.branchId,
-        stage_id: branch?.stage_id,
-      })
-    }
-  }
-
-  logActivity({ action: 'create', resource: 'courses', targetLabel: `محاضرة: ${input.title}` }).catch(() => {})
-  revalidatePath('/courses')
-  revalidatePath('/calendar')
-  revalidatePath('/')
-  return { success: true }
-}
-
-// Resolves the stage slug (= grade) for a branch and notifies that grade's
-// students about a newly added lecture. Best-effort; never fails the caller.
-async function notifyLectureGrade(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  branchId: string,
-  lectureTitle: string,
-) {
   try {
-    const { data: branch } = await supabase
-      .from('branches')
-      .select('stage_id, stages:stage_id ( slug )')
-      .eq('id', branchId)
-      .single()
-    const grade = (branch as any)?.stages?.slug as string | undefined
-    await createNotification({
-      type: 'كورس',
-      title: 'محاضرة جديدة متاحة',
-      description: `تمت إضافة محاضرة "${lectureTitle}". تقدر تشوفها في صفحة تصفّح المحاضرات.`,
-      grade: grade ?? null,
-    })
-  } catch {
-    // ignore notification failures
-  }
-}
-
-export async function updateLecture(id: string, input: LectureInput) {
-  const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
-
-  const patch: Record<string, any> = {
-    branch_id: input.branchId,
-    monthly_course_id: input.monthlyCourseId || null,
-    monthly_course_section_id: input.monthlyCourseId ? input.courseSectionId || null : null,
-    title: input.title,
-    description: input.description,
-    instructor: input.instructor?.trim() || null,
-    price: input.price,
-    old_price: input.oldPrice,
-    badge: input.badge,
-    release_date: input.releaseDate || null,
-    what_you_learn: input.whatYouLearn || null,
-    is_free: input.isFree ?? false,
-  }
-  if (input.image !== undefined) patch.image = input.image
-
-  let { error } = await supabase.from('lectures').update(patch).eq('id', id)
-  // Retry without `monthly_course_section_id` if that column doesn't exist yet.
-  if (error && /monthly_course_section_id/.test(error.message) && 'monthly_course_section_id' in patch) {
-    delete patch.monthly_course_section_id
-    ;({ error } = await supabase.from('lectures').update(patch).eq('id', id))
-  }
-  // Retry without `is_free` if that column doesn't exist yet (migration pending).
-  if (error && /is_free/.test(error.message) && 'is_free' in patch) {
-    delete patch.is_free
-    ;({ error } = await supabase.from('lectures').update(patch).eq('id', id))
-  }
-  // Retry without `image` if that column doesn't exist yet (migration pending).
-  if (error && /image/.test(error.message) && 'image' in patch) {
-    delete patch.image
-    ;({ error } = await supabase.from('lectures').update(patch).eq('id', id))
-  }
-
-  if (error) {
-    console.log('[v0] updateLecture error:', error.message)
-    return { error: 'تعذّر تحديث المحاضرة.' }
-  }
-
-  // Update or create calendar event
-  if (input.releaseDate) {
-    const parsedDate = new Date(input.releaseDate)
-    const d = parsedDate.toISOString().slice(0, 10)
-    const t = parsedDate.toTimeString().slice(0, 5)
-
-    const { data: existingEvent } = await supabase.from('calendar_events').select('code').eq('lecture_id', id).single()
-
-    if (existingEvent) {
-      await supabase.from('calendar_events').update({
-        event_date: d,
-        event_time: t,
-        title: `موعد نزول: ${input.title}`,
-        course: input.title,
+    const data = await prisma.lectures.create({
+      data: {
+        branch_id: input.branchId,
+        monthly_course_id: input.monthlyCourseId || null,
+        monthly_course_section_id: input.monthlyCourseId ? input.courseSectionId || null : null,
+        slug: slugify(input.title),
+        title: input.title,
         description: input.description,
-      }).eq('lecture_id', id)
-    } else {
-      const { data: branch } = await supabase.from('branches').select('stage_id').eq('id', input.branchId).single()
-      const { data: latest } = await supabase.from('calendar_events').select('code').order('code', { ascending: false }).limit(1).single()
+        instructor: input.instructor?.trim() || null,
+        price: input.price,
+        old_price: input.oldPrice,
+        badge: input.badge,
+        sort_order: count + 1,
+        release_date: input.releaseDate || null,
+        what_you_learn: input.whatYouLearn || [],
+        is_free: input.isFree ?? false,
+        image: input.image || null,
+      },
+      select: { id: true, slug: true }
+    })
+
+    await notifyLectureGrade(input.branchId, input.title)
+
+    if (input.releaseDate) {
+      const latest = await prisma.calendar_events.findFirst({ select: { code: true }, orderBy: { code: 'desc' } })
       let nextNum = 1
       if (latest && latest.code.startsWith('EVT-')) {
         const num = parseInt(latest.code.replace('EVT-', ''), 10)
@@ -479,287 +294,235 @@ export async function updateLecture(id: string, input: LectureInput) {
       }
       const code = `EVT-${String(nextNum).padStart(2, '0')}`
 
-      await supabase.from('calendar_events').insert({
-        code,
-        title: `موعد نزول: ${input.title}`,
-        event_date: d,
-        event_time: t,
-        type: 'محاضرة',
-        course: input.title,
-        description: input.description,
-        custom: false,
-        lecture_id: id,
-        branch_id: input.branchId,
-        stage_id: branch?.stage_id,
+      const parsedDate = new Date(input.releaseDate)
+      const d = parsedDate.toISOString().slice(0, 10)
+      const t = parsedDate.toTimeString().slice(0, 5)
+
+      const branch = await prisma.branches.findUnique({ where: { id: input.branchId }, select: { stage_id: true } })
+
+      await prisma.calendar_events.create({
+        data: {
+          code,
+          title: `موعد نزول: ${input.title}`,
+          event_date: d,
+          event_time: t,
+          type: 'محاضرة',
+          course: input.title,
+          description: input.description,
+          custom: false,
+          lecture_id: data.id,
+          branch_id: input.branchId,
+          stage_id: branch?.stage_id,
+        }
       })
     }
-  } else {
-    // If release date is removed, remove the calendar event
-    await supabase.from('calendar_events').delete().eq('lecture_id', id)
-  }
 
-  logActivity({ action: 'update', resource: 'courses', targetId: id, targetLabel: `محاضرة ID: ${id}` }).catch(() => {})
-  revalidatePath('/courses')
-  revalidatePath('/calendar')
-  revalidatePath('/')
-  return { success: true }
+    logActivity({ action: 'create', resource: 'courses', targetLabel: `محاضرة: ${input.title}` }).catch(() => {})
+    revalidatePath('/courses')
+    revalidatePath('/calendar')
+    revalidatePath('/')
+    return { success: true }
+  } catch (error: any) {
+    return { error: 'تعذّر إضافة المحاضرة.' }
+  }
+}
+
+async function notifyLectureGrade(branchId: string, lectureTitle: string) {
+  try {
+    const branch = await prisma.branches.findUnique({
+      where: { id: branchId },
+      select: { stages: { select: { slug: true } } }
+    })
+    const grade = branch?.stages?.slug
+    await createNotification({
+      type: 'كورس',
+      title: 'محاضرة جديدة متاحة',
+      description: `تمت إضافة محاضرة "${lectureTitle}". تقدر تشوفها في صفحة تصفّح المحاضرات.`,
+      grade: grade ?? null,
+    })
+  } catch {
+  }
+}
+
+export async function updateLecture(id: string, input: LectureInput) {
+  if (!(await hasResourceAccess('courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+
+  try {
+    await prisma.lectures.update({
+      where: { id },
+      data: {
+        branch_id: input.branchId,
+        monthly_course_id: input.monthlyCourseId || null,
+        monthly_course_section_id: input.monthlyCourseId ? input.courseSectionId || null : null,
+        title: input.title,
+        description: input.description,
+        instructor: input.instructor?.trim() || null,
+        price: input.price,
+        old_price: input.oldPrice,
+        badge: input.badge,
+        release_date: input.releaseDate || null,
+        what_you_learn: input.whatYouLearn || [],
+        is_free: input.isFree ?? false,
+        image: input.image !== undefined ? input.image : undefined,
+      }
+    })
+
+    if (input.releaseDate) {
+      const parsedDate = new Date(input.releaseDate)
+      const d = parsedDate.toISOString().slice(0, 10)
+      const t = parsedDate.toTimeString().slice(0, 5)
+
+      const existingEvent = await prisma.calendar_events.findFirst({ where: { lecture_id: id }, select: { code: true } })
+
+      if (existingEvent) {
+        await prisma.calendar_events.update({
+          where: { code: existingEvent.code },
+          data: {
+            event_date: d,
+            event_time: t,
+            title: `موعد نزول: ${input.title}`,
+            course: input.title,
+            description: input.description,
+          }
+        })
+      } else {
+        const branch = await prisma.branches.findUnique({ where: { id: input.branchId }, select: { stage_id: true } })
+        const latest = await prisma.calendar_events.findFirst({ select: { code: true }, orderBy: { code: 'desc' } })
+        let nextNum = 1
+        if (latest && latest.code.startsWith('EVT-')) {
+          const num = parseInt(latest.code.replace('EVT-', ''), 10)
+          if (!isNaN(num)) nextNum = num + 1
+        }
+        const code = `EVT-${String(nextNum).padStart(2, '0')}`
+
+        await prisma.calendar_events.create({
+          data: {
+            code,
+            title: `موعد نزول: ${input.title}`,
+            event_date: d,
+            event_time: t,
+            type: 'محاضرة',
+            course: input.title,
+            description: input.description,
+            custom: false,
+            lecture_id: id,
+            branch_id: input.branchId,
+            stage_id: branch?.stage_id,
+          }
+        })
+      }
+    } else {
+      await prisma.calendar_events.deleteMany({ where: { lecture_id: id } })
+    }
+
+    logActivity({ action: 'update', resource: 'courses', targetId: id, targetLabel: `محاضرة ID: ${id}` }).catch(() => {})
+    revalidatePath('/courses')
+    revalidatePath('/calendar')
+    revalidatePath('/')
+    return { success: true }
+  } catch (error: any) {
+    return { error: 'تعذّر تحديث المحاضرة.' }
+  }
 }
 
 export async function deleteLecture(id: string) {
-  const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess('courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
-  // Clean up all media (image + lesson videos/attachments/R2 HLS) before DB delete.
   await cleanupLectureMedia(id).catch((e) => console.log('[v0] cleanupLectureMedia error:', e))
 
-  const { error } = await supabase.from('lectures').delete().eq('id', id)
-  if (error) {
-    console.log('[v0] deleteLecture error:', error.message)
+  try {
+    await prisma.lectures.delete({ where: { id } })
+    logActivity({ action: 'delete', resource: 'courses', targetId: id, targetLabel: `محاضرة ID: ${id}` }).catch(() => {})
+    revalidatePath('/courses')
+    revalidatePath('/')
+    return { success: true }
+  } catch (error: any) {
     return { error: 'تعذّر حذف المحاضرة.' }
   }
-  logActivity({ action: 'delete', resource: 'courses', targetId: id, targetLabel: `محاضرة ID: ${id}` }).catch(() => {})
-  revalidatePath('/courses')
-  revalidatePath('/')
-  return { success: true }
 }
 
-// ── Lesson CRUD ───────────────────────────────────────────────────
 export async function createLesson(lectureId: string, input: LessonInput) {
-  const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess('courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
-  const sortOrder = await nextContentOrder(supabase, lectureId)
+  const sortOrder = await nextContentOrder(lectureId)
 
-  const { error } = await supabase.from('lessons').insert({
-    lecture_id: lectureId,
-    slug: slugify(input.title),
-    title: input.title,
-    duration: input.duration,
-    is_free: input.isFree,
-    content_type: input.contentType ?? 'فيديو',
-    sort_order: sortOrder,
-    video_url: input.videoUrl ?? null,
-    description: input.description ?? null,
-    attachments: input.attachments ?? [],
-  })
+  try {
+    await prisma.lessons.create({
+      data: {
+        lecture_id: lectureId,
+        slug: slugify(input.title),
+        title: input.title,
+        duration: input.duration,
+        is_free: input.isFree,
+        content_type: input.contentType ?? 'فيديو',
+        sort_order: sortOrder,
+        video_url: input.videoUrl ?? null,
+        description: input.description ?? null,
+        attachments: input.attachments ?? [],
+      }
+    })
 
-  if (error) {
-    console.log('[v0] createLesson error:', error.message)
+    logActivity({ action: 'create', resource: 'courses', targetLabel: `درس: ${input.title}` }).catch(() => {})
+    revalidatePath('/courses', 'layout')
+    revalidatePath('/', 'layout')
+    revalidatePath('/student', 'layout')
+    return { success: true }
+  } catch (error: any) {
     return { error: 'تعذّر إضافة الدرس.' }
   }
-  logActivity({ action: 'create', resource: 'courses', targetLabel: `درس: ${input.title}` }).catch(() => {})
-  revalidatePath('/courses', 'layout')
-  revalidatePath('/', 'layout')
-  revalidatePath('/student', 'layout')
-  return { success: true }
 }
 
 export async function updateLesson(id: string, input: LessonInput) {
-  const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess('courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
-  const patch: Record<string, any> = {
-    title: input.title,
-    duration: input.duration,
-    is_free: input.isFree,
-    content_type: input.contentType ?? 'فيديو',
-  }
-  if (input.videoUrl !== undefined) patch.video_url = input.videoUrl
-  if (input.description !== undefined) patch.description = input.description
-  if (input.attachments !== undefined) patch.attachments = input.attachments
+  try {
+    await prisma.lessons.update({
+      where: { id },
+      data: {
+        title: input.title,
+        duration: input.duration,
+        is_free: input.isFree,
+        content_type: input.contentType ?? 'فيديو',
+        video_url: input.videoUrl !== undefined ? input.videoUrl : undefined,
+        description: input.description !== undefined ? input.description : undefined,
+        attachments: input.attachments !== undefined ? input.attachments : undefined,
+      }
+    })
 
-  const { error } = await supabase.from('lessons').update(patch).eq('id', id)
-
-  if (error) {
-    console.log('[v0] updateLesson error:', error.message)
+    logActivity({ action: 'update', resource: 'courses', targetId: id, targetLabel: `درس: ${input.title}` }).catch(() => {})
+    revalidatePath('/courses', 'layout')
+    revalidatePath('/', 'layout')
+    revalidatePath('/student', 'layout')
+    return { success: true }
+  } catch (error: any) {
     return { error: 'تعذّر تحديث الدرس.' }
   }
-  logActivity({ action: 'update', resource: 'courses', targetId: id, targetLabel: `درس: ${input.title}` }).catch(() => {})
-  revalidatePath('/courses', 'layout')
-  revalidatePath('/', 'layout')
-  revalidatePath('/student', 'layout')
-  return { success: true }
 }
 
 export async function deleteLesson(id: string) {
-  const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess('courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
-  // Clean up video, attachments, and any R2 HLS data before DB delete.
   await cleanupLessonMedia(id).catch((e) => console.log('[v0] cleanupLessonMedia error:', e))
 
-  const { error } = await supabase.from('lessons').delete().eq('id', id)
-  if (error) {
-    console.log('[v0] deleteLesson error:', error.message)
+  try {
+    await prisma.lessons.delete({ where: { id } })
+    logActivity({ action: 'delete', resource: 'courses', targetId: id, targetLabel: `درس ID: ${id}` }).catch(() => {})
+    revalidatePath('/courses', 'layout')
+    revalidatePath('/', 'layout')
+    revalidatePath('/student', 'layout')
+    return { success: true }
+  } catch (error: any) {
     return { error: 'تعذّر حذف الدرس.' }
   }
-  logActivity({ action: 'delete', resource: 'courses', targetId: id, targetLabel: `درس ID: ${id}` }).catch(() => {})
-  revalidatePath('/courses', 'layout')
-  revalidatePath('/', 'layout')
-  revalidatePath('/student', 'layout')
-  return { success: true }
 }
 
-// ── Single lecture / lesson detail (admin views) ──────────────────
-export async function getLectureDetailAdmin(
-  id: string,
-): Promise<{ lecture: AdminLecture; content: AdminContentItem[] } | null> {
-  const supabase = await createClient()
-
-  const { data: row, error } = await supabase
-    .from('lectures')
-    .select('*')
-    .eq('id', id)
-    .single()
-
-  if (error || !row) {
-    console.log('[v0] getLectureDetailAdmin error:', error?.message)
-    return null
-  }
-
-  const [branchRes, lessonsRes] = await Promise.all([
-    supabase
-      .from('branches')
-      .select('id, title, stage_id, stages:stage_id ( id, title )')
-      .eq('id', row.branch_id)
-      .single(),
-    supabase
-      .from('lessons')
-      .select('id, slug, title, duration, is_free, sort_order, video_url, description, content_type, attachments')
-      .eq('lecture_id', id)
-      .order('sort_order', { ascending: true }),
-  ])
-
-  const branch = branchRes.data as any
-  const lecture: AdminLecture = {
-    id: row.id,
-    slug: row.slug,
-    title: row.title,
-    description: row.description,
-    instructor: (row as any).instructor ?? null,
-    price: Number(row.price),
-    oldPrice: row.old_price != null ? Number(row.old_price) : null,
-    badge: row.badge,
-    image: (row as any).image ?? null,
-    sortOrder: row.sort_order,
-    releaseDate: row.release_date ?? null,
-    branchId: row.branch_id,
-    monthlyCourseId: row.monthly_course_id ?? null,
-    courseSectionId: (row as any).monthly_course_section_id ?? null,
-    branchTitle: branch?.title ?? '',
-    stageId: branch?.stage_id ?? '',
-    stageTitle: branch?.stages?.title ?? '',
-    whatYouLearn: (row as any).what_you_learn ?? null,
-    isFree: (row as any).is_free ?? false,
-    lessons: (lessonsRes.data ?? []).map((l) => {
-      const ct = (l as any).content_type
-      return {
-        id: l.id,
-        slug: l.slug,
-        title: l.title,
-        duration: l.duration,
-        isFree: l.is_free,
-        contentType: (ct === 'مقال' || ct === 'تمرين' ? ct : 'فيديو') as AdminLesson['contentType'],
-        sortOrder: l.sort_order,
-        videoUrl: l.video_url ?? null,
-        description: l.description ?? null,
-        attachments: Array.isArray((l as any).attachments) ? (l as any).attachments : [],
-      }
-    }),
-  }
-
-  // Build the unified, ordered content list (lessons + assignments).
-  const assignments = await getLectureAssignments(supabase, id)
-
-  const content: AdminContentItem[] = [
-    ...lecture.lessons.map(
-      (lesson): AdminContentItem => ({
-        kind: 'lesson',
-        sortOrder: lesson.sortOrder,
-        lesson,
-      }),
-    ),
-    ...assignments.map(
-      (assignment): AdminContentItem => ({
-        kind: 'assignment',
-        sortOrder: assignment.sortOrder,
-        assignment,
-      }),
-    ),
-  ].sort((a, b) => a.sortOrder - b.sortOrder)
-
-  return { lecture, content }
-}
-
-export async function getLessonDetailAdmin(
-  lessonId: string,
-): Promise<{
-  lesson: AdminLesson
-  lectureId: string
-  lectureTitle: string
-  lectureImage: string | null
-  siblings: AdminLesson[]
-} | null> {
-  const supabase = await createClient()
-
-  const { data: row, error } = await supabase
-    .from('lessons')
-    .select('id, slug, lecture_id, title, duration, is_free, sort_order, video_url, description, content_type, attachments')
-    .eq('id', lessonId)
-    .single()
-
-  if (error || !row) {
-    console.log('[v0] getLessonDetailAdmin error:', error?.message)
-    return null
-  }
-
-  const [lectureRes, siblingsRes] = await Promise.all([
-    supabase.from('lectures').select('id, title, image').eq('id', row.lecture_id).single(),
-    supabase
-      .from('lessons')
-      .select('id, slug, title, duration, is_free, sort_order, video_url, description, content_type, attachments')
-      .eq('lecture_id', row.lecture_id)
-      .order('sort_order', { ascending: true }),
-  ])
-
-  const lecture = lectureRes.data as any
-  const map = (l: any): AdminLesson => {
-    const ct = l.content_type
-    return {
-      id: l.id,
-      slug: l.slug,
-      title: l.title,
-      duration: l.duration,
-      isFree: l.is_free,
-      contentType: (ct === 'مقال' || ct === 'تمرين' ? ct : 'فيديو') as AdminLesson['contentType'],
-      sortOrder: l.sort_order,
-      videoUrl: l.video_url ?? null,
-      description: l.description ?? null,
-      attachments: Array.isArray(l.attachments) ? l.attachments : [],
-    }
-  }
-
-  return {
-    lesson: map(row),
-    lectureId: row.lecture_id,
-    lectureTitle: lecture?.title ?? '',
-    lectureImage: lecture?.image ?? null,
-    siblings: (siblingsRes.data ?? []).map(map),
-  }
-}
-
-// ── Lecture assignments (واجبات) + unified content ────────────────
-// A question can be multiple choice, an essay (written answer), or a file
-// upload that the student answers by submitting a file.
 export type QuestionKind = 'mcq' | 'essay' | 'file'
 
 export type AdminAssignmentQuestion = {
   id?: string
   kind: QuestionKind
   question: string
-  /** خيارات الاختيار من متعدد، تُستخدم فقط عندما يكون النوع mcq */
   options: string[]
-  /** رقم الإجابة الصحيحة، يُستخدم فقط عندما يكون النوع mcq */
   correctIndex: number
 }
 
@@ -785,61 +548,149 @@ export type AssignmentInput = {
   questions: AdminAssignmentQuestion[]
 }
 
-// A single ordered entry in a lecture's content list.
 export type AdminContentItem =
   | { kind: 'lesson'; sortOrder: number; lesson: AdminLesson }
   | { kind: 'assignment'; sortOrder: number; assignment: AdminAssignment }
 
-async function getLectureAssignments(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  lectureId: string,
-): Promise<AdminAssignment[]> {
-  const { data: rows } = await supabase
-    .from('assignments')
-    .select(
-      'id, code, type, title, description, instructions, points, due_date, sort_order, ' +
-        'assignment_questions ( id, kind, question, options, correct_index, position )',
-    )
-    .eq('lecture_id', lectureId)
-    .order('sort_order', { ascending: true })
+async function getLectureAssignments(lectureId: string): Promise<AdminAssignment[]> {
+  const rows = await prisma.assignments.findMany({
+    where: { lecture_id: lectureId },
+    select: {
+      id: true, code: true, type: true, title: true, description: true, instructions: true, points: true, due_date: true, sort_order: true,
+      assignment_questions: { select: { id: true, kind: true, question: true, options: true, correct_index: true, position: true } }
+    },
+    orderBy: { sort_order: 'asc' }
+  })
 
-  return (rows ?? []).map((a: any) => ({
+  return rows.map((a) => ({
     id: a.id,
-    code: a.code,
+    code: a.code || a.id,
     type: (a.type === 'اختبار' ? 'اختبار' : 'تسليم') as AdminAssignment['type'],
     title: a.title,
     description: a.description ?? '',
-    instructions: (a.instructions as string[]) ?? [],
+    instructions: Array.isArray(a.instructions) ? (a.instructions as string[]) : [],
     points: a.points ?? 0,
-    dueDate: a.due_date ?? null,
+    dueDate: a.due_date ? a.due_date.toISOString() : null,
     sortOrder: a.sort_order ?? 0,
-    questions: [...(a.assignment_questions ?? [])]
-      .sort((x: any, y: any) => (x.position ?? 0) - (y.position ?? 0))
-      .map((q: any) => ({
+    questions: a.assignment_questions
+      .sort((x, y) => (x.position ?? 0) - (y.position ?? 0))
+      .map((q) => ({
         id: q.id,
         kind: (q.kind as QuestionKind) ?? 'mcq',
         question: q.question,
-        options: (q.options as string[]) ?? [],
+        options: Array.isArray(q.options) ? (q.options as string[]) : [],
         correctIndex: q.correct_index ?? 0,
       })),
   }))
+}
+
+export async function getLectureDetailAdmin(id: string): Promise<{ lecture: AdminLecture; content: AdminContentItem[] } | null> {
+  const row = await prisma.lectures.findUnique({ where: { id } })
+  if (!row) return null
+
+  const [branch, lessons] = await Promise.all([
+    prisma.branches.findUnique({ where: { id: row.branch_id }, select: { id: true, title: true, stage_id: true, stages: { select: { id: true, title: true } } } }),
+    prisma.lessons.findMany({
+      where: { lecture_id: id },
+      select: { id: true, slug: true, title: true, duration: true, is_free: true, sort_order: true, video_url: true, description: true, content_type: true, attachments: true },
+      orderBy: { sort_order: 'asc' }
+    })
+  ])
+
+  const lecture: AdminLecture = {
+    id: row.id,
+    slug: row.slug,
+    title: row.title,
+    description: row.description ?? '',
+    instructor: row.instructor ?? null,
+    price: Number(row.price),
+    oldPrice: row.old_price != null ? Number(row.old_price) : null,
+    badge: row.badge,
+    image: row.image ?? null,
+    sortOrder: row.sort_order,
+    releaseDate: row.release_date ?? null,
+    branchId: row.branch_id,
+    monthlyCourseId: row.monthly_course_id ?? null,
+    courseSectionId: row.monthly_course_section_id ?? null,
+    branchTitle: branch?.title ?? '',
+    stageId: branch?.stage_id ?? '',
+    stageTitle: branch?.stages?.title ?? '',
+    whatYouLearn: Array.isArray(row.what_you_learn) ? (row.what_you_learn as string[]) : null,
+    isFree: !!row.is_free,
+    lessons: lessons.map((l) => {
+      const ct = l.content_type
+      return {
+        id: l.id,
+        slug: l.slug,
+        title: l.title,
+        duration: l.duration,
+        isFree: !!l.is_free,
+        contentType: (ct === 'مقال' || ct === 'تمرين' ? ct : 'فيديو') as AdminLesson['contentType'],
+        sortOrder: l.sort_order,
+        videoUrl: l.video_url ?? null,
+        description: l.description ?? null,
+        attachments: Array.isArray(l.attachments) ? (l.attachments as LessonAttachment[]) : [],
+      }
+    }),
+  }
+
+  const assignments = await getLectureAssignments(id)
+
+  const content: AdminContentItem[] = [
+    ...lecture.lessons.map((lesson): AdminContentItem => ({ kind: 'lesson', sortOrder: lesson.sortOrder, lesson })),
+    ...assignments.map((assignment): AdminContentItem => ({ kind: 'assignment', sortOrder: assignment.sortOrder, assignment })),
+  ].sort((a, b) => a.sortOrder - b.sortOrder)
+
+  return { lecture, content }
+}
+
+export async function getLessonDetailAdmin(lessonId: string): Promise<{ lesson: AdminLesson; lectureId: string; lectureTitle: string; lectureImage: string | null; siblings: AdminLesson[] } | null> {
+  const row = await prisma.lessons.findUnique({
+    where: { id: lessonId },
+    select: { id: true, slug: true, lecture_id: true, title: true, duration: true, is_free: true, sort_order: true, video_url: true, description: true, content_type: true, attachments: true }
+  })
+  if (!row) return null
+
+  const [lecture, siblings] = await Promise.all([
+    prisma.lectures.findUnique({ where: { id: row.lecture_id }, select: { id: true, title: true, image: true } }),
+    prisma.lessons.findMany({
+      where: { lecture_id: row.lecture_id },
+      select: { id: true, slug: true, title: true, duration: true, is_free: true, sort_order: true, video_url: true, description: true, content_type: true, attachments: true },
+      orderBy: { sort_order: 'asc' }
+    })
+  ])
+
+  const map = (l: any): AdminLesson => {
+    const ct = l.content_type
+    return {
+      id: l.id,
+      slug: l.slug,
+      title: l.title,
+      duration: l.duration,
+      isFree: !!l.is_free,
+      contentType: (ct === 'مقال' || ct === 'تمرين' ? ct : 'فيديو') as AdminLesson['contentType'],
+      sortOrder: l.sort_order,
+      videoUrl: l.video_url ?? null,
+      description: l.description ?? null,
+      attachments: Array.isArray(l.attachments) ? (l.attachments as LessonAttachment[]) : [],
+    }
+  }
+
+  return {
+    lesson: map(row),
+    lectureId: row.lecture_id,
+    lectureTitle: lecture?.title ?? '',
+    lectureImage: lecture?.image ?? null,
+    siblings: siblings.map(map),
+  }
 }
 
 function assignmentCode() {
   return `ASG-LEC-${Math.random().toString(36).slice(2, 7).toUpperCase()}`
 }
 
-// Replaces all questions of an assignment with the provided set.
-async function replaceAssignmentQuestions(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  assignmentId: string,
-  questions: AdminAssignmentQuestion[],
-) {
-  await supabase
-    .from('assignment_questions')
-    .delete()
-    .eq('assignment_id', assignmentId)
-
+async function replaceAssignmentQuestions(assignmentId: string, questions: AdminAssignmentQuestion[]) {
+  await prisma.assignment_questions.deleteMany({ where: { assignment_id: assignmentId } })
   if (questions.length === 0) return null
 
   const rows = questions.map((q, i) => ({
@@ -850,125 +701,122 @@ async function replaceAssignmentQuestions(
     correct_index: q.kind === 'mcq' ? q.correctIndex : 0,
     position: i + 1,
   }))
-  const { error } = await supabase.from('assignment_questions').insert(rows)
-  return error
+  try {
+    await prisma.assignment_questions.createMany({ data: rows })
+    return null
+  } catch (error: any) {
+    return error
+  }
 }
 
 export async function createAssignment(lectureId: string, input: AssignmentInput) {
-  const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess('courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
-  const sortOrder = await nextContentOrder(supabase, lectureId)
+  const sortOrder = await nextContentOrder(lectureId)
 
-  const { data, error } = await supabase
-    .from('assignments')
-    .insert({
-      code: assignmentCode(),
-      lecture_id: lectureId,
-      type: input.type ?? 'تسليم',
-      title: input.title,
-      description: input.description,
-      instructions: [],
-      points: input.points,
-      due_date: input.dueDate || null,
-      sort_order: sortOrder,
+  try {
+    const data = await prisma.assignments.create({
+      data: {
+        code: assignmentCode(),
+        lecture_id: lectureId,
+        type: input.type ?? 'تسليم',
+        title: input.title,
+        description: input.description,
+        instructions: [],
+        points: input.points,
+        due_date: input.dueDate ? new Date(input.dueDate) : null,
+        sort_order: sortOrder,
+      },
+      select: { id: true }
     })
-    .select('id')
-    .single()
 
-  if (error || !data) {
-    console.log('[v0] createAssignment error:', error?.message)
+    const qErr = await replaceAssignmentQuestions(data.id, input.questions)
+    if (qErr) {
+      return { error: 'تعذّر حفظ أسئلة الواجب.' }
+    }
+
+    logActivity({ action: 'create', resource: 'courses', targetLabel: `واجب: ${input.title}` }).catch(() => {})
+    revalidatePath(`/admin/courses/${lectureId}`)
+    revalidatePath('/courses', 'layout')
+    revalidatePath('/student', 'layout')
+    return { success: true }
+  } catch (error: any) {
     return { error: 'تعذّر إنشاء الواجب.' }
   }
-
-  const qErr = await replaceAssignmentQuestions(supabase, data.id, input.questions)
-  if (qErr) {
-    console.log('[v0] createAssignment questions error:', qErr.message)
-    return { error: 'تعذّر حفظ أسئلة الواجب.' }
-  }
-
-  logActivity({ action: 'create', resource: 'courses', targetLabel: `واجب: ${input.title}` }).catch(() => {})
-  revalidatePath(`/admin/courses/${lectureId}`)
-  revalidatePath('/courses', 'layout')
-  revalidatePath('/student', 'layout')
-  return { success: true }
 }
 
 export async function updateAssignment(id: string, input: AssignmentInput) {
-  const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess('courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
-  const { error } = await supabase
-    .from('assignments')
-    .update({
-      type: input.type ?? 'تسليم',
-      title: input.title,
-      description: input.description,
-      points: input.points,
-      due_date: input.dueDate || null,
+  try {
+    await prisma.assignments.update({
+      where: { id },
+      data: {
+        type: input.type ?? 'تسليم',
+        title: input.title,
+        description: input.description,
+        points: input.points,
+        due_date: input.dueDate ? new Date(input.dueDate) : null,
+      }
     })
-    .eq('id', id)
 
-  if (error) {
-    console.log('[v0] updateAssignment error:', error.message)
+    const qErr = await replaceAssignmentQuestions(id, input.questions)
+    if (qErr) {
+      return { error: 'تعذّر حفظ أسئلة الواجب.' }
+    }
+
+    logActivity({ action: 'update', resource: 'courses', targetId: id, targetLabel: `واجب: ${input.title}` }).catch(() => {})
+    revalidatePath('/admin/courses')
+    revalidatePath('/courses', 'layout')
+    revalidatePath('/student', 'layout')
+    return { success: true }
+  } catch (error: any) {
     return { error: 'تعذّر تحديث الواجب.' }
   }
-
-  const qErr = await replaceAssignmentQuestions(supabase, id, input.questions)
-  if (qErr) {
-    console.log('[v0] updateAssignment questions error:', qErr.message)
-    return { error: 'تعذّر حفظ أسئلة الواجب.' }
-  }
-
-  logActivity({ action: 'update', resource: 'courses', targetId: id, targetLabel: `واجب: ${input.title}` }).catch(() => {})
-  revalidatePath('/admin/courses')
-  revalidatePath('/courses', 'layout')
-  revalidatePath('/student', 'layout')
-  return { success: true }
 }
 
 export async function deleteAssignment(id: string) {
-  const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess('courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
-  await supabase.from('assignment_questions').delete().eq('assignment_id', id)
-  const { error } = await supabase.from('assignments').delete().eq('id', id)
-  if (error) {
-    console.log('[v0] deleteAssignment error:', error.message)
+  try {
+    await prisma.assignment_questions.deleteMany({ where: { assignment_id: id } })
+    await prisma.assignments.delete({ where: { id } })
+    logActivity({ action: 'delete', resource: 'courses', targetId: id, targetLabel: `واجب ID: ${id}` }).catch(() => {})
+    revalidatePath('/courses', 'layout')
+    revalidatePath('/student', 'layout')
+    return { success: true }
+  } catch (error: any) {
     return { error: 'تعذّر حذف الواجب.' }
   }
-  logActivity({ action: 'delete', resource: 'courses', targetId: id, targetLabel: `واجب ID: ${id}` }).catch(() => {})
-  revalidatePath('/courses', 'layout')
-  revalidatePath('/student', 'layout')
-  return { success: true }
 }
 
-// Reorders a lecture's mixed content (lessons + assignments) into one list.
-// `items` is the new order; sort_order is assigned 1..n across both tables.
 export async function reorderLectureContent(
   lectureId: string,
   items: { kind: 'lesson' | 'assignment'; id: string }[],
 ) {
-  const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+  if (!(await hasResourceAccess('courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
-  const updates = items.map((item, i) => {
-    const table = item.kind === 'lesson' ? 'lessons' : 'assignments'
-    return supabase
-      .from(table)
-      .update({ sort_order: i + 1 })
-      .eq('id', item.id)
-      .eq('lecture_id', lectureId)
-  })
+  try {
+    const promises = items.map((item, i) => {
+      if (item.kind === 'lesson') {
+        return prisma.lessons.updateMany({
+          where: { id: item.id, lecture_id: lectureId },
+          data: { sort_order: i + 1 }
+        })
+      } else {
+        return prisma.assignments.updateMany({
+          where: { id: item.id, lecture_id: lectureId },
+          data: { sort_order: i + 1 }
+        })
+      }
+    })
 
-  const results = await Promise.all(updates)
-  const failed = results.find((r) => r.error)
-  if (failed?.error) {
-    console.log('[v0] reorderLectureContent error:', failed.error.message)
+    await Promise.all(promises)
+
+    revalidatePath(`/admin/courses/${lectureId}`)
+    revalidatePath('/courses')
+    return { success: true }
+  } catch (error: any) {
     return { error: 'تعذّر إعادة الترتيب.' }
   }
-
-  revalidatePath(`/admin/courses/${lectureId}`)
-  revalidatePath('/courses')
-  return { success: true }
 }

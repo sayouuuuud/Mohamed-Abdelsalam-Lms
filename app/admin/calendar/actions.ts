@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
 import { hasResourceAccess } from '@/lib/auth-guard'
 import { logActivity } from '@/lib/audit-log'
 import { createNotification } from '@/lib/notify'
@@ -8,44 +8,36 @@ import { revalidatePath } from 'next/cache'
 import type { CalendarEvent, CalendarEventType } from '@/lib/calendar-data'
 
 export async function getEvents(): Promise<CalendarEvent[]> {
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('calendar_events')
-    .select('*')
-    .order('event_date', { ascending: true })
-    .order('event_time', { ascending: true })
-
-  if (error || !data) return []
+  const data = await prisma.calendar_events.findMany({
+    orderBy: [
+      { event_date: 'asc' },
+      { event_time: 'asc' }
+    ]
+  })
 
   return data.map((row) => ({
     id: row.code,
     title: row.title,
-    date: row.event_date,
+    date: row.event_date instanceof Date ? row.event_date.toISOString().split('T')[0] : String(row.event_date),
     time: row.event_time,
     type: row.type as CalendarEventType,
     course: row.course || undefined,
     description: row.description || undefined,
     custom: row.custom,
-    stageId: row.stage_id,
-    branchId: row.branch_id,
-    lectureId: row.lecture_id,
+    stageId: row.stage_id || undefined,
+    branchId: row.branch_id || undefined,
+    lectureId: row.lecture_id || undefined,
   }))
 }
 
 export async function getTargetingOptions() {
-  const supabase = await createClient()
-
-  const [stagesRes, branchesRes, lecturesRes] = await Promise.all([
-    supabase.from('stages').select('id, title, sort_order').order('sort_order'),
-    supabase.from('branches').select('id, stage_id, title, sort_order').order('sort_order'),
-    supabase.from('lectures').select('id, branch_id, title, sort_order').order('sort_order'),
+  const [stages, branches, lectures] = await Promise.all([
+    prisma.stages.findMany({ select: { id: true, title: true, sort_order: true }, orderBy: { sort_order: 'asc' } }),
+    prisma.branches.findMany({ select: { id: true, stage_id: true, title: true, sort_order: true }, orderBy: { sort_order: 'asc' } }),
+    prisma.lectures.findMany({ select: { id: true, branch_id: true, title: true, sort_order: true }, orderBy: { sort_order: 'asc' } }),
   ])
 
-  return {
-    stages: stagesRes.data || [],
-    branches: branchesRes.data || [],
-    lectures: lecturesRes.data || [],
-  }
+  return { stages, branches, lectures }
 }
 
 export async function createEvent(values: {
@@ -59,17 +51,14 @@ export async function createEvent(values: {
   branchId?: string | null
   lectureId?: string | null
 }) {
-  const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'calendar', 'manage'))) {
+  if (!(await hasResourceAccess('calendar', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
-  const { data: latest } = await supabase
-    .from('calendar_events')
-    .select('code')
-    .order('code', { ascending: false })
-    .limit(1)
-    .single()
+  const latest = await prisma.calendar_events.findFirst({
+    select: { code: true },
+    orderBy: { code: 'desc' }
+  })
 
   let nextNum = 1
   if (latest && latest.code.startsWith('EVT-')) {
@@ -78,33 +67,36 @@ export async function createEvent(values: {
   }
   const code = `EVT-${String(nextNum).padStart(2, '0')}`
 
-  const { error } = await supabase.from('calendar_events').insert({
-    code,
-    title: values.title,
-    event_date: values.date,
-    event_time: values.time,
-    type: values.type,
-    course: values.course,
-    description: values.description,
-    custom: true,
-    stage_id: values.stageId,
-    branch_id: values.branchId,
-    lecture_id: values.lectureId,
-  })
+  try {
+    await prisma.calendar_events.create({
+      data: {
+        code,
+        title: values.title,
+        event_date: values.date,
+        event_time: values.time,
+        type: values.type,
+        course: values.course || '',
+        description: values.description || '',
+        custom: true,
+        stage_id: values.stageId,
+        branch_id: values.branchId,
+        lecture_id: values.lectureId,
+      }
+    })
 
-  if (error) return { error: error.message }
+    logActivity({ action: 'create', resource: 'calendar', targetId: code, targetLabel: `حدث: ${values.title}` }).catch(() => {})
 
-  logActivity({ action: 'create', resource: 'calendar', targetId: code, targetLabel: `حدث: ${values.title}` }).catch(() => {})
+    await createNotification({
+      type: values.type === 'اختبار' ? 'اختبار' : 'نظام',
+      title: `موعد جديد: ${values.title}`,
+      description: `${values.date} - ${values.time}${values.course ? ` · ${values.course}` : ''}`,
+    })
 
-  // Notify all students about the new event (exam / assignment / lesson, etc).
-  await createNotification({
-    type: values.type === 'اختبار' ? 'اختبار' : 'نظام',
-    title: `موعد جديد: ${values.title}`,
-    description: `${values.date} - ${values.time}${values.course ? ` · ${values.course}` : ''}`,
-  })
-
-  revalidatePath('/calendar')
-  return { success: true }
+    revalidatePath('/calendar')
+    return { success: true }
+  } catch (error: any) {
+    return { error: error.message }
+  }
 }
 
 export async function updateEvent(
@@ -121,41 +113,45 @@ export async function updateEvent(
     lectureId?: string | null
   },
 ) {
-  const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'calendar', 'manage'))) {
+  if (!(await hasResourceAccess('calendar', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
-  const { error } = await supabase
-    .from('calendar_events')
-    .update({
-      title: values.title,
-      event_date: values.date,
-      event_time: values.time,
-      type: values.type,
-      course: values.course,
-      description: values.description,
-      stage_id: values.stageId,
-      branch_id: values.branchId,
-      lecture_id: values.lectureId,
+  try {
+    await prisma.calendar_events.update({
+      where: { code: id },
+      data: {
+        title: values.title,
+        event_date: values.date,
+        event_time: values.time,
+        type: values.type,
+        course: values.course || '',
+        description: values.description || '',
+        stage_id: values.stageId,
+        branch_id: values.branchId,
+        lecture_id: values.lectureId,
+      }
     })
-    .eq('code', id)
 
-  if (error) return { error: error.message }
-  logActivity({ action: 'update', resource: 'calendar', targetId: id, targetLabel: `حدث: ${values.title}` }).catch(() => {})
-  revalidatePath('/calendar')
-  return { success: true }
+    logActivity({ action: 'update', resource: 'calendar', targetId: id, targetLabel: `حدث: ${values.title}` }).catch(() => {})
+    revalidatePath('/calendar')
+    return { success: true }
+  } catch (error: any) {
+    return { error: error.message }
+  }
 }
 
 export async function deleteEvent(id: string) {
-  const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'calendar', 'manage'))) {
+  if (!(await hasResourceAccess('calendar', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
-  const { error } = await supabase.from('calendar_events').delete().eq('code', id)
-  if (error) return { error: error.message }
-  logActivity({ action: 'delete', resource: 'calendar', targetId: id, targetLabel: `حدث كود: ${id}` }).catch(() => {})
-  revalidatePath('/calendar')
-  return { success: true }
+  try {
+    await prisma.calendar_events.delete({ where: { code: id } })
+    logActivity({ action: 'delete', resource: 'calendar', targetId: id, targetLabel: `حدث كود: ${id}` }).catch(() => {})
+    revalidatePath('/calendar')
+    return { success: true }
+  } catch (error: any) {
+    return { error: error.message }
+  }
 }

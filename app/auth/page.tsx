@@ -4,7 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowLeft, Check } from 'lucide-react'
 import { AuthForm } from '@/components/auth/auth-form'
-import { createClient } from '@/lib/supabase/server'
+import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
 import { getSiteContent } from '@/lib/site-content'
 
@@ -20,19 +20,11 @@ export default async function AuthPage({
 }: {
   searchParams: Promise<{ mode?: string }>
 }) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const session = await auth()
+  const user = session?.user as any
 
   if (user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    if (profile?.role === 'admin' || profile?.role === 'assistant') {
+    if (user.role === 'admin' || user.role === 'assistant') {
       // Assistants land on the dashboard; middleware forwards them to their
       // first permitted page if they lack dashboard access.
       redirect('/admin/dashboard')

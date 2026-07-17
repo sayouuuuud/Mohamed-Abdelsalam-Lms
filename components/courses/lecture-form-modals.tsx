@@ -167,7 +167,7 @@ export function LectureFormModals() {
 
   const handleLectureSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!title.trim() || !branchId) return
+    if (!title.trim() || !branchId || !monthlyCourseId) return
     submitLectureForm({
       branchId,
       monthlyCourseId: monthlyCourseId || null,
@@ -257,7 +257,7 @@ export function LectureFormModals() {
             </Field>
           </div>
 
-          <Field label="الكورس / الشهر (اختياري)">
+          <Field label="الكورس / الشهر">
             {creatingCourse ? (
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-2">
@@ -301,7 +301,7 @@ export function LectureFormModals() {
                   disabled={!branchId}
                   className={cn(selectClass, !branchId && 'opacity-50')}
                 >
-                  <option value="">بدون كورس — تظهر في تاب المحاضرات فقط</option>
+                  <option value="" disabled>اختر الكورس / الشهر</option>
                   {coursesForBranch.map((course) => (
                     <option key={course.id} value={course.id}>{course.title}</option>
                   ))}

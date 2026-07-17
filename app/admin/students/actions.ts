@@ -1,10 +1,10 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { prisma } from '@/lib/prisma'
 import { hasResourceAccess } from '@/lib/auth-guard'
 import { logActivity } from '@/lib/audit-log'
+import bcrypt from 'bcryptjs'
 import type {
   StudentGender,
   StudentRecord,
@@ -23,117 +23,75 @@ export type StudentInput = {
 
 export type StageOption = { id: string; title: string }
 
-// Academic years used to assign a student and drive the branch comparison.
 export async function getStages(): Promise<StageOption[]> {
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('stages')
-    .select('id, title, sort_order')
-    .order('sort_order', { ascending: true })
-  if (error) {
-    console.log('[v0] getStages error:', error.message)
-    return []
-  }
-  return (data || []).map((s: any) => ({ id: s.id, title: s.title }))
+  const data = await prisma.stages.findMany({
+    select: { id: true, title: true, sort_order: true },
+    orderBy: { sort_order: 'asc' }
+  })
+  return data.map((s) => ({ id: s.id, title: s.title }))
 }
 
-// Guards student writes (create/delete). These use the service-role client,
-// so we enforce 'manage' at the app layer instead of relying on RLS.
-async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
-  return hasResourceAccess(supabase, 'students', 'manage')
+async function requireAdmin() {
+  return hasResourceAccess('students', 'manage')
 }
 
-type StudentRow = {
-  id: string
-  code: string
-  name: string
-  email: string | null
-  phone: string | null
-  gender: StudentGender
-  avatar: string | null
-  courses: number
-  progress: number
-  spent: string
-  status: StudentStatus
-  joined_at: string
-}
-
-function formatJoinedAt(date: string): string {
+function formatJoinedAt(date: string | Date): string {
   try {
-    return new Date(date).toLocaleDateString('ar-EG', {
+    const d = typeof date === 'string' ? new Date(date) : date
+    return new Intl.DateTimeFormat('ar-EG', {
       day: 'numeric',
       month: 'long',
       year: 'numeric',
-    })
+    }).format(d)
   } catch {
-    return date
-  }
-}
-
-function mapRow(row: StudentRow): StudentRecord {
-  return {
-    // The UI uses `id` as the human-readable identifier (e.g. STD-1042),
-    // so we expose `code` here while keeping the uuid internal to the DB.
-    id: row.code,
-    name: row.name,
-    email: row.email ?? '',
-    phone: row.phone ?? '',
-    gender: row.gender,
-    avatar: row.avatar ?? undefined,
-    courses: row.courses,
-    progress: row.progress,
-    spent: row.spent,
-    status: row.status,
-    joinedAt: formatJoinedAt(row.joined_at),
+    return String(date)
   }
 }
 
 export async function getStudents(): Promise<StudentRecord[]> {
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('students')
-    .select(
-      'id, code, name, email, phone, gender, avatar, courses, progress, spent, status, joined_at',
-    )
-    .order('created_at', { ascending: false })
+  const data = await prisma.students.findMany({
+    select: { id: true, code: true, name: true, email: true, phone: true, gender: true, avatar: true, courses: true, progress: true, spent: true, status: true, joined_at: true },
+    orderBy: { created_at: 'desc' }
+  })
 
-  if (error) {
-    console.log('[v0] getStudents error:', error.message)
-    return []
-  }
-  return (data as StudentRow[]).map(mapRow)
+  return data.map((row) => ({
+    id: row.code,
+    name: row.name ?? '',
+    email: row.email ?? '',
+    phone: row.phone ?? '',
+    gender: row.gender as StudentGender,
+    avatar: row.avatar ?? undefined,
+    courses: row.courses ?? 0,
+    progress: row.progress ?? 0,
+    spent: row.spent ?? '0',
+    status: row.status as StudentStatus,
+    joinedAt: formatJoinedAt(row.joined_at),
+  }))
 }
 
 export async function getStudentsStats() {
-  const supabase = await createClient()
-  
-  if (!(await hasResourceAccess(supabase, 'students'))) {
+  if (!(await hasResourceAccess('students'))) {
     return null
   }
 
-  const { data: studentsRaw } = await supabase
-    .from('students')
-    .select('id, status, created_at')
-
-  if (!studentsRaw) return null
+  const studentsRaw = await prisma.students.findMany({
+    select: { id: true, status: true, created_at: true }
+  })
 
   const now = new Date()
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
   const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
 
-  // Current window
   const totalThis = studentsRaw.length
   const activeThis = studentsRaw.filter(s => s.status === 'نشط').length
   const suspendedThis = studentsRaw.filter(s => s.status === 'موقوف').length
   const newThis = studentsRaw.filter(s => new Date(s.created_at) >= thirtyDaysAgo).length
 
-  // Previous window (for Total, Active, Suspended - these are cumulative, so previous is total up to 30 days ago)
   const studentsPrevWindow = studentsRaw.filter(s => new Date(s.created_at) < thirtyDaysAgo)
   const totalPrev = studentsPrevWindow.length
   const activePrev = studentsPrevWindow.filter(s => s.status === 'نشط').length
   const suspendedPrev = studentsPrevWindow.filter(s => s.status === 'موقوف').length
   
-  // Previous window (for New - this is a discrete bucket, so it's between 60 and 30 days ago)
   const newPrev = studentsRaw.filter(s => new Date(s.created_at) >= sixtyDaysAgo && new Date(s.created_at) < thirtyDaysAgo).length
 
   const calcChange = (curr: number, prev: number) => {
@@ -153,15 +111,11 @@ export async function getStudentsStats() {
   }
 }
 
-async function generateStudentCode(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-): Promise<string> {
-  const { data } = await supabase
-    .from('students')
-    .select('code')
-    .order('code', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+async function generateStudentCode(): Promise<string> {
+  const data = await prisma.students.findFirst({
+    select: { code: true },
+    orderBy: { code: 'desc' }
+  })
 
   let next = 1043
   if (data?.code) {
@@ -172,92 +126,96 @@ async function generateStudentCode(
 }
 
 export async function createStudent(input: StudentInput) {
-  const supabase = await createClient()
-
-  if (!(await requireAdmin(supabase))) {
+  if (!(await requireAdmin())) {
     return { error: 'غير مسموح. لازم تكون أدمن عشان تضيف طالب.' }
   }
 
-  const code = await generateStudentCode(supabase)
+  const code = await generateStudentCode()
   let userId: string | null = null
 
-  // If a password is provided, create a real login account for the student.
   if (input.email && input.password) {
-    const admin = createAdminClient()
-    const { data: created, error: authError } = await admin.auth.admin.createUser({
-      email: input.email,
-      password: input.password,
-      email_confirm: true,
-      user_metadata: { full_name: input.name, phone: input.phone, role: 'student' },
+    const existingUser = await prisma.user.findFirst({
+      where: { email: input.email }
     })
-    if (authError) {
-      console.log('[v0] createStudent auth error:', authError.message)
-      return {
-        error: authError.message.toLowerCase().includes('already')
-          ? 'البريد الإلكتروني مستخدم بالفعل.'
-          : 'تعذّر إنشاء حساب الطالب. حاول تاني.',
-      }
+    if (existingUser) {
+      return { error: 'البريد الإلكتروني مستخدم بالفعل.' }
     }
-    userId = created.user?.id ?? null
+
+    try {
+      const hashedPassword = bcrypt.hashSync(input.password, 10)
+      const newUserId = crypto.randomUUID()
+      const user = await prisma.user.create({
+        data: {
+          id: newUserId,
+          email: input.email,
+          encrypted_password: hashedPassword,
+          role: 'student',
+          phone: input.phone,
+        }
+      })
+      userId = user.id
+      await prisma.profiles.create({
+        data: {
+          id: userId,
+          full_name: input.name,
+          email: input.email,
+          phone: input.phone,
+          role: 'student',
+        }
+      })
+    } catch (authError: any) {
+      console.log('[v0] createStudent auth error:', authError.message)
+      return { error: 'تعذّر إنشاء حساب الطالب. حاول تاني.' }
+    }
   }
 
-  const { error } = await supabase.from('students').insert({
-    code,
-    user_id: userId,
-    name: input.name,
-    email: input.email || null,
-    phone: input.phone || null,
-    gender: input.gender,
-    status: input.status,
-    stage_id: input.stageId || null,
-  })
+  try {
+    await prisma.students.create({
+      data: {
+        code,
+        user_id: userId,
+        name: input.name,
+        email: input.email || null,
+        phone: input.phone || null,
+        gender: input.gender,
+        status: input.status,
+        stage_id: input.stageId || null,
+      }
+    })
 
-  if (error) {
+    logActivity({ action: 'create', resource: 'students', targetId: code, targetLabel: `طالب: ${input.name}` }).catch(() => {})
+    revalidatePath('/students')
+    return { success: true }
+  } catch (error: any) {
     console.log('[v0] createStudent error:', error.message)
-    return { error: 'تعذّر إضافة الطالب. تأكد من صلاحياتك وحاول تاني.' }
+    return { error: 'تعذّر إضافة الطالب. تأكد من البيانات وحاول تاني.' }
   }
-
-  logActivity({ action: 'create', resource: 'students', targetId: code, targetLabel: `طالب: ${input.name}` }).catch(() => {})
-  revalidatePath('/students')
-  return { success: true }
 }
 
 export async function deleteStudent(code: string) {
-  const supabase = await createClient()
-
-  if (!(await requireAdmin(supabase))) {
+  if (!(await requireAdmin())) {
     return { error: 'غير مسموح. لازم تكون أدمن عشان تحذف طالب.' }
   }
 
-  // Grab the linked auth user id BEFORE deleting the row so we can also
-  // remove the login account — otherwise the student could still sign in.
-  const { data: row } = await supabase
-    .from('students')
-    .select('user_id')
-    .eq('code', code)
-    .maybeSingle()
+  const row = await prisma.students.findUnique({
+    where: { code },
+    select: { user_id: true }
+  })
 
-  const { error } = await supabase.from('students').delete().eq('code', code)
+  try {
+    await prisma.students.delete({ where: { code } })
+    
+    if (row?.user_id) {
+      await prisma.user.delete({ where: { id: row.user_id } }).catch((e: any) => {
+        console.log('[v0] deleteStudent auth delete threw:', e.message)
+      })
+    }
 
-  if (error) {
+    logActivity({ action: 'delete', resource: 'students', targetId: code, targetLabel: `طالب كود: ${code}` }).catch(() => {})
+    revalidatePath('/students')
+    return { success: true }
+  } catch (error: any) {
     console.log('[v0] deleteStudent error:', error.message)
     return { error: 'تعذّر حذف الطالب.' }
   }
-
-  // Delete the auth account too so the credentials stop working entirely.
-  if (row?.user_id) {
-    try {
-      const admin = createAdminClient()
-      const { error: authErr } = await admin.auth.admin.deleteUser(row.user_id)
-      if (authErr) {
-        console.log('[v0] deleteStudent auth delete error:', authErr.message)
-      }
-    } catch (e) {
-      console.log('[v0] deleteStudent auth delete threw:', e instanceof Error ? e.message : String(e))
-    }
-  }
-
-  logActivity({ action: 'delete', resource: 'students', targetId: code, targetLabel: `طالب كود: ${code}` }).catch(() => {})
-  revalidatePath('/students')
-  return { success: true }
 }

@@ -266,9 +266,15 @@ export function StudentBrowsePage({
                   </button>
                   <div className="mt-auto flex items-center justify-between gap-3 border-t border-border pt-4">
                     <div className="flex items-baseline gap-1.5">
-                      <strong className="text-lg font-extrabold text-foreground">{formatEGP(course.price)}</strong>
-                      <span className="text-xs font-bold text-primary">ج.م</span>
-                      {course.oldPrice && <span className="text-xs text-muted-foreground line-through">{formatEGP(course.oldPrice)}</span>}
+                      {course.price === 0 ? (
+                        <strong className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400">مجاناً</strong>
+                      ) : (
+                        <>
+                          <strong className="text-lg font-extrabold text-foreground">{formatEGP(course.price)}</strong>
+                          <span className="text-xs font-bold text-primary">ج.م</span>
+                          {course.oldPrice && <span className="text-xs text-muted-foreground line-through">{formatEGP(course.oldPrice)}</span>}
+                        </>
+                      )}
                     </div>
                     <button
                       type="button"
@@ -279,7 +285,7 @@ export function StudentBrowsePage({
                         added ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-primary text-primary-foreground hover:opacity-90',
                       )}
                     >
-                      {added ? (<><Check className="size-4" />في السلة</>) : (<><Plus className="size-4" />أضف للسلة</>)}
+                      {added ? (<><Check className="size-4" />في السلة</>) : course.price === 0 ? (<><Plus className="size-4" />احصل عليه مجاناً</>) : (<><Plus className="size-4" />أضف للسلة</>)}
                     </button>
                   </div>
                 </div>
@@ -312,6 +318,7 @@ function CourseDetailsModal({ course, inCart, onAddCourse, onClose, purchasedCou
 }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const isCoursePurchased = course.dbId ? purchasedCourseIds.includes(course.dbId) : false
+  const { add, inCart: lectureInCart } = useCart()
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -343,6 +350,7 @@ function CourseDetailsModal({ course, inCart, onAddCourse, onClose, purchasedCou
                 // not that individual lectures inside it are free to preview.
                 const isLectureFree = lecture.isFree
                 const isFreeAccess = isLectureFree || isCoursePurchased
+                const addedLecture = lecture.dbId ? lectureInCart(lecture.dbId) : false
                 
                 return (
                   <div key={lecture.dbId ?? lecture.slug} className="overflow-hidden rounded-xl border border-border bg-card">
@@ -382,14 +390,33 @@ function CourseDetailsModal({ course, inCart, onAddCourse, onClose, purchasedCou
                             شاهد مجاناً
                           </Link>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={onAddCourse}
-                            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-transparent px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                          >
-                            <ShoppingCart className="size-3.5" />
-                            السلة
-                          </button>
+                          <div className="flex items-center gap-3">
+                            {lecture.price === 0 ? (
+                              <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">مجاناً</span>
+                            ) : (
+                              <div className="flex items-baseline gap-1">
+                                <span className="text-sm font-bold text-foreground">{formatEGP(lecture.price)}</span>
+                                <span className="text-[10px] text-muted-foreground">ج.م</span>
+                              </div>
+                            )}
+
+                            <button
+                              type="button"
+                              disabled={addedLecture || !lecture.dbId}
+                              onClick={() => lecture.dbId && add(lecture.dbId, lecture.title)}
+                              className={cn(
+                                "inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors",
+                                addedLecture
+                                  ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                  : lecture.price === 0
+                                    ? "border-emerald-500/50 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500/20"
+                                    : "border-border bg-transparent text-muted-foreground hover:bg-secondary hover:text-foreground"
+                              )}
+                            >
+                              {addedLecture ? <Check className="size-3.5" /> : lecture.price === 0 ? <Plus className="size-3.5" /> : <ShoppingCart className="size-3.5" />}
+                              {addedLecture ? 'في السلة' : lecture.price === 0 ? 'احصل عليها' : 'السلة'}
+                            </button>
+                          </div>
                         )}
                         <button
                           type="button"
@@ -460,8 +487,19 @@ function CourseDetailsModal({ course, inCart, onAddCourse, onClose, purchasedCou
         </div>
         {!isCoursePurchased && (
           <footer className="flex items-center justify-between gap-3 border-t border-border p-4">
-            <div><strong className="text-xl text-foreground">{formatEGP(course.price)}</strong> <span className="text-xs font-bold text-primary">ج.م</span></div>
-            <button type="button" disabled={inCart || !course.dbId} onClick={onAddCourse} className={cn('rounded-full px-5 py-2.5 text-sm font-bold', inCart ? 'bg-muted text-muted-foreground' : 'bg-primary text-primary-foreground transition-opacity hover:opacity-90')}>{inCart ? 'الباقة في السلة' : 'اشترِ الكورس كاملًا'}</button>
+            <div>
+              {course.price === 0 ? (
+                <strong className="text-xl text-emerald-600 dark:text-emerald-400">مجاناً</strong>
+              ) : (
+                <>
+                  <strong className="text-xl text-foreground">{formatEGP(course.price)}</strong>
+                  <span className="text-xs font-bold text-primary">ج.م</span>
+                </>
+              )}
+            </div>
+            <button type="button" disabled={inCart || !course.dbId} onClick={onAddCourse} className={cn('rounded-full px-5 py-2.5 text-sm font-bold', inCart ? 'bg-muted text-muted-foreground' : 'bg-primary text-primary-foreground transition-opacity hover:opacity-90')}>
+              {inCart ? 'الباقة في السلة' : course.price === 0 ? 'اشترِ الكورس مجاناً' : 'اشترِ الكورس كاملًا'}
+            </button>
           </footer>
         )}
       </section>

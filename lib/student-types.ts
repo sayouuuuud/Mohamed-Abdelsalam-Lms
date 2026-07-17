@@ -238,7 +238,7 @@ export type ScheduleItem = {
   id: string
   title: string
   course: string
-  type: 'محاضرة' | 'اختبار' | 'واجب' | 'مراجعة'
+  type: 'محاضرة' | 'اختبار' | 'واجب' | 'مراجعة' | 'مباشر'
   day: string
   date: string
   time: string

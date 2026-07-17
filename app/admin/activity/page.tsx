@@ -1,5 +1,4 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
 import { requireAdmin } from '@/lib/auth-guard'
 import {
   getActivityLogs,
@@ -16,8 +15,7 @@ export const metadata = {
 }
 
 export default async function ActivityPage() {
-  const supabase = await createClient()
-  const isAdmin = await requireAdmin(supabase)
+  const isAdmin = await requireAdmin()
   if (!isAdmin) redirect('/admin/no-access')
 
   const [{ logs: activityLogs, total: activityTotal }, { logs: authLogs, total: authTotal }, stats, actors] =

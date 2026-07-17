@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
 import { hasResourceAccess } from '@/lib/auth-guard'
 
 export type SearchResultItem = {
@@ -26,47 +26,45 @@ export async function globalAdminSearch(q: string): Promise<GlobalSearchResults>
 
   if (!q || q.trim().length < 2) return empty
 
-  const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'students', 'view'))) return empty
+  if (!(await hasResourceAccess('students', 'view'))) return empty
 
   const term = `%${q.trim()}%`
 
-  const [studentsRes, lecturesRes, coursesRes, examsRes, stagesRes, branchesRes] =
-    await Promise.all([
-      supabase
-        .from('profiles')
-        .select('id, full_name, email, phone')
-        .or(`full_name.ilike.${term},email.ilike.${term},phone.ilike.${term}`)
-        .eq('role', 'student')
-        .limit(8),
-      supabase
-        .from('lectures')
-        .select('id, slug, title, branch_id, branches:branch_id(title, stages:stage_id(title))')
-        .ilike('title', term)
-        .limit(8),
-      supabase
-        .from('monthly_courses')
-        .select('id, slug, title, branch_id, branches:branch_id(title, stages:stage_id(title))')
-        .ilike('title', term)
-        .limit(8),
-      supabase
-        .from('exams')
-        .select('id, title, status')
-        .ilike('title', term)
-        .limit(8),
-      supabase
-        .from('stages')
-        .select('id, slug, title')
-        .ilike('title', term)
-        .limit(5),
-      supabase
-        .from('branches')
-        .select('id, slug, title, stage_id, stages:stage_id(title)')
-        .ilike('title', term)
-        .limit(5),
-    ])
+  const [studentsRes, lecturesRes, coursesRes, examsRes, stagesRes, branchesRes] = await Promise.all([
+    prisma.$queryRaw`
+      SELECT id, name as full_name, email, phone 
+      FROM users 
+      WHERE role = 'student' AND (name ILIKE ${term} OR email ILIKE ${term} OR phone ILIKE ${term})
+      LIMIT 8
+    `,
+    prisma.lectures.findMany({
+      where: { title: { contains: q.trim(), mode: 'insensitive' } },
+      select: { id: true, title: true, branches: { select: { title: true, stages: { select: { title: true } } } } },
+      take: 8
+    }),
+    prisma.monthly_courses.findMany({
+      where: { title: { contains: q.trim(), mode: 'insensitive' } },
+      select: { id: true, title: true, branches: { select: { title: true, stages: { select: { title: true } } } } },
+      take: 8
+    }),
+    prisma.exams.findMany({
+      where: { title: { contains: q.trim(), mode: 'insensitive' } },
+      select: { id: true, title: true, status: true },
+      take: 8
+    }),
+    prisma.stages.findMany({
+      where: { title: { contains: q.trim(), mode: 'insensitive' } },
+      select: { id: true, title: true },
+      take: 5
+    }),
+    prisma.branches.findMany({
+      where: { title: { contains: q.trim(), mode: 'insensitive' } },
+      select: { id: true, title: true, stages: { select: { title: true } } },
+      take: 5
+    })
+  ])
 
-  const students: SearchResultItem[] = (studentsRes.data ?? []).map((r: any) => ({
+  const students: SearchResultItem[] = (studentsRes as any[]).map((r: any) => ({
     id: r.id,
     label: r.full_name || r.email,
     sublabel: r.email,
@@ -74,7 +72,7 @@ export async function globalAdminSearch(q: string): Promise<GlobalSearchResults>
     type: 'student',
   }))
 
-  const lectures: SearchResultItem[] = (lecturesRes.data ?? []).map((r: any) => ({
+  const lectures: SearchResultItem[] = (lecturesRes as any[]).map((r: any) => ({
     id: r.id,
     label: r.title,
     sublabel: [r.branches?.stages?.title, r.branches?.title].filter(Boolean).join(' · '),
@@ -82,7 +80,7 @@ export async function globalAdminSearch(q: string): Promise<GlobalSearchResults>
     type: 'lecture',
   }))
 
-  const courses: SearchResultItem[] = (coursesRes.data ?? []).map((r: any) => ({
+  const courses: SearchResultItem[] = (coursesRes as any[]).map((r: any) => ({
     id: r.id,
     label: r.title,
     sublabel: [r.branches?.stages?.title, r.branches?.title].filter(Boolean).join(' · '),
@@ -90,7 +88,7 @@ export async function globalAdminSearch(q: string): Promise<GlobalSearchResults>
     type: 'course',
   }))
 
-  const exams: SearchResultItem[] = (examsRes.data ?? []).map((r: any) => ({
+  const exams: SearchResultItem[] = (examsRes as any[]).map((r: any) => ({
     id: r.id,
     label: r.title,
     sublabel: r.status === 'منشور' ? 'منشور' : 'مسودة',
@@ -99,17 +97,17 @@ export async function globalAdminSearch(q: string): Promise<GlobalSearchResults>
   }))
 
   const categories: SearchResultItem[] = [
-    ...(stagesRes.data ?? []).map((r: any): SearchResultItem => ({
+    ...(stagesRes as any[]).map((r: any): SearchResultItem => ({
       id: r.id,
       label: r.title,
       sublabel: 'مرحلة دراسية',
       href: `/admin/categories`,
       type: 'category',
     })),
-    ...(branchesRes.data ?? []).map((r: any): SearchResultItem => ({
+    ...(branchesRes as any[]).map((r: any): SearchResultItem => ({
       id: r.id,
       label: r.title,
-      sublabel: (r.stages as any)?.title || 'فرع',
+      sublabel: r.stages?.title || 'فرع',
       href: `/admin/categories`,
       type: 'category',
     })),

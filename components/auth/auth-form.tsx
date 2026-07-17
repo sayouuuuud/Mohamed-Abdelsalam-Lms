@@ -4,8 +4,8 @@ import { useState, type FormEvent } from 'react'
 import Link from 'next/link'
 import { Eye, EyeOff, Loader2, Lock, Mail, Phone, User, GraduationCap, Check, AlertCircle, ShieldCheck, ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { createClient } from '@/lib/supabase/client'
 import { recordLogin } from '@/app/auth/audit-actions'
+import { signIn, getSession } from 'next-auth/react'
 
 type Tab = 'login' | 'register'
 
@@ -54,60 +54,44 @@ export function AuthForm({ initialTab = 'login' }: { initialTab?: Tab }) {
     setDone(false)
     setError('')
 
-    const supabase = createClient()
-
     try {
       if (tab === 'login') {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
+        const res = await signIn('credentials', {
           email: loginEmail.trim(),
           password: loginPassword,
+          redirect: false,
         })
-        if (signInError) {
+        
+        if (res?.error) {
           setError('البريد الإلكتروني أو كلمة السر غير صحيحة.')
           return
         }
-        // Fetch role to decide destination.
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
+
+        const session = await getSession()
+        const user = session?.user as any
+
         let destination = '/student'
         if (user) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single()
-            
-          if (profile?.role === 'admin' || profile?.role === 'assistant') {
+          if (user.role === 'admin' || user.role === 'assistant') {
             destination = '/admin/dashboard'
           } else {
-            // Student login check
-            const { data: studentRow } = await supabase
-              .from('students')
-              .select('status')
-              .eq('user_id', user.id)
-              .single()
-              
-            if (studentRow && studentRow.status === 'موقوف') {
-              await supabase.auth.signOut()
+            if (user.status === 'موقوف') {
+              // Sign out if suspended
+              await fetch('/api/auth/signout', { method: 'POST' })
               setError('تم إيقاف حسابك. يرجى التواصل مع الإدارة.')
               return
             }
             destination = '/student'
           }
         }
-        // Fire-and-forget — must not block navigation.
+
         if (destination === '/admin/dashboard') {
-          recordLogin().catch(() => {})
+          recordLogin().catch(() => { })
         }
-        // Hard navigation so the freshly-set auth cookies reach the server on
-        // the very first request. A soft router.push races the cookie sync and
-        // makes the middleware bounce the user until they manually refresh.
+
         window.location.assign(destination)
         return
       } else {
-        // Register via our own endpoint, which creates the user and emails an
-        // activation code through our SMTP (Gmail).
         const res = await fetch('/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -124,15 +108,14 @@ export function AuthForm({ initialTab = 'login' }: { initialTab?: Tab }) {
           setError(result.error ?? 'حصلت مشكلة أثناء إنشاء الحساب. حاول تاني.')
           return
         }
-        // When the admin turned off email verification, the account is created
-        // already-confirmed — sign in directly and skip the activation step.
+
         if (result.verified) {
-          const { error: signInError } = await supabase.auth.signInWithPassword({
+          const signInRes = await signIn('credentials', {
             email: email.trim(),
             password,
+            redirect: false,
           })
-          if (signInError) {
-            // Account was created; just send them to login to finish.
+          if (signInRes?.error) {
             switchTab('login')
             setLoginEmail(email.trim())
             setError('تم إنشاء حسابك. سجّل دخولك للمتابعة.')
@@ -141,7 +124,7 @@ export function AuthForm({ initialTab = 'login' }: { initialTab?: Tab }) {
           window.location.assign('/student')
           return
         }
-        // Code emailed -> show the activation-code step.
+
         setDoneMessage(
           'بعتنالك كود تفعيل على بريدك الإلكتروني. اكتبه تحت عشان تفعّل حسابك.',
         )
@@ -154,25 +137,38 @@ export function AuthForm({ initialTab = 'login' }: { initialTab?: Tab }) {
     }
   }
 
-  // Verify the activation code sent to the user's email.
   const handleVerify = async (e: FormEvent) => {
     e.preventDefault()
     setSubmitting(true)
     setError('')
 
-    const supabase = createClient()
-
     try {
-      const { data, error: verifyError } = await supabase.auth.verifyOtp({
-        email: email.trim(),
-        token: code.trim(),
-        type: 'signup',
+      const res = await fetch('/auth/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), code: code.trim() }),
       })
-      if (verifyError || !data.session) {
-        setError('الكود غير صحيح أو انتهت صلاحيته. حاول تاني أو اطلب كود جديد.')
+      const result = await res.json().catch(() => ({}))
+      
+      if (!res.ok) {
+        setError(result.error ?? 'الكود غير صحيح أو انتهت صلاحيته. حاول تاني أو اطلب كود جديد.')
         return
       }
-      // Account activated + signed in -> students go to their portal.
+
+      // Automatically sign in after verify
+      const signInRes = await signIn('credentials', {
+        email: email.trim(),
+        password,
+        redirect: false,
+      })
+
+      if (signInRes?.error) {
+        switchTab('login')
+        setLoginEmail(email.trim())
+        setError('تم تفعيل الحساب بنجاح. الرجاء تسجيل الدخول.')
+        return
+      }
+
       window.location.assign('/student')
       return
     } catch {
@@ -182,7 +178,6 @@ export function AuthForm({ initialTab = 'login' }: { initialTab?: Tab }) {
     }
   }
 
-  // Resend a fresh activation code to the same email (via our SMTP endpoint).
   const handleResend = async () => {
     setResending(true)
     setError('')
@@ -363,7 +358,7 @@ export function AuthForm({ initialTab = 'login' }: { initialTab?: Tab }) {
         {tab === 'register' && (
           <Field
             id="name"
-            label="ال��سم بالكامل"
+            label="الإسم بالكامل"
             icon={<User className="size-4" />}
             type="text"
             placeholder="اكتب اسمك"

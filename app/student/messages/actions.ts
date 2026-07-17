@@ -1,24 +1,18 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
+import { getCurrentStudent } from '@/lib/auth-guard'
+import { auth } from '@/auth'
 import type { Conversation, ChatMessage, TicketStatus } from '@/lib/student-messages-data'
 
-// The single contact a student is allowed to reach: the teacher / support.
 const TEACHER_NAME = 'أ. عبد السلام'
 const TEACHER_ROLE = 'المدرّس وفريق الدعم'
 const TEACHER_INITIALS = 'ع'
 
-// The `messages` table is admin-only under RLS. Student reads/writes are
-// therefore performed with the service-role client, but ALWAYS scoped to the
-// authenticated user's own id so a student can only ever touch their own tickets.
-
-// In the stored chat_history, `fromMe: true` is admin/teacher-relative. For the
-// student view we invert it so the student's own messages appear as "from me".
-function toStudentMessages(history: any[]): ChatMessage[] {
+function toStudentMessages(history: any): ChatMessage[] {
   if (!Array.isArray(history)) return []
-  return history.map((m, i) => ({
+  return history.map((m: any, i: number) => ({
     id: m.id ?? `m${i}`,
     fromMe: !m.fromMe,
     text: m.text ?? '',
@@ -27,22 +21,18 @@ function toStudentMessages(history: any[]): ChatMessage[] {
 }
 
 export async function getStudentConversations(): Promise<Conversation[]> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return []
+  const student = await getCurrentStudent()
+  const session = await auth()
+  const user = session?.user
+  if (!user || !student) return []
 
-  const admin = createAdminClient()
-  const { data, error } = await admin
-    .from('messages')
-    .select('code, subject, content, time_label, chat_history, status, student_unread')
-    .eq('student_id', user.id)
-    .order('created_at', { ascending: false })
+  const rows = await prisma.messages.findMany({
+    where: { student_id: user.id as string },
+    select: { code: true, subject: true, content: true, time_label: true, chat_history: true, status: true, student_unread: true },
+    orderBy: { created_at: 'desc' }
+  })
 
-  if (error || !data) return []
-
-  return data.map((row: any) => ({
+  return rows.map((row) => ({
     id: row.code,
     name: TEACHER_NAME,
     role: TEACHER_ROLE,
@@ -55,50 +45,42 @@ export async function getStudentConversations(): Promise<Conversation[]> {
   }))
 }
 
-// Opens a new support ticket from the student to the teacher.
 export async function startConversation(subject: string, text: string) {
   const message = text.trim()
   if (!message) return { error: 'اكتب رسالتك الأول.' }
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const session = await auth()
+  const user = session?.user
   if (!user) return { error: 'لازم تسجّل دخول.' }
 
-  const admin = createAdminClient()
-
-  const { data: profile } = await admin
-    .from('profiles')
-    .select('full_name')
-    .eq('id', user.id)
-    .maybeSingle()
+  const profile = await prisma.profiles.findUnique({
+    where: { id: user.id as string },
+    select: { full_name: true }
+  })
   const studentName = profile?.full_name || user.email || 'طالب'
 
-  // Stored as fromMe:false → sent BY the student.
   const newMsg = { id: `m${Date.now()}`, fromMe: false, text: message, time: 'الآن' }
-  const code = `ticket-${user.id.slice(0, 8)}-${Date.now().toString(36)}`
+  const code = `ticket-${(user.id as string).slice(0, 8)}-${Date.now().toString(36)}`
 
-  const { error } = await admin.from('messages').insert({
-    code,
-    student_id: user.id,
-    sender_name: studentName,
-    sender_avatar: null,
-    subject: subject.trim() || 'تذكرة دعم',
-    content: message,
-    time_label: 'الآن',
-    is_read: false,
-    has_attachment: false,
-    sender_role: 'student',
-    course: '',
-    unread_count: 1, // unread for the admin
-    student_unread: 0,
-    is_online: false,
-    status: 'open',
-    chat_history: [newMsg],
+  await prisma.messages.create({
+    data: {
+      code,
+      student_id: user.id as string,
+      sender_name: studentName,
+      subject: subject.trim() || 'تذكرة دعم',
+      content: message,
+      time_label: 'الآن',
+      is_read: false,
+      has_attachment: false,
+      sender_role: 'student',
+      unread_count: 1,
+      student_unread: 0,
+      is_online: false,
+      status: 'open',
+      chat_history: [newMsg],
+    }
   })
 
-  if (error) return { error: error.message }
   revalidatePath('/student/messages')
   return { success: true, code }
 }
@@ -107,61 +89,52 @@ export async function sendStudentMessage(code: string, text: string) {
   const message = text.trim()
   if (!message) return { error: 'الرسالة فاضية.' }
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const session = await auth()
+  const user = session?.user
   if (!user) return { error: 'لازم تسجّل دخول.' }
 
-  const admin = createAdminClient()
-
-  const { data: convo } = await admin
-    .from('messages')
-    .select('chat_history, unread_count')
-    .eq('code', code)
-    .eq('student_id', user.id)
-    .single()
+  const convo = await prisma.messages.findFirst({
+    where: { code, student_id: user.id as string },
+    select: { id: true, chat_history: true, unread_count: true }
+  })
 
   if (!convo) return { error: 'التذكرة غير موجودة.' }
 
-  // Student message → stored as fromMe:false (teacher-relative).
   const newMsg = { id: `m${Date.now()}`, fromMe: false, text: message, time: 'الآن' }
   const history = Array.isArray(convo.chat_history) ? convo.chat_history : []
 
-  const { error } = await admin
-    .from('messages')
-    .update({
-      chat_history: [...history, newMsg],
+  await prisma.messages.update({
+    where: { id: convo.id },
+    data: {
+      chat_history: [...history, newMsg] as any,
       content: message,
       time_label: 'الآن',
-      unread_count: (convo.unread_count ?? 0) + 1, // unread for the admin
-      // a student follow-up reopens a closed ticket
+      unread_count: (convo.unread_count ?? 0) + 1,
       status: 'open',
-    })
-    .eq('code', code)
-    .eq('student_id', user.id)
+    }
+  })
 
-  if (error) return { error: error.message }
   revalidatePath('/student/messages')
   return { success: true }
 }
 
-// Marks the teacher's replies as read once the student opens the ticket.
 export async function markTicketRead(code: string) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const session = await auth()
+  const user = session?.user
   if (!user) return { error: 'لازم تسجّل دخول.' }
 
-  const admin = createAdminClient()
-  const { error } = await admin
-    .from('messages')
-    .update({ student_unread: 0 })
-    .eq('code', code)
-    .eq('student_id', user.id)
+  const convo = await prisma.messages.findFirst({
+    where: { code, student_id: user.id as string },
+    select: { id: true }
+  })
 
-  if (error) return { error: error.message }
+  if (!convo) return { success: true }
+
+  await prisma.messages.update({
+    where: { id: convo.id },
+    data: { student_unread: 0 }
+  })
+
   revalidatePath('/student/messages')
   return { success: true }
 }

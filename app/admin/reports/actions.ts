@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
 import { hasResourceAccess } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
 import { logActivity } from '@/lib/audit-log'
@@ -17,13 +17,9 @@ export type ReportItem = {
 }
 
 export async function getReports(): Promise<ReportItem[]> {
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('reports')
-    .select('*')
-    .order('created_at', { ascending: false })
-
-  if (error || !data) return []
+  const data = await prisma.reports.findMany({
+    orderBy: { created_at: 'desc' }
+  })
 
   return data.map((row) => {
     const d = new Date(row.created_at)
@@ -32,71 +28,60 @@ export async function getReports(): Promise<ReportItem[]> {
       code: row.code,
       title: row.title,
       type: row.type,
-      createdBy: row.created_by,
+      createdBy: row.created_by ?? '',
       createdAt: `${d.getDate()} ${d.toLocaleString('ar-EG', { month: 'short' })} ${d.getFullYear()}`,
-      status: row.status,
+      status: row.status ?? '',
     }
   })
 }
 
 export async function generateReport() {
-  const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'reports', 'manage'))) {
+  if (!(await hasResourceAccess('reports', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
-  const { error } = await supabase
-    .from('reports')
-    .insert({
-      code: `REP-${Math.floor(Math.random() * 900) + 100}`,
-      title: 'تقرير مخصص جديد',
-      type: 'أكاديمي',
-      created_by: 'الأدمن',
-      status: 'قيد التجهيز',
+  try {
+    await prisma.reports.create({
+      data: {
+        code: `REP-${Math.floor(Math.random() * 900) + 100}`,
+        title: 'تقرير مخصص جديد',
+        type: 'أكاديمي',
+        created_by: 'الأدمن',
+        status: 'قيد التجهيز',
+      }
     })
 
-  if (error) return { error: error.message }
-  logActivity({ action: 'create', resource: 'reports', targetLabel: 'تقرير مخصص جديد' }).catch(() => {})
-  revalidatePath('/reports')
-  return { success: true }
+    logActivity({ action: 'create', resource: 'reports', targetLabel: 'تقرير مخصص جديد' }).catch(() => {})
+    revalidatePath('/reports')
+    return { success: true }
+  } catch (error: any) {
+    return { error: 'تعذر إنشاء التقرير.' }
+  }
 }
 
 export async function getReportsData() {
-  const supabase = await createClient()
-
-  if (!(await hasResourceAccess(supabase, 'reports'))) {
+  if (!(await hasResourceAccess('reports'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
-  // Fetch all necessary data
-  const { data: allOrders } = await supabase
-    .from('orders')
-    .select('id, status, total, created_at, order_items(lecture_title, branch_title, price, stage_title)')
+  const [allOrders, studentsCount, studentsDataRaw, enrollmentsCount, enrollmentsRaw] = await Promise.all([
+    prisma.orders.findMany({
+      select: { id: true, status: true, total: true, created_at: true, order_items: { select: { lecture_title: true, branch_title: true, price: true, stage_title: true } } }
+    }),
+    prisma.students.count(),
+    prisma.students.findMany({ select: { id: true, created_at: true } }),
+    prisma.enrollments.count(),
+    prisma.enrollments.findMany({ select: { id: true, enrolled_at: true } })
+  ])
 
-  const { count: studentsCount, data: studentsDataRaw } = await supabase
-    .from('students')
-    .select('id, created_at', { count: 'exact' })
-
-  const { count: enrollmentsCount, data: enrollmentsRaw } = await supabase
-    .from('enrollments')
-    .select('id, enrolled_at', { count: 'exact' })
-
-  const { data: coursesData } = await supabase
-    .from('courses')
-    .select('id, title, students, price, category')
-
-  const approvedOrders = allOrders?.filter((o) => o.status === 'approved') || []
+  const approvedOrders = allOrders.filter((o) => o.status === 'approved')
   const totalRevenue = approvedOrders.reduce((sum, o) => sum + Number(o.total || 0), 0)
-  const rejectedOrders = allOrders?.filter((o) => o.status === 'rejected') || []
-  const pendingOrders = allOrders?.filter((o) => o.status === 'pending') || []
+  const rejectedOrders = allOrders.filter((o) => o.status === 'rejected')
+  const pendingOrders = allOrders.filter((o) => o.status === 'pending')
 
-  // Real rolling 12-month window.
   const window = lastMonths(12)
   const windowStart = window[0].start
-  const thisKey = window[window.length - 1].key
-  const prevKey = window[window.length - 2].key
 
-  // Period-over-period change = last 30 days vs previous 30 days (avoids false drops at start of month)
   const now = new Date()
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
   const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000)
@@ -108,18 +93,18 @@ export async function getReportsData() {
     .filter((o) => new Date(o.created_at) >= sixtyDaysAgo && new Date(o.created_at) < thirtyDaysAgo)
     .reduce((s, o) => s + Number(o.total || 0), 0)
 
-  const studentsThis = (studentsDataRaw || []).filter(
+  const studentsThis = studentsDataRaw.filter(
     (s) => new Date(s.created_at) >= thirtyDaysAgo
   ).length
-  const studentsPrev = (studentsDataRaw || []).filter(
+  const studentsPrev = studentsDataRaw.filter(
     (s) => new Date(s.created_at) >= sixtyDaysAgo && new Date(s.created_at) < thirtyDaysAgo
   ).length
 
-  const enrollThis = (enrollmentsRaw || []).filter(
-    (e: any) => e.enrolled_at && new Date(e.enrolled_at) >= thirtyDaysAgo
+  const enrollThis = enrollmentsRaw.filter(
+    (e) => e.enrolled_at && new Date(e.enrolled_at) >= thirtyDaysAgo
   ).length
-  const enrollPrev = (enrollmentsRaw || []).filter(
-    (e: any) => e.enrolled_at && new Date(e.enrolled_at) >= sixtyDaysAgo && new Date(e.enrolled_at) < thirtyDaysAgo
+  const enrollPrev = enrollmentsRaw.filter(
+    (e) => e.enrolled_at && new Date(e.enrolled_at) >= sixtyDaysAgo && new Date(e.enrolled_at) < thirtyDaysAgo
   ).length
 
   const rejectedThis = rejectedOrders.filter(
@@ -141,7 +126,6 @@ export async function getReportsData() {
     { key: 'refunds', label: 'المدفوعات المرفوضة', value: rejectedOrders.length, suffix: 'طلب', change: Math.abs(refChange), up: refChange <= 0 },
   ]
 
-  // Monthly revenue vs a +15% stretch target (real revenue, derived target).
   const revenueBucket: Record<string, number> = {}
   approvedOrders.forEach((o) => {
     const k = monthKeyOf(o.created_at)
@@ -153,15 +137,13 @@ export async function getReportsData() {
     prevD.setMonth(prevD.getMonth() - 1)
     const prevKey = monthKeyOf(prevD)
     const prevRevenue = revenueBucket[prevKey] || 0
-    // Target is previous month's revenue + 15%
     const target = prevRevenue === 0 ? revenue * 1.15 : prevRevenue * 1.15
     return { month: b.month, revenue, target: Math.round(target) }
   })
 
-  // Cumulative students growth over the window.
   const signupsBucket: Record<string, number> = {}
   let baseStudents = 0
-  studentsDataRaw?.forEach((s) => {
+  studentsDataRaw.forEach((s) => {
     const date = new Date(s.created_at)
     if (date < windowStart) {
       baseStudents += 1
@@ -175,7 +157,6 @@ export async function getReportsData() {
     return { month: b.month, students: cumulativeStudents }
   })
 
-  // Payment status distribution (real counts).
   const paymentStatus = [
     { name: 'مقبول', value: approvedOrders.length, fill: 'var(--chart-1)' },
     { name: 'قيد المراجعة', value: pendingOrders.length, fill: 'var(--chart-4)' },
@@ -183,16 +164,12 @@ export async function getReportsData() {
   ].filter((s) => s.value > 0)
 
   const colors = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)']
-  const priceOf = (c: any) => Number(String(c.price ?? '').replace(/\D/g, '') || 0)
-  const courseRevenue = (c: any) => priceOf(c) * (c.students || 0)
 
-  // Students per category (real, derived from orders)
   const categoryCount: Record<string, number> = {}
-  // Revenue per category (real, derived from orders)
   const categoryRevenue: Record<string, number> = {}
   
-  approvedOrders?.forEach((order) => {
-    order.order_items?.forEach((item: any) => {
+  approvedOrders.forEach((order) => {
+    order.order_items.forEach((item) => {
       const catName = item.stage_title || item.branch_title || 'عام'
       categoryRevenue[catName] = (categoryRevenue[catName] || 0) + (Number(item.price) || 0)
       categoryCount[catName] = (categoryCount[catName] || 0) + 1
@@ -208,12 +185,11 @@ export async function getReportsData() {
     .sort((a, b) => b[1] - a[1])
     .map(([name, revenue], i) => ({ name, revenue, fill: colors[i % colors.length] }))
 
-  // Course performance (Real data from orders and order_items)
   const itemStats: Record<string, { title: string, category: string, students: number, revenue: number }> = {}
   let totalItemsRevenue = 0
 
-  approvedOrders?.forEach((order) => {
-    order.order_items?.forEach((item: any) => {
+  approvedOrders.forEach((order) => {
+    order.order_items.forEach((item) => {
       const key = item.lecture_title || 'غير معروف'
       if (!itemStats[key]) {
         itemStats[key] = { title: key, category: item.branch_title || 'عام', students: 0, revenue: 0 }
@@ -246,35 +222,30 @@ export async function getReportsData() {
 }
 
 export async function getAdvancedAnalytics() {
-  const supabase = await createClient()
-
-  if (!(await hasResourceAccess(supabase, 'reports'))) {
+  if (!(await hasResourceAccess('reports'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
-  const { data, error } = await supabase.rpc('get_advanced_analytics')
-
-  if (error) {
+  try {
+    const data = await prisma.$queryRaw`SELECT * FROM get_advanced_analytics()`
+    return { success: true, data }
+  } catch (error: any) {
     console.error('Failed to fetch advanced analytics:', error)
     return { error: 'حدث خطأ أثناء جلب التحليلات المتقدمة' }
   }
-
-  return { success: true, data }
 }
 
 export async function exportReportsCSV() {
-  const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'reports'))) {
+  if (!(await hasResourceAccess('reports'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
   const data = await getReportsData()
   if ('error' in data) return { error: data.error }
 
-  let csv = '\uFEFF' // BOM for Arabic support in Excel
+  let csv = '\uFEFF'
   csv += 'تقرير المنصة الشامل\n\n'
   
-  // Section 1: Stats
   csv += 'ملخص الأداء\n'
   csv += 'المؤشر,القيمة\n'
   data.reportStats?.forEach((s: any) => {
@@ -282,7 +253,6 @@ export async function exportReportsCSV() {
   })
   csv += '\n'
 
-  // Section 2: Monthly Revenue
   csv += 'الإيرادات الشهرية\n'
   csv += 'الشهر,الإيرادات (ج.م)\n'
   data.monthlyRevenue?.forEach((m: any) => {
@@ -290,7 +260,6 @@ export async function exportReportsCSV() {
   })
   csv += '\n'
 
-  // Section 3: Course Performance
   csv += 'أداء الكورسات\n'
   csv += 'الكورس,القسم,عدد الطلاب,الإيرادات (ج.م)\n'
   data.coursePerformance?.forEach((c: any) => {

@@ -1,8 +1,7 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
 import { requireAdmin } from '@/lib/auth-guard'
-import { revalidatePath } from 'next/cache'
 
 export type ActionType = 'create' | 'update' | 'delete' | 'approve' | 'reject'
 
@@ -65,114 +64,134 @@ export async function getActivityLogs(filters: ActivityFilters = {}): Promise<{
   logs: ActivityLog[]
   total: number
 }> {
-  const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) return { logs: [], total: 0 }
+  if (!(await requireAdmin())) return { logs: [], total: 0 }
 
   const page = filters.page ?? 1
-  const from = (page - 1) * PAGE_SIZE
-  const to = from + PAGE_SIZE - 1
+  const skip = (page - 1) * PAGE_SIZE
 
-  let query = supabase
-    .from('activity_logs')
-    .select('*', { count: 'exact' })
-    .order('created_at', { ascending: false })
-    .range(from, to)
+  const where: any = {}
+  if (filters.actorId) where.actor_id = filters.actorId
+  if (filters.resource) where.resource = filters.resource
+  if (filters.action) where.action = filters.action
+  if (filters.from || filters.to) {
+    where.created_at = {}
+    if (filters.from) where.created_at.gte = new Date(filters.from)
+    if (filters.to) where.created_at.lte = new Date(filters.to)
+  }
 
-  if (filters.actorId) query = query.eq('actor_id', filters.actorId)
-  if (filters.resource) query = query.eq('resource', filters.resource)
-  if (filters.action) query = query.eq('action', filters.action)
-  if (filters.from) query = query.gte('created_at', filters.from)
-  if (filters.to) query = query.lte('created_at', filters.to)
+  const [total, data] = await Promise.all([
+    prisma.activity_logs.count({ where }),
+    prisma.activity_logs.findMany({
+      where,
+      orderBy: { created_at: 'desc' },
+      skip,
+      take: PAGE_SIZE
+    })
+  ])
 
-  const { data, count } = await query
-  return { logs: (data ?? []) as ActivityLog[], total: count ?? 0 }
+  return {
+    logs: data.map(d => ({
+      ...d,
+      actor_id: d.actor_id || '',
+      created_at: d.created_at.toISOString(),
+      action: d.action as ActionType,
+      actor_role: d.actor_role as 'admin' | 'assistant'
+    })),
+    total
+  }
 }
 
 export async function getAuthLogs(filters: AuthFilters = {}): Promise<{
   logs: AuthLog[]
   total: number
 }> {
-  const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) return { logs: [], total: 0 }
+  if (!(await requireAdmin())) return { logs: [], total: 0 }
 
   const page = filters.page ?? 1
-  const from = (page - 1) * PAGE_SIZE
-  const to = from + PAGE_SIZE - 1
+  const skip = (page - 1) * PAGE_SIZE
 
-  let query = supabase
-    .from('auth_logs')
-    .select('*', { count: 'exact' })
-    .order('created_at', { ascending: false })
-    .range(from, to)
+  const where: any = {}
+  if (filters.actorId) where.actor_id = filters.actorId
+  if (filters.event) where.event = filters.event
+  if (filters.from || filters.to) {
+    where.created_at = {}
+    if (filters.from) where.created_at.gte = new Date(filters.from)
+    if (filters.to) where.created_at.lte = new Date(filters.to)
+  }
 
-  if (filters.actorId) query = query.eq('actor_id', filters.actorId)
-  if (filters.event) query = query.eq('event', filters.event)
-  if (filters.from) query = query.gte('created_at', filters.from)
-  if (filters.to) query = query.lte('created_at', filters.to)
+  const [total, data] = await Promise.all([
+    prisma.auth_logs.count({ where }),
+    prisma.auth_logs.findMany({
+      where,
+      orderBy: { created_at: 'desc' },
+      skip,
+      take: PAGE_SIZE
+    })
+  ])
 
-  const { data, count } = await query
-  return { logs: (data ?? []) as AuthLog[], total: count ?? 0 }
+  return {
+    logs: data.map(d => ({
+      ...d,
+      actor_id: d.actor_id || '',
+      created_at: d.created_at.toISOString(),
+      event: d.event as 'login' | 'logout',
+      actor_role: d.actor_role as 'admin' | 'assistant'
+    })),
+    total
+  }
 }
 
 export async function getActivityStats(): Promise<ActivityStats> {
-  const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) {
+  if (!(await requireAdmin())) {
     return { todayCount: 0, totalActors: 0, lastEventAt: null, activeAssistants: 0 }
   }
 
   const todayStart = new Date()
   todayStart.setHours(0, 0, 0, 0)
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
 
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-
-  const [todayRes, lastRes, actorsRes, assistantsRes] = await Promise.all([
-    // Count of today's actions
-    supabase
-      .from('activity_logs')
-      .select('id', { count: 'exact', head: true })
-      .gte('created_at', todayStart.toISOString()),
-    // Most recent event timestamp
-    supabase
-      .from('activity_logs')
-      .select('created_at')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single(),
-    // Distinct actor count (aggregate in DB, not in JS)
-    supabase.rpc('count_distinct_actors'),
-    // Distinct assistants active in last 7 days
-    supabase
-      .from('auth_logs')
-      .select('actor_id')
-      .eq('event', 'login')
-      .eq('actor_role', 'assistant')
-      .gte('created_at', sevenDaysAgo),
+  const [todayCount, lastEvent, actorsQuery, assistantsRes] = await Promise.all([
+    prisma.activity_logs.count({
+      where: { created_at: { gte: todayStart } }
+    }),
+    prisma.activity_logs.findFirst({
+      select: { created_at: true },
+      orderBy: { created_at: 'desc' }
+    }),
+    prisma.$queryRaw`SELECT count_distinct_actors()`,
+    prisma.auth_logs.findMany({
+      where: {
+        event: 'login',
+        actor_role: 'assistant',
+        created_at: { gte: sevenDaysAgo }
+      },
+      select: { actor_id: true }
+    })
   ])
 
-  // assistantsRes is a small bounded set (recent logins), safe to dedupe in JS
-  const activeAssistants = new Set((assistantsRes.data ?? []).map((r: any) => r.actor_id)).size
+  const totalActors = Number((actorsQuery as any[])[0]?.count_distinct_actors || 0)
+  const activeAssistants = new Set(assistantsRes.map((r) => r.actor_id)).size
 
   return {
-    todayCount: todayRes.count ?? 0,
-    totalActors: (actorsRes.data as number | null) ?? 0,
-    lastEventAt: lastRes.data?.created_at ?? null,
+    todayCount,
+    totalActors,
+    lastEventAt: lastEvent?.created_at?.toISOString() || null,
     activeAssistants,
   }
 }
 
 export async function getActorsList(): Promise<ActorOption[]> {
-  const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) return []
+  if (!(await requireAdmin())) return []
 
-  const { data } = await supabase
-    .from('profiles')
-    .select('id, full_name, role')
-    .in('role', ['admin', 'assistant'])
-    .order('full_name')
+  const data = await prisma.profiles.findMany({
+    where: { role: { in: ['admin', 'assistant'] } },
+    select: { id: true, full_name: true, role: true },
+    orderBy: { full_name: 'asc' }
+  })
 
-  return (data ?? []).map((p: any) => ({
+  return data.map((p) => ({
     id: p.id,
     name: p.full_name ?? 'غير معروف',
-    role: p.role,
+    role: p.role as 'admin' | 'assistant',
   }))
 }

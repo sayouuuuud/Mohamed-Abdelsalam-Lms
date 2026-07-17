@@ -1,10 +1,10 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { prisma } from '@/lib/prisma'
 import { requireAdmin } from '@/lib/auth-guard'
 import { logActivity } from '@/lib/audit-log'
+import bcrypt from 'bcryptjs'
 import {
   type AccessLevel,
   type ResourceKey,
@@ -37,70 +37,57 @@ function sanitizePermissions(
   return rows
 }
 
-/** True when the current session belongs to a full admin (role = 'admin'). */
 export async function isCurrentUserFullAdmin(): Promise<boolean> {
-  const supabase = await createClient()
-  return requireAdmin(supabase)
+  return requireAdmin()
 }
 
-/** List all assistants with their permission maps. Full admins only. */
 export async function listAssistants(): Promise<AssistantRecord[]> {
-  const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) return []
+  if (!(await requireAdmin())) return []
 
-  const { data: profiles, error } = await supabase
-    .from('profiles')
-    .select('id, full_name, email, avatar_url, created_at')
-    .eq('role', 'assistant')
-    .order('created_at', { ascending: false })
+  const users = await prisma.profiles.findMany({
+    where: { role: 'assistant' },
+    select: { id: true, full_name: true, email: true, avatar_url: true, created_at: true },
+    orderBy: { created_at: 'desc' }
+  })
 
-  if (error || !profiles) {
-    console.log('[v0] listAssistants error:', error?.message)
-    return []
-  }
+  if (!users || users.length === 0) return []
 
-  const ids = profiles.map((p) => p.id)
+  const ids = users.map((u) => u.id)
   const permsByProfile = new Map<string, Partial<Record<ResourceKey, AccessLevel>>>()
 
-  if (ids.length) {
-    const { data: perms } = await supabase
-      .from('assistant_permissions')
-      .select('profile_id, resource, access_level')
-      .in('profile_id', ids)
+  const perms = await prisma.assistant_permissions.findMany({
+    where: { profile_id: { in: ids } },
+    select: { profile_id: true, resource: true, access_level: true }
+  })
 
-    for (const row of perms ?? []) {
-      const map = permsByProfile.get(row.profile_id) ?? {}
-      map[row.resource as ResourceKey] = row.access_level as AccessLevel
-      permsByProfile.set(row.profile_id, map)
-    }
+  for (const row of perms) {
+    const map = permsByProfile.get(row.profile_id) ?? {}
+    map[row.resource as ResourceKey] = row.access_level as AccessLevel
+    permsByProfile.set(row.profile_id, map)
   }
 
-  return profiles.map((p) => {
-    const permissions = permsByProfile.get(p.id) ?? {}
-    const grantedCount = Object.values(permissions).filter(
-      (l) => l && l !== 'none',
-    ).length
+  return users.map((u) => {
+    const permissions = permsByProfile.get(u.id) ?? {}
+    const grantedCount = Object.values(permissions).filter((l) => l && l !== 'none').length
     return {
-      id: p.id,
-      name: p.full_name ?? '',
-      email: p.email ?? '',
-      avatarUrl: p.avatar_url ?? null,
+      id: u.id,
+      name: u.full_name ?? '',
+      email: u.email ?? '',
+      avatarUrl: u.avatar_url ?? null,
       permissions,
       grantedCount,
-      createdAt: p.created_at,
+      createdAt: u.created_at ? u.created_at.toISOString() : new Date().toISOString(),
     }
   })
 }
 
-/** Create a new assistant login + profile + permission rows. Full admins only. */
 export async function createAssistant(input: {
   name: string
   email: string
   password: string
   permissions: Record<string, string>
 }) {
-  const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) {
+  if (!(await requireAdmin())) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
@@ -111,181 +98,117 @@ export async function createAssistant(input: {
     return { error: 'كلمة المرور لازم تكون 6 حروف على الأقل.' }
   }
 
-  // Build the service-role client (throws with a clear message if env is missing).
-  let admin: ReturnType<typeof createAdminClient>
   try {
-    admin = createAdminClient()
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    console.log('[v0] createAssistant admin client error:', msg)
-    return { error: `إعداد Supabase ناقص: ${msg}. أضف المفتاح في إعدادات المشروع.` }
-  }
-
-  // GoTrue occasionally returns a transient AuthRetryableFetchError (500) in
-  // this runtime. It's flaky, not fatal, so retry a few times with a short
-  // backoff before surfacing an error to the admin.
-  let created: Awaited<ReturnType<typeof admin.auth.admin.createUser>>['data'] | null = null
-  let authError: Awaited<ReturnType<typeof admin.auth.admin.createUser>>['error'] = null
-  for (let attempt = 1; attempt <= 4; attempt++) {
-    const res = await admin.auth.admin.createUser({
-      email: input.email.trim(),
-      password: input.password,
-      email_confirm: true,
-      user_metadata: { full_name: input.name, role: 'assistant' },
+    const existing = await prisma.user.findFirst({
+      where: { email: input.email.trim() }
     })
-    created = res.data
-    authError = res.error
 
-    if (!authError && created?.user) break
-
-    const retryable =
-      authError?.name === 'AuthRetryableFetchError' ||
-      authError?.status === 500 ||
-      authError?.status === 502 ||
-      authError?.status === 503 ||
-      authError?.status === 504
-    if (!retryable) break
-
-    console.log(`[v0] createAssistant retryable error on attempt ${attempt}, retrying...`)
-    await new Promise((r) => setTimeout(r, attempt * 400))
-  }
-
-  if (authError || !created?.user) {
-    // Supabase AuthError props aren't JSON-serializable, so pull them out.
-    const err = authError as unknown as
-      | { message?: string; status?: number; code?: string; name?: string }
-      | null
-    const msg = err?.message ?? 'no user returned'
-    const code = err?.code ?? ''
-    const status = err?.status ?? ''
-    console.log('[v0] createAssistant auth error:', JSON.stringify({ msg, code, status, name: err?.name }))
-
-    const lower = `${msg} ${code}`.toLowerCase()
-    if (lower.includes('already') || lower.includes('registered') || lower.includes('exists')) {
+    if (existing) {
       return { error: 'البريد الإلكتروني مستخدم بالفعل.' }
     }
-    if (lower.includes('invalid') && lower.includes('key')) {
-      return { error: 'مفتاح الخدمة (service role key) غير صحيح. تحقق من إعدادات Supabase.' }
-    }
-    if (status === 401 || status === 403 || lower.includes('not authorized') || lower.includes('unauthorized')) {
-      return { error: 'غير مصرح — مفتاح الخدمة غير صالح للـ live DB. تحقق من SUPABASE_SERVICE_ROLE_KEY.' }
-    }
-    if (lower.includes('password')) {
-      return { error: 'كلمة المرور ضعيفة جداً. استخدم كلمة أقوى.' }
-    }
-    if (err?.name === 'AuthRetryableFetchError' || status === 500) {
-      return { error: 'تعذّر الاتصال بخدمة المصادقة مؤقتاً. حاول تاني بعد لحظات.' }
-    }
-    return { error: `تعذّر إنشاء الحساب${msg ? `: ${msg}` : '. تأكد من مفتاح الخدمة في إعدادات المشروع.'}` }
-  }
 
-  const userId = created.user.id
+    const hashedPassword = bcrypt.hashSync(input.password, 10)
 
-  // Upsert the profile with role = assistant (a trigger may have created a row).
-  const { error: profileError } = await admin
-    .from('profiles')
-    .upsert(
-      {
+    const userId = crypto.randomUUID()
+    const user = await prisma.user.create({
+      data: {
         id: userId,
-        full_name: input.name,
-        email: input.email,
+        email: input.email.trim(),
+        encrypted_password: hashedPassword,
         role: 'assistant',
-      },
-      { onConflict: 'id' },
-    )
+      }
+    })
+    await prisma.profiles.create({
+      data: {
+        id: userId,
+        full_name: input.name.trim(),
+        email: input.email.trim(),
+        role: 'assistant',
+      }
+    })
 
-  if (profileError) {
-    console.log('[v0] createAssistant profile error:', profileError.message)
-    return { error: 'تعذّر حفظ بيانات المساعد.' }
-  }
+    const rows = sanitizePermissions(input.permissions).map((r) => ({
+      profile_id: user.id,
+      resource: r.resource,
+      access_level: r.access_level,
+    }))
 
-  const rows = sanitizePermissions(input.permissions).map((r) => ({
-    profile_id: userId,
-    resource: r.resource,
-    access_level: r.access_level,
-  }))
-  if (rows.length) {
-    const { error: permError } = await admin
-      .from('assistant_permissions')
-      .insert(rows)
-    if (permError) {
-      console.log('[v0] createAssistant perms error:', permError.message)
-      return { error: 'تم إنشاء الحساب لكن تعذّر حفظ الصلاحيات.' }
+    if (rows.length > 0) {
+      await prisma.assistant_permissions.createMany({ data: rows })
     }
-  }
 
-  logActivity({ action: 'create', resource: 'settings', targetId: userId, targetLabel: `مساعد جديد: ${input.name} (${input.email})` }).catch(() => {})
-  revalidatePath('/admin/settings')
-  return { success: true }
+    logActivity({ action: 'create', resource: 'settings', targetId: user.id, targetLabel: `مساعد جديد: ${input.name} (${input.email})` }).catch(() => {})
+    revalidatePath('/admin/settings')
+    return { success: true }
+  } catch (error: any) {
+    return { error: 'تعذّر إنشاء الحساب. تأكد من البيانات وحاول مرة أخرى.' }
+  }
 }
 
-/** Replace an assistant's permission map. Full admins only. */
 export async function updateAssistantPermissions(
   profileId: string,
   permissions: Record<string, string>,
 ) {
-  const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) {
+  if (!(await requireAdmin())) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
-  const admin = createAdminClient()
+  const target = await prisma.profiles.findUnique({
+    where: { id: profileId },
+    select: { role: true }
+  })
 
-  // Ensure the target is actually an assistant.
-  const { data: target } = await admin
-    .from('profiles')
-    .select('role')
-    .eq('id', profileId)
-    .single()
   if (target?.role !== 'assistant') {
     return { error: 'الحساب ده مش مساعد.' }
   }
 
-  // Reset then insert the new set (simple + consistent).
-  await admin.from('assistant_permissions').delete().eq('profile_id', profileId)
+  try {
+    await prisma.assistant_permissions.deleteMany({
+      where: { profile_id: profileId }
+    })
 
-  const rows = sanitizePermissions(permissions).map((r) => ({
-    profile_id: profileId,
-    resource: r.resource,
-    access_level: r.access_level,
-  }))
-  if (rows.length) {
-    const { error } = await admin.from('assistant_permissions').insert(rows)
-    if (error) {
-      console.log('[v0] updateAssistantPermissions error:', error.message)
-      return { error: 'تعذّر تحديث الصلاحيات.' }
+    const rows = sanitizePermissions(permissions).map((r) => ({
+      profile_id: profileId,
+      resource: r.resource,
+      access_level: r.access_level,
+    }))
+
+    if (rows.length > 0) {
+      await prisma.assistant_permissions.createMany({ data: rows })
     }
-  }
 
-  logActivity({ action: 'update', resource: 'settings', targetId: profileId, targetLabel: `صلاحيات مساعد ID: ${profileId}` }).catch(() => {})
-  revalidatePath('/admin/settings')
-  return { success: true }
+    logActivity({ action: 'update', resource: 'settings', targetId: profileId, targetLabel: `صلاحيات مساعد ID: ${profileId}` }).catch(() => {})
+    revalidatePath('/admin/settings')
+    return { success: true }
+  } catch (error: any) {
+    return { error: 'تعذّر تحديث الصلاحيات.' }
+  }
 }
 
-/**
- * Remove an assistant: demote to 'student' role and clear permissions.
- * Keeps the auth account and history intact.
- */
 export async function deleteAssistant(profileId: string) {
-  const supabase = await createClient()
-  if (!(await requireAdmin(supabase))) {
+  if (!(await requireAdmin())) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
-  const admin = createAdminClient()
-  await admin.from('assistant_permissions').delete().eq('profile_id', profileId)
-  const { error } = await admin
-    .from('profiles')
-    .update({ role: 'student' })
-    .eq('id', profileId)
-    .eq('role', 'assistant')
+  try {
+    await prisma.assistant_permissions.deleteMany({
+      where: { profile_id: profileId }
+    })
 
-  if (error) {
-    console.log('[v0] deleteAssistant error:', error.message)
+    await prisma.profiles.update({
+      where: { id: profileId },
+      data: { role: 'student' }
+    })
+
+    await prisma.user.update({
+      where: { id: profileId },
+      data: { role: 'student' }
+    })
+
+    logActivity({ action: 'delete', resource: 'settings', targetId: profileId, targetLabel: `إزالة مساعد ID: ${profileId}` }).catch(() => {})
+    revalidatePath('/admin/settings')
+    return { success: true }
+  } catch (error: any) {
     return { error: 'تعذّر إزالة المساعد.' }
   }
-
-  logActivity({ action: 'delete', resource: 'settings', targetId: profileId, targetLabel: `إزالة مساعد ID: ${profileId}` }).catch(() => {})
-  revalidatePath('/admin/settings')
-  return { success: true }
 }

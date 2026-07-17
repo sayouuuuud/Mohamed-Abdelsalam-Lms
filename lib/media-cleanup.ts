@@ -13,7 +13,14 @@
 
 import { UTApi } from 'uploadthing/server'
 import { deleteR2Object, isR2Configured } from '@/lib/r2'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@supabase/supabase-js'
+
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 const utapi = new UTApi()
@@ -121,7 +128,7 @@ async function deleteR2HlsPrefix(prefix: string): Promise<void> {
  *   - videos row r2_hls_prefix (R2 HLS tree) + r2_raw_key
  */
 export async function cleanupLessonMedia(lessonId: string): Promise<void> {
-  const supabase = createAdminClient()
+  const supabase = getSupabaseAdmin()
 
   const { data: lesson } = await supabase
     .from('lessons')
@@ -173,7 +180,7 @@ export async function cleanupLessonMedia(lessonId: string): Promise<void> {
  * Collects image + all lessons' media for a lecture.
  */
 export async function cleanupLectureMedia(lectureId: string): Promise<void> {
-  const supabase = createAdminClient()
+  const supabase = getSupabaseAdmin()
 
   const { data: lecture } = await supabase
     .from('lectures')
@@ -200,7 +207,7 @@ export async function cleanupLectureMedia(lectureId: string): Promise<void> {
  * Collects image + all lectures' media for a monthly course.
  */
 export async function cleanupCourseMedia(courseId: string): Promise<void> {
-  const supabase = createAdminClient()
+  const supabase = getSupabaseAdmin()
 
   const { data: course } = await supabase
     .from('monthly_courses')
@@ -226,7 +233,7 @@ export async function cleanupCourseMedia(courseId: string): Promise<void> {
  *  deleteLecture/deleteMonthlyCourse which cascade first in our delete actions)
  */
 export async function cleanupBranchMedia(branchId: string): Promise<void> {
-  const supabase = createAdminClient()
+  const supabase = getSupabaseAdmin()
   const { data } = await supabase
     .from('branches')
     .select('image')
@@ -244,7 +251,7 @@ export async function cleanupBranchMedia(branchId: string): Promise<void> {
  * cleanupStageMedia — deletes the stage image only
  */
 export async function cleanupStageMedia(stageId: string): Promise<void> {
-  const supabase = createAdminClient()
+  const supabase = getSupabaseAdmin()
   const { data } = await supabase
     .from('stages')
     .select('image')

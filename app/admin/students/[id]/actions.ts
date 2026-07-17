@@ -1,37 +1,28 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { hasResourceAccess } from '@/lib/auth-guard'
 import { logActivity } from '@/lib/audit-log'
 import type { StudentProfile, DeviceInfo, EnrolledCourse, PaymentRecord, ExamGrade, AssignmentRecord, StudentStatus } from '@/lib/student-profile-data'
 
-// ── Update student account status ─────────────────────────────────────────────
 export async function updateStudentStatus(
-  studentId: string,           // students.id (UUID)
-  studentCode: string,         // students.code  (for revalidation)
+  studentId: string,
+  studentCode: string,
   newStatus: StudentStatus,
 ): Promise<{ success?: boolean; error?: string }> {
   try {
-    const supabase = await createClient()
-
-    if (!(await hasResourceAccess(supabase, 'students', 'manage'))) {
+    if (!(await hasResourceAccess('students', 'manage'))) {
       return { error: 'غير مسموح.' }
     }
 
-    const adminDb = createAdminClient()
+    const updated = await prisma.students.update({
+      where: { id: studentId },
+      data: { status: newStatus },
+      select: { id: true }
+    })
 
-    // .select() ensures we detect the "0 rows matched" case — without it
-    // Supabase returns success even when nothing was actually updated.
-    const { data: updated, error } = await adminDb
-      .from('students')
-      .update({ status: newStatus })
-      .eq('id', studentId)
-      .select('id')
-
-    if (error) return { error: error.message }
-    if (!updated || updated.length === 0) {
+    if (!updated) {
       return { error: 'لم يتم العثور على الطالب في قاعدة البيانات.' }
     }
 
@@ -39,119 +30,110 @@ export async function updateStudentStatus(
     revalidatePath(`/admin/students/${studentCode}`)
     revalidatePath('/admin/students')
     return { success: true }
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : 'حدث خطأ غير متوقع أثناء تغيير الحالة.' }
+  } catch (e: any) {
+    return { error: 'حدث خطأ غير متوقع أثناء تغيير الحالة.' }
   }
 }
 
-// ── Send a message / notification to a student ────────────────────────────────
 export async function sendMessageToStudent(
-  studentId: string,   // students.id (UUID)
+  studentId: string,
   studentCode: string,
   studentName: string,
   subject: string,
   body: string,
   channel: 'رسالة داخلية' | 'إشعار',
 ): Promise<{ success?: boolean; error?: string }> {
-  const supabase = await createClient()
-
-  if (!(await hasResourceAccess(supabase, 'students', 'manage'))) {
+  if (!(await hasResourceAccess('students', 'manage'))) {
     return { error: 'غير مسموح.' }
   }
 
-  const adminDb = createAdminClient()
-
-  const timeLabel = new Date().toLocaleString('ar-EG', {
+  const timeLabel = new Intl.DateTimeFormat('ar-EG', {
     day: 'numeric',
     month: 'long',
     hour: '2-digit',
     minute: '2-digit',
-  })
+  }).format(new Date())
 
-  if (channel === 'إشعار') {
-    // Insert into notifications table
-    const code = `NOTIF-${Date.now()}`
-    const { error } = await adminDb.from('notifications').insert({
-      code,
-      student_id: studentId,
-      type: 'رسالة',
-      title: subject || 'رسالة من الإدارة',
-      description: body,
-      time_label: timeLabel,
-    })
-    if (error) return { error: error.message }
-  } else {
-    // We need the student's user_id for the messages table!
-    const { data: studentRow } = await adminDb
-      .from('students')
-      .select('user_id')
-      .eq('id', studentId)
-      .single()
-
-    if (!studentRow?.user_id) {
-      return { error: 'الطالب غير مرتبط بحساب مستخدم.' }
-    }
-    const studentUserId = studentRow.user_id
-
-    // Insert or append into messages table
-    // Check if an existing open thread exists for this student
-    const { data: existing } = await adminDb
-      .from('messages')
-      .select('id, code, chat_history, student_unread')
-      .eq('student_id', studentUserId)
-      .eq('status', 'open')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-
-    const newMsg = {
-      id: `m${Date.now()}`,
-      fromMe: true,
-      text: body,
-      time: 'الآن',
-    }
-
-    if (existing) {
-      // Append to existing thread
-      const history = (existing.chat_history as any[]) ?? []
-      const { error } = await adminDb
-        .from('messages')
-        .update({
-          chat_history: [...history, newMsg],
-          content: body,
+  try {
+    if (channel === 'إشعار') {
+      const code = `NOTIF-${Date.now()}`
+      await prisma.notifications.create({
+        data: {
+          code,
+          student_id: studentId,
+          type: 'رسالة',
+          title: subject || 'رسالة من الإدارة',
+          description: body,
           time_label: timeLabel,
-          student_unread: (existing.student_unread ?? 0) + 1,
-        })
-        .eq('id', existing.id)
-      if (error) return { error: error.message }
-    } else {
-      // Create a new thread
-      const code = `MSG-ADMIN-${Date.now()}`
-      const { error } = await adminDb.from('messages').insert({
-        code,
-        student_id: studentUserId,
-        sender_name: studentName,
-        subject: subject || 'رسالة من الإدارة',
-        content: body,
-        time_label: timeLabel,
-        unread_count: 0,
-        student_unread: 1,
-        is_read: true,
-        sender_role: 'أدمن',
-        chat_history: [newMsg],
-        status: 'open',
+        }
       })
-      if (error) return { error: error.message }
-    }
-  }
+    } else {
+      const studentRow = await prisma.students.findUnique({
+        where: { id: studentId },
+        select: { user_id: true }
+      })
 
-  logActivity({ action: 'create', resource: 'students', targetId: studentCode, targetLabel: `رسالة لـ ${studentName} (${channel})` }).catch(() => {})
-  revalidatePath(`/admin/students/${studentCode}`)
-  revalidatePath('/admin/messages')
-  return { success: true }
+      if (!studentRow?.user_id) {
+        return { error: 'الطالب غير مرتبط بحساب مستخدم.' }
+      }
+      const studentUserId = studentRow.user_id
+
+      const existing = await prisma.messages.findFirst({
+        where: { student_id: studentUserId, status: 'open' },
+        select: { id: true, code: true, chat_history: true, student_unread: true },
+        orderBy: { created_at: 'desc' }
+      })
+
+      const newMsg = {
+        id: `m${Date.now()}`,
+        fromMe: true,
+        text: body,
+        time: 'الآن',
+      }
+
+      if (existing) {
+        const history = (existing.chat_history as any[]) ?? []
+        await prisma.messages.update({
+          where: { id: existing.id },
+          data: {
+            chat_history: [...history, newMsg] as any,
+            content: body,
+            time_label: timeLabel,
+            student_unread: (existing.student_unread ?? 0) + 1,
+          }
+        })
+      } else {
+        const code = `MSG-ADMIN-${Date.now()}`
+        await prisma.messages.create({
+          data: {
+            code,
+            student_id: studentUserId,
+            sender_name: studentName,
+            subject: subject || 'رسالة من الإدارة',
+            content: body,
+            time_label: timeLabel,
+            unread_count: 0,
+            student_unread: 1,
+            is_read: true,
+            sender_role: 'أدمن',
+            chat_history: [newMsg] as any,
+            status: 'open',
+          }
+        })
+      }
+    }
+
+    logActivity({ action: 'create', resource: 'students', targetId: studentCode, targetLabel: `رسالة لـ ${studentName} (${channel})` }).catch(() => {})
+    revalidatePath(`/admin/students/${studentCode}`)
+    revalidatePath('/admin/messages')
+    return { success: true }
+  } catch (error: any) {
+    return { error: error.message }
+  }
 }
 
-function formatRelativeTime(date: string | Date): string {
+function formatRelativeTime(date: string | Date | null): string {
+  if (!date) return 'غير معروف';
   try {
     const d = new Date(date);
     const now = new Date();
@@ -173,65 +155,60 @@ function formatRelativeTime(date: string | Date): string {
   }
 }
 
-function formatJoinedAt(date: string): string {
+function formatJoinedAt(date: string | Date | null): string {
+  if (!date) return 'غير معروف'
   try {
-    return new Date(date).toLocaleDateString('ar-EG', {
+    const d = typeof date === 'string' ? new Date(date) : date
+    return new Intl.DateTimeFormat('ar-EG', {
       day: 'numeric',
       month: 'long',
       year: 'numeric',
-    })
+    }).format(d)
   } catch {
-    return date
+    return String(date)
   }
 }
 
 export async function getStudentProfileData(code: string): Promise<StudentProfile | null> {
-  const supabase = await createClient()
+  if (!(await hasResourceAccess('students'))) return null
 
-  if (!(await hasResourceAccess(supabase, 'students'))) return null
+  const studentRow = await prisma.students.findUnique({
+    where: { code }
+  })
 
-  // 1. Fetch Student
-  const { data: studentRow, error: studentError } = await supabase
-    .from('students')
-    .select('*')
-    .eq('code', code)
-    .single()
-
-  if (studentError || !studentRow) return null
+  if (!studentRow) return null
 
   const studentId = studentRow.id
-  // `courses` and `progress` will be overwritten below with real computed values.
-  const student = {
+  const studentUserId = studentRow.user_id
+
+  const student: any = {
     id: studentRow.code,
     name: studentRow.name,
     email: studentRow.email || '',
     phone: studentRow.phone || '',
-    gender: studentRow.gender,
+    gender: studentRow.gender as StudentGender,
     avatar: studentRow.avatar || undefined,
-    courses: 0,        // overwritten after courses fetch
-    progress: 0,       // overwritten after progress fetch
+    courses: 0,
+    progress: 0,
     spent: studentRow.spent,
-    status: studentRow.status,
+    status: studentRow.status as StudentStatus,
     joinedAt: formatJoinedAt(studentRow.joined_at),
   }
 
-  // 2. Fetch Device Info
-  const { data: deviceRow } = await supabase
-    .from('student_devices')
-    .select('*')
-    .eq('student_id', studentId)
-    .single()
+  const deviceRow = await prisma.student_devices.findFirst({
+    where: { student_id: studentId }
+  })
 
   const device: DeviceInfo = deviceRow
     ? {
-        browser: deviceRow.browser,
-        os: deviceRow.os,
-        deviceType: deviceRow.device_type,
-        ip: deviceRow.ip,
-        city: deviceRow.city,
-        country: deviceRow.country,
+        browser: deviceRow.browser ?? 'غير معروف',
+        os: deviceRow.os ?? 'غير معروف',
+        deviceType: deviceRow.device_type ?? 'غير معروف',
+        ip: deviceRow.ip ?? 'غير معروف',
+        city: deviceRow.city ?? 'غير معروف',
+        country: deviceRow.country ?? 'غير معروف',
         lastActive: formatRelativeTime(deviceRow.last_active),
-        sessions: deviceRow.sessions,
+        sessions: deviceRow.sessions ?? 0,
       }
     : {
         browser: 'غير معروف',
@@ -244,82 +221,84 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
         sessions: 0,
       }
 
-  // 3. Fetch Courses & Progress via orders + order_items
-  // The system uses lectures (not the legacy `courses` table) as the product
-  // unit. Enrollments are NOT written on purchase — ownership lives in
-  // approved orders. We fetch each purchased lecture, then its lesson progress
-  // via student_content_progress (keyed by user_id + lesson_id).
-  const { data: orderedItems } = await supabase
-    .from('orders')
-    .select(`
-      created_at,
-      status,
-      order_items (
-        lecture_id,
-        lecture_title,
-        branch_title,
-        stage_title,
-        lectures:lecture_id (
-          id,
-          title,
-          lessons ( id )
-        )
-      )
-    `)
-    .eq('student_id', studentRow.user_id)
-    .eq('status', 'approved')
-    .order('created_at', { ascending: false })
+  let lectureRows: Array<{ lectureId: string; title: string; category: string; purchasedAt: Date; lessonIds: string[] }> = []
+  let orderedItems: any[] = []
+  let progressRows: any[] = []
+  let legacyProgress: any[] = []
+  let ordersData: any[] = []
 
-  // Flatten to one row per lecture (deduplicate in case of duplicate orders).
-  // Also collect lesson ids per lecture for accurate per-lecture progress.
-  const seenLectureIds = new Set<string>()
-  const lectureRows: Array<{
-    lectureId: string
-    title: string
-    category: string
-    purchasedAt: string
-    lessonIds: string[]
-  }> = []
+  if (studentUserId) {
+    orderedItems = await prisma.orders.findMany({
+      where: { student_id: studentUserId, status: 'approved' },
+      select: {
+        created_at: true,
+        status: true,
+        order_items: {
+          select: {
+            lecture_id: true,
+            lecture_title: true,
+            branch_title: true,
+            stage_title: true,
+            lectures: {
+              select: { id: true, title: true, lessons: { select: { id: true } } }
+            }
+          }
+        }
+      },
+      orderBy: { created_at: 'desc' }
+    })
 
-  for (const order of orderedItems ?? []) {
-    for (const item of (order.order_items as any[]) ?? []) {
-      const lectureId: string = item.lecture_id
-      if (!lectureId || seenLectureIds.has(lectureId)) continue
-      seenLectureIds.add(lectureId)
+    const seenLectureIds = new Set<string>()
+    for (const order of orderedItems) {
+      for (const item of order.order_items) {
+        const lectureId = item.lecture_id
+        if (!lectureId || seenLectureIds.has(lectureId)) continue
+        seenLectureIds.add(lectureId)
 
-      const lecObj = Array.isArray(item.lectures) ? item.lectures[0] : item.lectures
-      const lessonIds: string[] = (lecObj?.lessons ?? []).map((l: any) => l.id).filter(Boolean)
+        const lecObj = item.lectures
+        const lessonIds = (lecObj?.lessons ?? []).map((l) => l.id).filter(Boolean)
 
-      lectureRows.push({
-        lectureId,
-        title: item.lecture_title || lecObj?.title || 'محاضرة',
-        category: item.branch_title || 'عام',
-        purchasedAt: order.created_at,
-        lessonIds,
-      })
+        lectureRows.push({
+          lectureId,
+          title: item.lecture_title || lecObj?.title || 'محاضرة',
+          category: item.branch_title || 'عام',
+          purchasedAt: order.created_at,
+          lessonIds,
+        })
+      }
     }
+
+    progressRows = await prisma.student_content_progress.findMany({
+      where: { user_id: studentUserId, item_type: 'lesson', status: 'completed' },
+      select: { item_id: true, updated_at: true }
+    })
+
+    legacyProgress = await prisma.lesson_progress.findMany({
+      where: { student_id: studentUserId, completed: true },
+      select: { lesson_id: true, completed_at: true }
+    })
+
+    ordersData = await prisma.orders.findMany({
+      where: { student_id: studentUserId },
+      select: {
+        id: true,
+        code: true,
+        total: true,
+        subtotal: true,
+        discount: true,
+        method: true,
+        status: true,
+        created_at: true,
+        coupon_code: true,
+        order_items: { select: { lecture_title: true, branch_title: true, stage_title: true, price: true } }
+      },
+      orderBy: { created_at: 'desc' }
+    })
   }
 
-  const adminDb = createAdminClient()
-
-  // Fetch all completed lesson/content progress for this student at once.
-  const { data: progressRows } = await adminDb
-    .from('student_content_progress')
-    .select('item_id, updated_at')
-    .eq('user_id', studentRow.user_id)
-    .eq('item_type', 'lesson')
-    .eq('status', 'completed')
-
-  const { data: legacyProgress } = await adminDb
-    .from('lesson_progress')
-    .select('lesson_id, completed_at')
-    .eq('student_id', studentRow.user_id)
-    .eq('completed', true)
-
-  // Build a set of completed lesson/content ids for fast lookup.
   const completedIds = new Set<string>([
-    ...((progressRows ?? []).map((r: any) => r.item_id as string)),
-    ...((legacyProgress ?? []).map((r: any) => r.lesson_id as string)),
+    ...progressRows.map((r) => r.item_id),
+    ...legacyProgress.map((r) => r.lesson_id),
   ])
 
   const courses: EnrolledCourse[] = lectureRows.map((lec) => {
@@ -327,14 +306,15 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
     const lessonsDone = lec.lessonIds.filter((id) => completedIds.has(id)).length
     const progress = totalLessons > 0 ? Math.round((lessonsDone / totalLessons) * 100) : 0
 
-    // Last accessed = latest completed_at for a lesson in this lecture.
     let lastAccessedDate = lec.purchasedAt
-    for (const row of [...(progressRows ?? []).map((r: any) => ({ ...r, completed_at: r.updated_at })), ...(legacyProgress ?? [])] as any[]) {
-      const id = row.item_id ?? row.lesson_id
-      if (lec.lessonIds.includes(id) && row.completed_at) {
-        if (new Date(row.completed_at) > new Date(lastAccessedDate)) {
-          lastAccessedDate = row.completed_at
-        }
+    for (const row of progressRows) {
+      if (lec.lessonIds.includes(row.item_id) && row.updated_at) {
+        if (row.updated_at > lastAccessedDate) lastAccessedDate = row.updated_at
+      }
+    }
+    for (const row of legacyProgress) {
+      if (lec.lessonIds.includes(row.lesson_id) && row.completed_at) {
+        if (row.completed_at > lastAccessedDate) lastAccessedDate = row.completed_at
       }
     }
 
@@ -350,37 +330,11 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
     }
   })
 
-  // Back-fill the summary stats with real computed values.
   student.courses = courses.length
-  student.progress = courses.length > 0
-    ? Math.round(courses.reduce((sum, c) => sum + c.progress, 0) / courses.length)
-    : 0
+  student.progress = courses.length > 0 ? Math.round(courses.reduce((sum, c) => sum + c.progress, 0) / courses.length) : 0
 
-  // 4. Fetch Payments from orders (matched by student.user_id = orders.student_id)
-  const { data: ordersData } = await supabase
-    .from('orders')
-    .select(`
-      id,
-      code,
-      total,
-      subtotal,
-      discount,
-      method,
-      status,
-      created_at,
-      coupon_code,
-      order_items (
-        lecture_title,
-        branch_title,
-        stage_title,
-        price
-      )
-    `)
-    .eq('student_id', studentRow.user_id)
-    .order('created_at', { ascending: false })
-
-  const payments: PaymentRecord[] = (ordersData || []).map((o: any) => {
-    const items: string[] = (o.order_items || []).map((i: any) => i.lecture_title).filter(Boolean)
+  const payments: PaymentRecord[] = ordersData.map((o) => {
+    const items = o.order_items.map((i: any) => i.lecture_title).filter(Boolean)
     const itemLabel = items.length > 0 ? items.join('، ') : 'طلب'
     return {
       id: o.code || o.id,
@@ -394,51 +348,27 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
 
   const totalSpent = payments.reduce((acc, p) => p.status === 'ناجح' ? acc + p.amount : acc, 0)
 
-  // 5. Fetch Exams
-  const { data: examsData } = await supabase
-    .from('exam_submissions')
-    .select(`
-      id,
-      score,
-      total,
-      status,
-      submitted_at,
-      exams (
-        title,
-        course
-      )
-    `)
-    .eq('student_id', studentId)
+  const examsData = await prisma.exam_submissions.findMany({
+    where: { student_id: studentId },
+    select: { id: true, score: true, total: true, status: true, submitted_at: true, exams: { select: { title: true, course: true } } }
+  })
 
-  const exams: ExamGrade[] = (examsData || []).map((e: any) => ({
+  const exams: ExamGrade[] = examsData.map((e) => ({
     id: e.id,
     name: e.exams?.title || 'امتحان',
     course: e.exams?.course || 'كورس',
-    score: e.score,
-    total: e.total,
+    score: e.score ? Number(e.score) : 0,
+    total: e.total ? Number(e.total) : 0,
     date: formatJoinedAt(e.submitted_at),
     status: e.status as ExamGrade['status'],
   }))
 
-  // 6. Fetch Assignments
-  const { data: assignmentsData } = await supabase
-    .from('assignment_submissions')
-    .select(`
-      id,
-      status,
-      score,
-      submitted_at,
-      assignments (
-        title,
-        due_date,
-        courses (title)
-      )
-    `)
-    .eq('student_id', studentId)
+  const assignmentsData = await prisma.assignment_submissions.findMany({
+    where: { student_id: studentId },
+    select: { id: true, status: true, score: true, submitted_at: true, assignments: { select: { title: true, due_date: true, courses: { select: { title: true } } } } }
+  })
 
-  const assignments: AssignmentRecord[] = (assignmentsData || []).map((a: any) => {
-    // A row in assignment_submissions means the student did submit.
-    // Only an explicit "متأخر" status marks it late; everything else is submitted.
+  const assignments: AssignmentRecord[] = assignmentsData.map((a) => {
     let status: AssignmentRecord['status'] = 'تم التسليم'
     if (a.status === 'متأخر') status = 'متأخر'
     else if (a.status === 'لم يسلّم') status = 'لم يسلّم'
@@ -447,130 +377,92 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
       id: a.id,
       name: a.assignments?.title || 'واجب',
       course: a.assignments?.courses?.title || 'كورس',
-      dueDate: formatJoinedAt(a.assignments?.due_date || a.submitted_at || new Date().toISOString()),
+      dueDate: formatJoinedAt(a.assignments?.due_date || a.submitted_at || new Date()),
       status,
-      grade: a.score,
+      grade: a.score ? Number(a.score) : 0,
     }
   })
 
-  // 7. Dashboard Analytics computed from real data (last 6 months).
-  const arMonths = [
-    'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
-    'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
-  ]
+  const arMonths = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
   const now = new Date()
-  // Build the last 6 month buckets (oldest → newest).
   const monthBuckets = Array.from({ length: 6 }).map((_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1)
     return { year: d.getFullYear(), month: d.getMonth(), label: arMonths[d.getMonth()] }
   })
 
-  // Total lessons across all enrolled courses (for progress %).
   const totalLessonsAll = courses.reduce((sum, c) => sum + c.lessonsTotal, 0)
-
-  // Flatten all completed lesson/content progress entries with a completion date.
   const completedLessons: Date[] = [
-    ...((progressRows ?? []).filter((r: any) => r.updated_at).map((r: any) => new Date(r.updated_at))),
-    ...((legacyProgress ?? []).filter((r: any) => r.completed_at).map((r: any) => new Date(r.completed_at))),
+    ...progressRows.filter((r) => r.updated_at).map((r) => new Date(r.updated_at)),
+    ...legacyProgress.filter((r) => r.completed_at).map((r) => new Date(r.completed_at)),
   ]
 
-  // Cumulative progress % at the end of each month bucket.
   const progressTrend = monthBuckets.map((b) => {
     const endOfMonth = new Date(b.year, b.month + 1, 0, 23, 59, 59)
     const doneByThen = completedLessons.filter((d) => d <= endOfMonth).length
-    const progress =
-      totalLessonsAll > 0 ? Math.round((doneByThen / totalLessonsAll) * 100) : 0
+    const progress = totalLessonsAll > 0 ? Math.round((doneByThen / totalLessonsAll) * 100) : 0
     return { month: b.label, progress }
   })
 
-  // Real monthly spend from accepted orders.
   const monthlySpend = monthBuckets.map((b) => {
-    const amount = (ordersData || [])
-      .filter((o: any) => o.status === 'approved' && o.created_at)
-      .filter((o: any) => {
+    const amount = ordersData
+      .filter((o) => o.status === 'approved' && o.created_at)
+      .filter((o) => {
         const d = new Date(o.created_at)
         return d.getFullYear() === b.year && d.getMonth() === b.month
       })
-      .reduce((sum: number, o: any) => sum + Number(o.total), 0)
+      .reduce((sum, o) => sum + Number(o.total), 0)
     return { month: b.label, amount }
   })
 
-  // 7. Skills = comparison across the branches of the student's academic year.
-  // For each branch we combine the student's average exam percentage with the
-  // average progress in that branch's courses.
   let stageTitle = ''
   let skills: StudentProfile['skills'] = []
 
   if (studentRow.stage_id) {
-    const { data: stageRow } = await supabase
-      .from('stages')
-      .select('title')
-      .eq('id', studentRow.stage_id)
-      .single()
+    const stageRow = await prisma.stages.findUnique({
+      where: { id: studentRow.stage_id },
+      select: { title: true }
+    })
     stageTitle = stageRow?.title || ''
 
-    const { data: branchRows } = await supabase
-      .from('branches')
-      .select('id, title, sort_order')
-      .eq('stage_id', studentRow.stage_id)
-      .order('sort_order', { ascending: true })
+    const branchRows = await prisma.branches.findMany({
+      where: { stage_id: studentRow.stage_id },
+      select: { id: true, title: true, sort_order: true },
+      orderBy: { sort_order: 'asc' }
+    })
 
-    if (branchRows && branchRows.length > 0) {
-      // Exam submissions joined to their exam's branch.
-      const { data: branchExams } = await supabase
-        .from('exam_submissions')
-        .select('score, total, grading_status, exams!inner (branch_id)')
-        .eq('student_id', studentId)
+    if (branchRows.length > 0) {
+      const branchExams = await prisma.exam_submissions.findMany({
+        where: { student_id: studentId },
+        select: { score: true, total: true, grading_status: true, exams: { select: { branch_id: true } } }
+      })
 
-      // Student's enrollments joined to each course's branch.
-      const { data: branchEnrollments } = await supabase
-        .from('enrollments')
-        .select('id, courses!inner (id, branch_id)')
-        .eq('student_id', studentId)
+      const branchEnrollments = await prisma.enrollments.findMany({
+        where: { student_id: studentId },
+        select: { id: true, courses: { select: { id: true, branch_id: true } } }
+      })
 
-      // Build a map: course_id -> progress (already computed from lesson_progress in section 3)
       const courseProgressMap = new Map(courses.map((c) => [c.id, c.progress]))
 
-      const allBranchSkills = branchRows.map((branch: any) => {
-        // Average exam percentage for this branch (graded submissions only).
-        const branchSubs = (branchExams || []).filter(
-          (s: any) =>
-            s.exams?.branch_id === branch.id &&
-            (s.grading_status ?? 'graded') === 'graded' &&
-            s.total > 0,
+      skills = branchRows.map((branch) => {
+        const branchSubs = branchExams.filter(
+          (s) => s.exams?.branch_id === branch.id && (s.grading_status ?? 'graded') === 'graded' && (s.total ?? 0) > 0
         )
-        const examAvg =
-          branchSubs.length > 0
-            ? Math.round(
-                branchSubs.reduce(
-                  (sum: number, s: any) => sum + (s.score / s.total) * 100,
-                  0,
-                ) / branchSubs.length,
-              )
-            : 0
+        const examAvg = branchSubs.length > 0
+          ? Math.round(branchSubs.reduce((sum, s) => sum + (Number(s.score) / Number(s.total)) * 100, 0) / branchSubs.length)
+          : 0
 
-        // Average course progress for this branch (from already-computed lesson_progress).
-        const branchCourses = (branchEnrollments || []).filter(
-          (e: any) => e.courses?.branch_id === branch.id,
-        )
-        const courseProgress =
-          branchCourses.length > 0
-            ? Math.round(
-                branchCourses.reduce((sum: number, e: any) => {
-                  const pct = courseProgressMap.get(e.courses?.id) ?? 0
-                  return sum + pct
-                }, 0) / branchCourses.length,
-              )
-            : 0
+        const branchCourses = branchEnrollments.filter((e) => e.courses?.branch_id === branch.id)
+        const courseProgress = branchCourses.length > 0
+          ? Math.round(branchCourses.reduce((sum, e) => {
+              const pct = courseProgressMap.get(e.courses?.id ?? '') ?? 0
+              return sum + pct
+            }, 0) / branchCourses.length)
+          : 0
 
-        // Combined score: average of both metrics, or whichever exists.
         const parts: number[] = []
         if (branchSubs.length > 0) parts.push(examAvg)
         if (branchCourses.length > 0) parts.push(courseProgress)
-        const score =
-          parts.length > 0
-            ? Math.round(parts.reduce((a, b) => a + b, 0) / parts.length)
-            : 0
+        const score = parts.length > 0 ? Math.round(parts.reduce((a, b) => a + b, 0) / parts.length) : 0
 
         return {
           subject: branch.title,
@@ -581,7 +473,6 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
           courseCount: branchCourses.length,
         }
       })
-      skills = allBranchSkills
     }
   }
 
@@ -595,16 +486,13 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
     { label: 'لم يسلّم', value: missing },
   ]
 
-  // 8. Live presence — online if the student pinged within the last 2 minutes.
-  const lastSeenAt: string | null = studentRow.last_seen_at ?? null
+  const lastSeenAt = studentRow.last_seen_at
   const ONLINE_WINDOW_MS = 2 * 60 * 1000
-  const isOnline = lastSeenAt
-    ? Date.now() - new Date(lastSeenAt).getTime() < ONLINE_WINDOW_MS
-    : false
+  const isOnline = lastSeenAt ? Date.now() - new Date(lastSeenAt).getTime() < ONLINE_WINDOW_MS : false
   const presence = {
     isOnline,
     lastSeenLabel: lastSeenAt ? formatRelativeTime(lastSeenAt) : 'لم يظهر بعد',
-    lastSeenAt,
+    lastSeenAt: lastSeenAt ? lastSeenAt.toISOString() : null,
   }
 
   return {
@@ -619,9 +507,7 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
     progressTrend,
     monthlySpend,
     completedLessonDates: completedLessons.map((d) => d.toISOString()),
-    rawOrders: (ordersData || [])
-      .filter((o: any) => o.status === 'approved' && o.created_at)
-      .map((o: any) => ({ date: o.created_at as string, amount: Number(o.total) })),
+    rawOrders: ordersData.filter((o) => o.status === 'approved' && o.created_at).map((o) => ({ date: o.created_at.toISOString(), amount: Number(o.total) })),
     totalLessonsAll,
     skills,
     stageTitle,

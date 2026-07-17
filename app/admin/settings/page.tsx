@@ -3,7 +3,7 @@ import { SettingsPanel } from '@/components/settings/settings-panel'
 import { getSettings, getAdminProfile, getSiteContentForAdmin, getPlatformSettings } from './actions'
 import { isCurrentUserFullAdmin, listAssistants } from './assistants-actions'
 import { getStreamingSettings } from '@/lib/video-actions'
-import { createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
 
 export default async function SettingsPage() {
   const [initialSettings, adminProfile, siteContent, platformSettings, isFullAdmin] =
@@ -23,23 +23,22 @@ export default async function SettingsPage() {
   let streamingVideos: any[] = []
 
   if (isFullAdmin) {
-    const supabase = await createClient()
     const [settingsRes, jobsRes, videosRes] = await Promise.all([
       getStreamingSettings(),
-      supabase
-        .from('video_jobs')
-        .select('id, status, attempts, created_at, updated_at, video_id')
-        .order('created_at', { ascending: false })
-        .limit(50),
-      supabase
-        .from('videos')
-        .select('id, lesson_id, status, duration_sec, file_size_bytes, created_at, r2_hls_prefix, error_message')
-        .order('created_at', { ascending: false })
-        .limit(50),
+      prisma.video_jobs.findMany({
+        select: { id: true, status: true, attempts: true, created_at: true, updated_at: true, video_id: true },
+        orderBy: { created_at: 'desc' },
+        take: 50
+      }),
+      prisma.videos.findMany({
+        select: { id: true, lesson_id: true, status: true, duration_sec: true, file_size_bytes: true, created_at: true, r2_hls_prefix: true, error_message: true },
+        orderBy: { created_at: 'desc' },
+        take: 50
+      })
     ])
     streamingSettings = settingsRes
-    streamingJobs = (jobsRes.data ?? []) as any[]
-    streamingVideos = (videosRes.data ?? []) as any[]
+    streamingJobs = jobsRes
+    streamingVideos = videosRes
   }
 
   return (

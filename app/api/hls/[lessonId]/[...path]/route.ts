@@ -1,10 +1,10 @@
 import { posix } from 'node:path'
 import { type NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { prisma } from '@/lib/prisma'
 import { verifyVideoToken, isLatestSession } from '@/lib/video-token'
 import { userCanAccessLecture } from '@/lib/lecture-access'
 import { createR2DownloadUrl } from '@/lib/r2'
+import { auth } from '@/auth'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -24,7 +24,6 @@ function cleanPrefix(prefix: string): string {
 }
 
 function safeRelativePath(currentManifest: string, target: string): string | null {
-  // Strip an existing query/hash before passing the path through our gateway.
   const targetPath = target.split(/[?#]/, 1)[0]
   const normalized = posix.normalize(
     posix.join(posix.dirname(currentManifest), targetPath),
@@ -43,11 +42,8 @@ async function resolveAuthorizedVideo(
     return { ok: false, status: 401 }
   }
 
-  // A copied URL is useless without the matching logged-in browser session.
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const session = await auth()
+  const user = session?.user
   if (!user || user.id !== payload.userId) {
     return { ok: false, status: 401 }
   }
@@ -56,28 +52,23 @@ async function resolveAuthorizedVideo(
     return { ok: false, status: 401 }
   }
 
-  // lessons/videos are read through the trusted server client because videos
-  // is admin-only under RLS. Entitlement is still scoped to this auth user.
-  const admin = createAdminClient()
-  const { data: lesson } = await admin
-    .from('lessons')
-    .select('video_id, lecture_id')
-    .eq('id', lessonId)
-    .maybeSingle()
+  const lesson = await prisma.lessons.findUnique({
+    where: { id: lessonId },
+    select: { video_id: true, lecture_id: true }
+  })
 
   if (!lesson?.video_id || !lesson.lecture_id) {
     return { ok: false, status: 404 }
   }
 
-  if (!(await userCanAccessLecture(admin, user.id, lesson.lecture_id))) {
+  if (!(await userCanAccessLecture(user.id, lesson.lecture_id))) {
     return { ok: false, status: 403 }
   }
 
-  const { data: video } = await admin
-    .from('videos')
-    .select('id, r2_hls_prefix, status')
-    .eq('id', lesson.video_id)
-    .maybeSingle()
+  const video = await prisma.videos.findUnique({
+    where: { id: lesson.video_id },
+    select: { id: true, r2_hls_prefix: true, status: true }
+  })
 
   if (!video || video.status !== 'ready') {
     return { ok: false, status: 404 }

@@ -1,8 +1,8 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
 import { hasResourceAccess } from '@/lib/auth-guard'
+import { revalidatePath } from 'next/cache'
 import { logActivity } from '@/lib/audit-log'
 
 export type ExamQuestion = {
@@ -30,6 +30,8 @@ export type ExamDetailsData = {
   code: string
   title: string
   course: string
+  description?: string
+  passMark?: number
   duration: number
   questionsCount: number
   participants: number
@@ -41,60 +43,40 @@ export type ExamDetailsData = {
 }
 
 export async function getExamDetails(code: string): Promise<ExamDetailsData | null> {
-  const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'exams'))) return null
+  if (!(await hasResourceAccess('exams'))) return null
 
-  // 1. Fetch exam
-  const { data: exam, error: examError } = await supabase
-    .from('exams')
-    .select('*')
-    .eq('code', code)
-    .single()
+  const exam = await prisma.exams.findUnique({
+    where: { code }
+  })
+  if (!exam) return null
 
-  if (examError || !exam) return null
+  const [questionsData, submissionsData] = await Promise.all([
+    prisma.exam_questions.findMany({
+      where: { exam_id: exam.id },
+      orderBy: { order_index: 'asc' }
+    }),
+    prisma.exam_submissions.findMany({
+      where: { exam_id: exam.id },
+      include: { students: { select: { id: true, name: true, code: true } } },
+      orderBy: { submitted_at: 'desc' }
+    })
+  ])
 
-  // 2. Fetch questions
-  const { data: questionsData } = await supabase
-    .from('exam_questions')
-    .select('*')
-    .eq('exam_id', exam.id)
-    .order('created_at', { ascending: true })
-
-  const questions: ExamQuestion[] = (questionsData || []).map((q: any) => ({
+  const questions: ExamQuestion[] = questionsData.map((q) => ({
     id: q.id,
     text: q.question_text,
-    options: q.options as string[],
-    correctAnswer: q.correct_answer,
-    points: q.points,
+    options: Array.isArray(q.options) ? (q.options as string[]) : [],
+    correctAnswer: q.correct_answer ?? '',
+    points: q.points ?? 1,
   }))
 
-  // 3. Fetch submissions with student info
-  const { data: submissionsData } = await supabase
-    .from('exam_submissions')
-    .select(`
-      id,
-      student_id,
-      score,
-      total,
-      status,
-      grading_status,
-      submitted_at,
-      students (
-        id,
-        name,
-        code
-      )
-    `)
-    .eq('exam_id', exam.id)
-    .order('submitted_at', { ascending: false })
-
-  const submissions: ExamSubmissionDetail[] = (submissionsData || []).map((s: any) => ({
+  const submissions: ExamSubmissionDetail[] = submissionsData.map((s) => ({
     id: s.id,
     studentId: s.students?.id || s.student_id,
     studentName: s.students?.name || 'غير معروف',
     studentCode: s.students?.code || '-',
-    score: s.score,
-    total: s.total,
+    score: s.score ?? 0,
+    total: s.total ?? 0,
     status: s.status,
     gradingStatus: (s.grading_status ?? 'graded') as 'graded' | 'pending',
     submittedAt: new Date(s.submitted_at).toLocaleString('ar-EG', {
@@ -106,12 +88,10 @@ export async function getExamDetails(code: string): Promise<ExamDetailsData | nu
     }),
   }))
 
-  // Calculate some stats if possible (e.g., actual average from submissions, pass rate)
-  // But for now we rely on the exam fields or compute them
   const actualParticipants = submissions.length
-  let avgScore = exam.avg_score
+  let avgScore = exam.avg_score ? Number(exam.avg_score) : 0
   if (actualParticipants > 0) {
-    const totalScore = submissions.reduce((sum, s) => sum + (s.score / s.total) * 100, 0)
+    const totalScore = submissions.reduce((sum, s) => sum + (s.total > 0 ? (s.score / s.total) * 100 : 0), 0)
     avgScore = Math.round(totalScore / actualParticipants)
   }
 
@@ -119,12 +99,12 @@ export async function getExamDetails(code: string): Promise<ExamDetailsData | nu
     id: exam.id,
     code: exam.code,
     title: exam.title,
-    course: exam.course,
+    course: exam.course || '',
     description: exam.description ?? '',
-    duration: exam.duration,
+    duration: exam.duration ?? 0,
     passMark: exam.pass_mark ?? 50,
-    questionsCount: questions.length > 0 ? questions.length : exam.questions,
-    participants: actualParticipants > 0 ? actualParticipants : exam.participants,
+    questionsCount: questions.length > 0 ? questions.length : (exam.questions ?? 0),
+    participants: actualParticipants > 0 ? actualParticipants : (exam.participants ?? 0),
     avgScore,
     status: exam.status,
     createdAt: new Date(exam.created_at).toLocaleDateString('ar-EG', {
@@ -136,8 +116,6 @@ export async function getExamDetails(code: string): Promise<ExamDetailsData | nu
     submissions,
   }
 }
-
-// ── Grading a single submission ──────────────────────────────────
 
 export type GradingAnswer = {
   answerId: string
@@ -170,39 +148,33 @@ export type GradingSubmission = {
   answers: GradingAnswer[]
 }
 
-// Loads a single submission with all answers + question keys for grading.
-export async function getSubmissionForGrading(
-  submissionId: string,
-): Promise<GradingSubmission | null> {
-  const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'exams'))) return null
+export async function getSubmissionForGrading(submissionId: string): Promise<GradingSubmission | null> {
+  if (!(await hasResourceAccess('exams'))) return null
 
-  const { data: submission } = await supabase
-    .from('exam_submissions')
-    .select(`
-      id, exam_id, score, total, auto_score, status, grading_status,
-      students ( name, code ),
-      exams ( code, title, pass_mark )
-    `)
-    .eq('id', submissionId)
-    .single()
-
+  const submission = await prisma.exam_submissions.findUnique({
+    where: { id: submissionId },
+    include: {
+      students: { select: { name: true, code: true } },
+      exams: { select: { code: true, title: true, pass_mark: true } }
+    }
+  })
   if (!submission) return null
 
-  const { data: answers } = await supabase
-    .from('exam_answers')
-    .select('id, question_id, awarded_points, is_correct, needs_manual, selected_option, answer_text, file_url')
-    .eq('submission_id', submissionId)
+  const [answers, questions] = await Promise.all([
+    prisma.exam_answers.findMany({
+      where: { submission_id: submissionId },
+      select: { id: true, question_id: true, awarded_points: true, is_correct: true, needs_manual: true, selected_option: true, answer_text: true, file_url: true }
+    }),
+    prisma.exam_questions.findMany({
+      where: { exam_id: submission.exam_id },
+      select: { id: true, question_text: true, question_type: true, points: true, correct_answer: true, model_answer: true, order_index: true },
+      orderBy: { order_index: 'asc' }
+    })
+  ])
 
-  const { data: questions } = await supabase
-    .from('exam_questions')
-    .select('id, question_text, question_type, points, correct_answer, model_answer, order_index')
-    .eq('exam_id', (submission as any).exam_id)
-    .order('order_index', { ascending: true })
+  const qMap = new Map(questions.map((q) => [q.id, q]))
 
-  const qMap = new Map((questions ?? []).map((q: any) => [q.id, q]))
-
-  const mappedAnswers: GradingAnswer[] = (answers ?? []).map((a: any) => {
+  const mappedAnswers: GradingAnswer[] = answers.map((a) => {
     const q = qMap.get(a.question_id)
     return {
       answerId: a.id,
@@ -221,120 +193,114 @@ export async function getSubmissionForGrading(
     }
   })
 
-  // Preserve question order.
   mappedAnswers.sort((x, y) => {
     const ox = qMap.get(x.questionId)?.order_index ?? 0
     const oy = qMap.get(y.questionId)?.order_index ?? 0
     return ox - oy
   })
 
-  const s: any = submission
   return {
-    id: s.id,
-    examCode: s.exams?.code ?? '',
-    examTitle: s.exams?.title ?? '',
-    passMark: s.exams?.pass_mark ?? 50,
-    studentName: s.students?.name ?? 'غير معروف',
-    studentCode: s.students?.code ?? '-',
-    score: s.score ?? 0,
-    total: s.total ?? 0,
-    autoScore: s.auto_score ?? 0,
-    status: s.status ?? '',
-    gradingStatus: (s.grading_status ?? 'graded') as 'graded' | 'pending',
+    id: submission.id,
+    examCode: submission.exams?.code ?? '',
+    examTitle: submission.exams?.title ?? '',
+    passMark: submission.exams?.pass_mark ?? 50,
+    studentName: submission.students?.name ?? 'غير معروف',
+    studentCode: submission.students?.code ?? '-',
+    score: submission.score ?? 0,
+    total: submission.total ?? 0,
+    autoScore: submission.auto_score ?? 0,
+    status: submission.status ?? '',
+    gradingStatus: (submission.grading_status ?? 'graded') as 'graded' | 'pending',
     answers: mappedAnswers,
   }
 }
 
-// Applies manual grades to essay/file answers, recomputes the final score and
-// marks the submission graded.
 export async function gradeSubmission(
   submissionId: string,
   manualGrades: { answerId: string; awardedPoints: number }[],
 ) {
-  const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'exams', 'manage'))) {
+  if (!(await hasResourceAccess('exams', 'manage'))) {
     return { success: false, error: 'غير مصرح لك' }
   }
 
-  const { data: submission } = await supabase
-    .from('exam_submissions')
-    .select('id, exam_id, total, exams ( code, pass_mark )')
-    .eq('id', submissionId)
-    .single()
-
+  const submission = await prisma.exam_submissions.findUnique({
+    where: { id: submissionId },
+    select: { id: true, exam_id: true, total: true, exams: { select: { code: true, pass_mark: true } } }
+  })
   if (!submission) return { success: false, error: 'التسليم غير موجود' }
 
-  const { data: answers } = await supabase
-    .from('exam_answers')
-    .select('id, question_id, awarded_points, needs_manual')
-    .eq('submission_id', submissionId)
+  const answers = await prisma.exam_answers.findMany({
+    where: { submission_id: submissionId },
+    select: { id: true, question_id: true, awarded_points: true, needs_manual: true }
+  })
 
-  // Fetch max points per question for clamping.
-  const questionIds = (answers ?? []).map((a: any) => a.question_id)
-  const { data: questions } = await supabase
-    .from('exam_questions')
-    .select('id, points')
-    .in('id', questionIds.length ? questionIds : ['00000000-0000-0000-0000-000000000000'])
+  const questionIds = answers.map((a) => a.question_id)
+  const questions = await prisma.exam_questions.findMany({
+    where: { id: { in: questionIds.length ? questionIds : ['00000000-0000-0000-0000-000000000000'] } },
+    select: { id: true, points: true }
+  })
 
-  const pointsMap = new Map((questions ?? []).map((q: any) => [q.id, q.points ?? 0]))
+  const pointsMap = new Map(questions.map((q) => [q.id, q.points ?? 0]))
   const gradeMap = new Map(manualGrades.map((g) => [g.answerId, g.awardedPoints]))
 
   let autoScore = 0
   let manualScore = 0
 
-  for (const a of answers ?? []) {
-    const maxPoints = pointsMap.get((a as any).question_id) ?? 0
-    if ((a as any).needs_manual) {
-      const raw = gradeMap.has((a as any).id)
-        ? gradeMap.get((a as any).id)!
-        : (a as any).awarded_points ?? 0
+  const updatePromises = []
+
+  for (const a of answers) {
+    const maxPoints = pointsMap.get(a.question_id) ?? 0
+    if (a.needs_manual) {
+      const raw = gradeMap.has(a.id)
+        ? gradeMap.get(a.id)!
+        : a.awarded_points ?? 0
       const awarded = Math.max(0, Math.min(maxPoints, Math.round(raw)))
       manualScore += awarded
-      // Persist the manual grade for this answer.
-      await supabase
-        .from('exam_answers')
-        .update({ awarded_points: awarded, is_correct: awarded >= maxPoints })
-        .eq('id', (a as any).id)
+      
+      updatePromises.push(
+        prisma.exam_answers.update({
+          where: { id: a.id },
+          data: { awarded_points: awarded, is_correct: awarded >= maxPoints }
+        })
+      )
     } else {
-      autoScore += (a as any).awarded_points ?? 0
+      autoScore += a.awarded_points ?? 0
     }
   }
 
-  const s: any = submission
-  const total = s.total ?? 0
+  await Promise.all(updatePromises)
+
+  const total = submission.total ?? 0
   const score = autoScore + manualScore
   const percent = total > 0 ? Math.round((score / total) * 100) : 0
-  const passMark = s.exams?.pass_mark ?? 50
+  const passMark = submission.exams?.pass_mark ?? 50
   const status = percent >= passMark ? 'ناجح' : 'راسب'
 
-  const { error: updateError } = await supabase
-    .from('exam_submissions')
-    .update({
-      auto_score: autoScore,
-      manual_score: manualScore,
-      score,
-      status,
-      grading_status: 'graded',
+  try {
+    await prisma.exam_submissions.update({
+      where: { id: submissionId },
+      data: {
+        auto_score: autoScore,
+        manual_score: manualScore,
+        score,
+        status,
+        grading_status: 'graded',
+      }
     })
-    .eq('id', submissionId)
 
-  if (updateError) {
-    console.log('[v0] gradeSubmission update error:', updateError.message)
+    const examCode = submission.exams?.code
+    if (examCode) {
+      revalidatePath(`/admin/exams/${examCode}`)
+      revalidatePath(`/student/exams/${examCode}`)
+    }
+    logActivity({ action: 'update', resource: 'exams', targetId: submissionId, targetLabel: `تصحيح اختبار — النتيجة: ${score}/${total} (${status})` }).catch(() => {})
+    revalidatePath('/student/exams')
+
+    return { success: true, score, total, status }
+  } catch (error: any) {
     return { success: false, error: 'تعذر حفظ الدرجات' }
   }
-
-  const examCode = s.exams?.code
-  if (examCode) {
-    revalidatePath(`/admin/exams/${examCode}`)
-    revalidatePath(`/student/exams/${examCode}`)
-  }
-  logActivity({ action: 'update', resource: 'exams', targetId: submissionId, targetLabel: `تصحيح اختبار — النتيجة: ${score}/${total} (${status})` }).catch(() => {})
-  revalidatePath('/student/exams')
-
-  return { success: true, score, total, status }
 }
-
-// ── Update exam metadata / status ──────────────────────────────────────────────
 
 export async function updateExam(
   examCode: string,
@@ -347,29 +313,28 @@ export async function updateExam(
     status?: string
   },
 ) {
-  const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'exams', 'manage'))) {
+  if (!(await hasResourceAccess('exams', 'manage'))) {
     return { success: false, error: 'غير مصرح لك' }
   }
 
-  const { error } = await supabase
-    .from('exams')
-    .update({
-      ...(updates.title !== undefined && { title: updates.title.trim() }),
-      ...(updates.course !== undefined && { course: updates.course.trim() || null }),
-      ...(updates.description !== undefined && { description: updates.description.trim() || null }),
-      ...(updates.duration !== undefined && { duration: updates.duration }),
-      ...(updates.passMark !== undefined && { pass_mark: updates.passMark }),
-      ...(updates.status !== undefined && { status: updates.status }),
+  try {
+    await prisma.exams.update({
+      where: { code: examCode },
+      data: {
+        ...(updates.title !== undefined && { title: updates.title.trim() }),
+        ...(updates.course !== undefined && { course: updates.course.trim() }),
+        ...(updates.description !== undefined && { description: updates.description.trim() || null }),
+        ...(updates.duration !== undefined && { duration: updates.duration }),
+        ...(updates.passMark !== undefined && { pass_mark: updates.passMark }),
+        ...(updates.status !== undefined && { status: updates.status }),
+      }
     })
-    .eq('code', examCode)
 
-  if (error) {
+    logActivity({ action: 'update', resource: 'exams', targetId: examCode, targetLabel: `تعديل اختبار: ${examCode}` }).catch(() => {})
+    revalidatePath(`/admin/exams/${examCode}`)
+    revalidatePath('/admin/exams')
+    return { success: true }
+  } catch (error: any) {
     return { success: false, error: 'تعذّر تحديث الاختبار' }
   }
-
-  logActivity({ action: 'update', resource: 'exams', targetId: examCode, targetLabel: `تعديل اختبار: ${examCode}` }).catch(() => {})
-  revalidatePath(`/admin/exams/${examCode}`)
-  revalidatePath('/admin/exams')
-  return { success: true }
 }

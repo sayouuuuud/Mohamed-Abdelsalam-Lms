@@ -3,8 +3,8 @@
 import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { updateSettings, updateAdminProfile, updatePlatformSettings } from '@/app/admin/settings/actions'
-import { createClient } from '@/lib/supabase/client'
+import { updateSettings, updateAdminProfile, updatePlatformSettings, updateAdminPassword } from '@/app/admin/settings/actions'
+import { createClient } from '@supabase/supabase-js'
 import { uploadToStorage } from '@/lib/storage-upload'
 import { useTheme } from '@/components/theme-provider'
 import {
@@ -267,10 +267,9 @@ export function SettingsPanel({
       return
     }
     startTransition(async () => {
-      const supabase = createClient()
-      const { error } = await supabase.auth.updateUser({ password: newPassword })
-      if (error) {
-        toast.error('تعذّر تحديث كلمة المرور. حاول تاني.')
+      const res = await updateAdminPassword(newPassword)
+      if (res?.error) {
+        toast.error(res.error || 'تعذّر تحديث كلمة المرور. حاول تاني.')
       } else {
         toast.success('تم تحديث كلمة المرور بنجاح')
         setCurrentPassword('')

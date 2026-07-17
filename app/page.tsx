@@ -3,13 +3,10 @@ import { getCurriculum } from '@/lib/curriculum'
 import { getSiteContent } from '@/lib/site-content'
 import { getSiteUrl } from '@/lib/seo'
 import { JsonLd } from '@/components/seo/json-ld'
-import { createClient } from '@/lib/supabase/server'
-
+import { auth } from '@/auth'
 export default async function Page() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const session = await auth()
+  const user = session?.user
   const [stages, siteContent] = await Promise.all([getCurriculum(), getSiteContent()])
   const siteUrl = getSiteUrl()
 

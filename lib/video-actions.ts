@@ -1,28 +1,13 @@
 'use server'
 
-/**
- * lib/video-actions.ts — Server Actions لنظام رفع الفيديو على R2
- *
- * التدفّق:
- *  1. getVideoUploadUrl()   → presigned PUT URL لرفع الملف الخام من المتصفح مباشرة
- *  2. confirmVideoUpload()  → بعد نجاح الرفع: يُنشئ سجل videos + video_jobs + يُحدّث lessons.video_id + يصحّي الوركر
- *  3. getVideoStatus()      → يُرجع حالة الفيديو لعرض شريط التقدّم
- *  4. getStreamingEnabled() → يقرأ streaming_settings.enabled
- */
-
-import { createClient as createAdminClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
 import { createR2UploadUrl, r2Keys, isR2Configured, checkR2Connection } from '@/lib/r2'
+import { auth } from '@/auth'
 
-// ---------------------------------------------------------------
-// R2 Diagnostic — يُستدعى من زر "اختبار الاتصال" في إعدادات الـ Streaming
-// ---------------------------------------------------------------
 export async function testR2Connection(): Promise<{ ok: boolean; message: string }> {
   return checkR2Connection()
 }
 
-// ---------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------
 export type VideoStatus = 'pending' | 'processing' | 'ready' | 'error'
 
 export type VideoRecord = {
@@ -36,46 +21,45 @@ export type VideoRecord = {
   renditions:   { quality: string; bandwidth: number }[] | null
 }
 
-// ---------------------------------------------------------------
-// 1. getVideoUploadUrl — يُرجع presigned PUT URL + videoId مبدئي
-//    يستدعيها المتصفح قبل الرفع
-// ---------------------------------------------------------------
 export async function getVideoUploadUrl(
   lessonId:    string,
   fileName:    string,
   contentType: string,
 ): Promise<{ uploadUrl: string; videoId: string; r2Key: string } | { error: string }> {
   try {
-    // فكّ الاعتماد على R2: لو غير مهيّأ نرفض بوضوح بدل ما نتعطّل
     if (!isR2Configured()) {
       return { error: 'التخزين السحابي (R2) غير مهيّأ بعد — استخدم الرفع العادي مؤقتاً' }
     }
 
-    const supabase = await createAdminClient()
+    const session = await auth()
+    const user = session?.user
+    if (!user || !user.id) return { error: 'غير مسجّل' }
 
-    // تأكد المستخدم أدمن
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { error: 'غير مسجّل' }
-    const { data: adminRow } = await supabase
-      .from('admins').select('id').eq('user_id', user.id).single()
-    if (!adminRow) return { error: 'غير مصرّح' }
+    const profile = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { role: true }
+    })
 
-    // أنشئ سجل video أولي بـ status='pending'
-    const ext     = fileName.split('.').pop()?.toLowerCase() ?? 'mp4'
-    const { data: vid, error: insErr } = await supabase
-      .from('videos')
-      .insert({ lesson_id: lessonId, status: 'pending' })
-      .select('id')
-      .single()
-    if (insErr || !vid) return { error: insErr?.message ?? 'خطأ في إنشاء السجل' }
+    if (!profile || (profile.role !== 'admin' && profile.role !== 'assistant')) {
+      return { error: 'غير مصرّح' }
+    }
 
-    const videoId = vid.id as string
+    const ext = fileName.split('.').pop()?.toLowerCase() ?? 'mp4'
+    const vid = await prisma.videos.create({
+      data: { lesson_id: lessonId, status: 'pending' },
+      select: { id: true }
+    })
+
+    if (!vid) return { error: 'خطأ في إنشاء السجل' }
+
+    const videoId = vid.id
     const r2Key   = r2Keys.raw(videoId, ext)
 
-    // احفظ المسار الخام في السجل
-    await supabase.from('videos').update({ r2_raw_key: r2Key }).eq('id', videoId)
+    await prisma.videos.update({
+      where: { id: videoId },
+      data: { r2_raw_key: r2Key }
+    })
 
-    // احصل على presigned PUT URL (صلاحية 30 دقيقة للملفات الكبيرة)
     const uploadUrl = await createR2UploadUrl(r2Key, contentType, 1800)
 
     return { uploadUrl, videoId, r2Key }
@@ -84,50 +68,43 @@ export async function getVideoUploadUrl(
   }
 }
 
-// ---------------------------------------------------------------
-// 2. confirmVideoUpload — يُستدعى بعد نجاح الرفع لـ R2
-//    يُحدّث السجل → يُنشئ job → يُحدّث lessons.video_id → يصحّي الوركر
-// ---------------------------------------------------------------
 export async function confirmVideoUpload(
   videoId:      string,
   lessonId:     string,
   fileSizeBytes: number,
 ): Promise<{ ok: true } | { error: string }> {
   try {
-    const supabase = await createAdminClient()
+    const session = await auth()
+    const user = session?.user
+    if (!user || !user.id) return { error: 'غير مسجّل' }
 
-    // تأكد المستخدم أدمن
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { error: 'غير مسجّل' }
-    const { data: adminRow } = await supabase
-      .from('admins').select('id').eq('user_id', user.id).single()
-    if (!adminRow) return { error: 'غير مصرّح' }
+    const profile = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { role: true }
+    })
 
-    // حدّث حالة الفيديو لـ processing + حجم الملف
-    const { error: updErr } = await supabase
-      .from('videos')
-      .update({
+    if (!profile || (profile.role !== 'admin' && profile.role !== 'assistant')) {
+      return { error: 'غير مصرّح' }
+    }
+
+    await prisma.videos.update({
+      where: { id: videoId },
+      data: {
         status:          'processing',
         file_size_bytes: fileSizeBytes,
         r2_hls_prefix:   r2Keys.hlsPrefix(videoId),
-      })
-      .eq('id', videoId)
-    if (updErr) return { error: updErr.message }
+      }
+    })
 
-    // أنشئ job في الطابور
-    const { error: jobErr } = await supabase
-      .from('video_jobs')
-      .insert({ video_id: videoId, status: 'queued' })
-    if (jobErr) return { error: jobErr.message }
+    await prisma.video_jobs.create({
+      data: { video_id: videoId, status: 'queued' }
+    })
 
-    // اربط الفيديو بالدرس
-    const { error: lsnErr } = await supabase
-      .from('lessons')
-      .update({ video_id: videoId })
-      .eq('id', lessonId)
-    if (lsnErr) return { error: lsnErr.message }
+    await prisma.lessons.update({
+      where: { id: lessonId },
+      data: { video_id: videoId }
+    })
 
-    // صحّي الوركر لو عنده URL (scale-to-zero wake)
     const wakeUrl    = process.env.WORKER_WAKE_URL
     const wakeSecret = process.env.WORKER_WAKE_SECRET
     if (wakeUrl) {
@@ -142,7 +119,6 @@ export async function confirmVideoUpload(
           signal: AbortSignal.timeout(5000),
         })
       } catch {
-        // الوركر مش حيمنع نجاح العملية لو مش رادّ
         console.warn('[video-actions] worker wake failed (non-fatal)')
       }
     }
@@ -153,34 +129,26 @@ export async function confirmVideoUpload(
   }
 }
 
-// ---------------------------------------------------------------
-// 3. getVideoStatus — polling من الـ UI لمتابعة التحويل
-// ---------------------------------------------------------------
 export async function getVideoStatus(
   videoId: string,
 ): Promise<VideoRecord | null> {
-  const supabase = await createAdminClient()
-  const { data } = await supabase
-    .from('videos')
-    .select('id, lesson_id, r2_raw_key, r2_hls_prefix, status, duration_sec, error_message, renditions')
-    .eq('id', videoId)
-    .single()
+  const data = await prisma.videos.findUnique({
+    where: { id: videoId },
+    select: { id: true, lesson_id: true, r2_raw_key: true, r2_hls_prefix: true, status: true, duration_sec: true, error_message: true, renditions: true }
+  })
   if (!data) return null
   return {
     id:           data.id,
-    lessonId:     data.lesson_id,
+    lessonId:     data.lesson_id ?? '',
     r2RawKey:     data.r2_raw_key ?? '',
     r2HlsPrefix:  data.r2_hls_prefix ?? null,
     status:       data.status as VideoStatus,
     durationSec:  data.duration_sec ?? null,
     errorMessage: data.error_message ?? null,
-    renditions:   data.renditions ?? null,
+    renditions:   (data.renditions as any) ?? null,
   }
 }
 
-// ---------------------------------------------------------------
-// 4. getStreamingSettings — يقرأ platform_settings للـ UI
-// ---------------------------------------------------------------
 export async function getStreamingSettings(): Promise<{
   enabled:            boolean
   r2Configured:      boolean
@@ -189,12 +157,10 @@ export async function getStreamingSettings(): Promise<{
   workerConcurrency: number
   segmentDurationSec:number
 } | null> {
-  const supabase = await createAdminClient()
-  const { data } = await supabase
-    .from('platform_settings')
-    .select('is_streaming_enabled, worker_cpu_threads, worker_ram_mb, worker_concurrency, segment_duration_sec')
-    .eq('id', 1)
-    .single()
+  const data = await prisma.platform_settings.findUnique({
+    where: { id: 1 },
+    select: { is_streaming_enabled: true, worker_cpu_threads: true, worker_ram_mb: true, worker_concurrency: true, segment_duration_sec: true }
+  })
 
   const r2Configured = isR2Configured()
   return {
@@ -207,9 +173,6 @@ export async function getStreamingSettings(): Promise<{
   }
 }
 
-// ---------------------------------------------------------------
-// 5. saveStreamingSettings — يحفظ إعدادات الوركر كاملة
-// ---------------------------------------------------------------
 export async function saveStreamingSettings(input: {
   enabled:            boolean
   workerCpuThreads:   number
@@ -217,22 +180,29 @@ export async function saveStreamingSettings(input: {
   workerConcurrency:  number
   segmentDurationSec: number
 }): Promise<{ ok: true } | { error: string }> {
-  const supabase = await createAdminClient()
-  const { error } = await supabase
-    .from('platform_settings')
-    .upsert({
-      id: 1,
-      is_streaming_enabled:  input.enabled,
-      worker_cpu_threads:    input.workerCpuThreads,
-      worker_ram_mb:         input.workerRamMb,
-      worker_concurrency:    input.workerConcurrency,
-      segment_duration_sec:  input.segmentDurationSec,
-      updated_at:            new Date().toISOString(),
-    }, { onConflict: 'id' })
-
-  if (error) {
-    console.log('[v0] saveStreamingSettings error:', error.message)
+  try {
+    await prisma.platform_settings.upsert({
+      where: { id: 1 },
+      update: {
+        is_streaming_enabled:  input.enabled,
+        worker_cpu_threads:    input.workerCpuThreads,
+        worker_ram_mb:         input.workerRamMb,
+        worker_concurrency:    input.workerConcurrency,
+        segment_duration_sec:  input.segmentDurationSec,
+        updated_at:            new Date(),
+      },
+      create: {
+        id: 1,
+        is_streaming_enabled:  input.enabled,
+        worker_cpu_threads:    input.workerCpuThreads,
+        worker_ram_mb:         input.workerRamMb,
+        worker_concurrency:    input.workerConcurrency,
+        segment_duration_sec:  input.segmentDurationSec,
+      }
+    })
+    return { ok: true }
+  } catch (err: any) {
+    console.log('[v0] saveStreamingSettings error:', err.message)
     return { error: 'تعذّر حفظ إعدادات الاستريمنج.' }
   }
-  return { ok: true }
 }

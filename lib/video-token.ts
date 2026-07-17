@@ -1,6 +1,6 @@
 import 'server-only'
 import crypto from 'node:crypto'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { prisma } from '@/lib/prisma'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Secure video playback tokens
@@ -97,11 +97,13 @@ export async function createPlaybackToken(
   lessonId: string,
 ): Promise<string> {
   const sid = crypto.randomBytes(16).toString('hex')
-  const admin = createAdminClient()
-  await admin.from('lecture_playback_sessions').upsert(
-    { user_id: userId, lesson_id: lessonId, sid, updated_at: new Date().toISOString() },
-    { onConflict: 'user_id,lesson_id' },
-  )
+  const now = new Date()
+  await prisma.$executeRaw`
+    INSERT INTO lecture_playback_sessions (user_id, lesson_id, sid, updated_at)
+    VALUES (${userId}::uuid, ${lessonId}::uuid, ${sid}, ${now})
+    ON CONFLICT (user_id, lesson_id)
+    DO UPDATE SET sid = EXCLUDED.sid, updated_at = EXCLUDED.updated_at
+  `
   const exp = Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS
   return signVideoToken({ lessonId, userId, sid, exp })
 }
@@ -112,12 +114,9 @@ export async function isLatestSession(
   lessonId: string,
   sid: string,
 ): Promise<boolean> {
-  const admin = createAdminClient()
-  const { data } = await admin
-    .from('lecture_playback_sessions')
-    .select('sid')
-    .eq('user_id', userId)
-    .eq('lesson_id', lessonId)
-    .maybeSingle()
-  return !!data && data.sid === sid
+  const data: any[] = await prisma.$queryRaw`
+    SELECT sid FROM lecture_playback_sessions
+    WHERE user_id = ${userId}::uuid AND lesson_id = ${lessonId}::uuid
+  `
+  return data.length > 0 && data[0].sid === sid
 }

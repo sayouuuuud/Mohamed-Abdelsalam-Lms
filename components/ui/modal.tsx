@@ -81,13 +81,15 @@ export function Modal({
 
 interface FieldProps {
   label: string
+  hint?: string
   children: React.ReactNode
 }
 
-export function Field({ label, children }: FieldProps) {
+export function Field({ label, hint, children }: FieldProps) {
   return (
     <label className="block text-right">
       <span className="mb-1.5 block text-sm font-medium text-foreground">{label}</span>
+      {hint && <span className="mb-2 block text-xs text-muted-foreground">{hint}</span>}
       {children}
     </label>
   )

@@ -1,19 +1,16 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
 import { hasResourceAccess } from '@/lib/auth-guard'
 import { revalidatePath } from 'next/cache'
 import { logActivity } from '@/lib/audit-log'
 import type { Conversation, ChatMessage, TicketStatus } from '@/lib/messages-data'
 
 export async function getConversations(): Promise<Conversation[]> {
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('messages')
-    .select('code, sender_name, subject, content, time_label, unread_count, status, chat_history')
-    .order('created_at', { ascending: false })
-
-  if (error || !data) return []
+  const data = await prisma.messages.findMany({
+    select: { code: true, sender_name: true, subject: true, content: true, time_label: true, unread_count: true, status: true, chat_history: true },
+    orderBy: { created_at: 'desc' }
+  })
 
   return data.map((row) => ({
     id: row.code,
@@ -23,62 +20,61 @@ export async function getConversations(): Promise<Conversation[]> {
     time: row.time_label,
     unread: row.unread_count ?? 0,
     status: (row.status as TicketStatus) ?? 'open',
-    messages: (row.chat_history as ChatMessage[]) ?? [],
+    messages: (row.chat_history ? (typeof row.chat_history === 'string' ? JSON.parse(row.chat_history) : row.chat_history) : []) as ChatMessage[],
   }))
 }
 
 export async function markAsRead(id: string) {
-  const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'messages', 'manage'))) {
+  if (!(await hasResourceAccess('messages', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
-  const { error } = await supabase
-    .from('messages')
-    .update({ unread_count: 0, is_read: true })
-    .eq('code', id)
-
-  if (error) return { error: error.message }
-  revalidatePath('/admin/messages')
-  return { success: true }
+  try {
+    await prisma.messages.update({
+      where: { code: id },
+      data: { unread_count: 0, is_read: true }
+    })
+    revalidatePath('/admin/messages')
+    return { success: true }
+  } catch (error: any) {
+    return { error: 'تعذر تحديث المحادثة.' }
+  }
 }
 
 export async function markAllAsRead() {
-  const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'messages', 'manage'))) {
+  if (!(await hasResourceAccess('messages', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
-  const { error } = await supabase
-    .from('messages')
-    .update({ unread_count: 0, is_read: true })
-    .gt('unread_count', 0)
-
-  if (error) return { error: error.message }
-  revalidatePath('/admin/messages')
-  return { success: true }
+  try {
+    await prisma.messages.updateMany({
+      where: { unread_count: { gt: 0 } },
+      data: { unread_count: 0, is_read: true }
+    })
+    revalidatePath('/admin/messages')
+    return { success: true }
+  } catch (error: any) {
+    return { error: 'تعذر تحديث المحادثات.' }
+  }
 }
 
 export async function replyToConversation(id: string, message: string) {
-  const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'messages', 'manage'))) {
+  if (!(await hasResourceAccess('messages', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
   const text = message.trim()
   if (!text) return { error: 'الرسالة فاضية.' }
 
-  const { data } = await supabase
-    .from('messages')
-    .select('chat_history, student_unread')
-    .eq('code', id)
-    .single()
+  const data = await prisma.messages.findUnique({
+    where: { code: id },
+    select: { chat_history: true, student_unread: true }
+  })
 
   if (!data) return { error: 'المحادثة غير موجودة.' }
 
-  const history = (data.chat_history as ChatMessage[]) ?? []
+  const history = (data.chat_history ? (typeof data.chat_history === 'string' ? JSON.parse(data.chat_history) : data.chat_history) : []) as ChatMessage[]
 
-  // fromMe:true → sent BY the admin/teacher.
   const newMsg: ChatMessage = {
     id: `m${Date.now()}`,
     fromMe: true,
@@ -86,38 +82,41 @@ export async function replyToConversation(id: string, message: string) {
     time: 'الآن',
   }
 
-  const { error } = await supabase
-    .from('messages')
-    .update({
-      chat_history: [...history, newMsg],
-      content: text,
-      time_label: 'الآن',
-      // the teacher just answered, so this becomes unread for the student
-      student_unread: (data.student_unread ?? 0) + 1,
-      // answering reopens a closed ticket so the thread stays active
-      status: 'open',
+  try {
+    await prisma.messages.update({
+      where: { code: id },
+      data: {
+        chat_history: JSON.stringify([...history, newMsg]),
+        content: text,
+        time_label: 'الآن',
+        student_unread: (data.student_unread ?? 0) + 1,
+        status: 'open',
+      }
     })
-    .eq('code', id)
 
-  if (error) return { error: error.message }
-  logActivity({ action: 'create', resource: 'messages', targetId: id, targetLabel: `رد على محادثة: ${id}` }).catch(() => {})
-  revalidatePath('/admin/messages')
-  return { success: true, newMsg }
+    logActivity({ action: 'create', resource: 'messages', targetId: id, targetLabel: `رد على محادثة: ${id}` }).catch(() => {})
+    revalidatePath('/admin/messages')
+    return { success: true, newMsg }
+  } catch (error: any) {
+    return { error: 'تعذر إرسال الرد.' }
+  }
 }
 
 export async function setTicketStatus(id: string, status: TicketStatus) {
-  const supabase = await createClient()
-  if (!(await hasResourceAccess(supabase, 'messages', 'manage'))) {
+  if (!(await hasResourceAccess('messages', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }
   }
 
-  const { error } = await supabase
-    .from('messages')
-    .update({ status })
-    .eq('code', id)
+  try {
+    await prisma.messages.update({
+      where: { code: id },
+      data: { status }
+    })
 
-  if (error) return { error: error.message }
-  logActivity({ action: 'update', resource: 'messages', targetId: id, targetLabel: `حالة تذكرة: ${status}` }).catch(() => {})
-  revalidatePath('/admin/messages')
-  return { success: true }
+    logActivity({ action: 'update', resource: 'messages', targetId: id, targetLabel: `حالة تذكرة: ${status}` }).catch(() => {})
+    revalidatePath('/admin/messages')
+    return { success: true }
+  } catch (error: any) {
+    return { error: 'تعذر تحديث الحالة.' }
+  }
 }

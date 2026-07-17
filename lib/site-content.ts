@@ -1,5 +1,5 @@
 import 'server-only'
-import { createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
 import {
   DEFAULT_SITE_CONTENT,
   deepMerge,
@@ -16,8 +16,6 @@ import {
   type StageOfferContent,
 } from '@/lib/site-content-defaults'
 
-// Re-export for server-side consumers (app/page.tsx, app/layout.tsx, actions).
-// Client components MUST import from '@/lib/site-content-defaults' instead.
 export { DEFAULT_SITE_CONTENT }
 export type {
   SiteContent,
@@ -39,22 +37,11 @@ export type {
   FooterLink,
 } from '@/lib/site-content-defaults'
 
-// ─────────────────────────────────────────────────────────────────────────────
-// getSiteContent — single server-side DB read, deep merged with defaults.
-// NEVER returns undefined for any field. Safe to call with an empty DB.
-// ─────────────────────────────────────────────────────────────────────────────
-
 export async function getSiteContent(): Promise<SiteContent> {
   try {
-    const supabase = await createClient()
-    const { data, error } = await supabase
-      .from('site_content')
-      .select('section, value')
-
-    if (error) {
-      console.log('[v0] getSiteContent fetch error:', error.message)
-      return DEFAULT_SITE_CONTENT
-    }
+    const data = await prisma.site_content.findMany({
+      select: { section: true, value: true }
+    })
 
     if (!data || data.length === 0) return DEFAULT_SITE_CONTENT
 
@@ -76,9 +63,6 @@ export async function getSiteContent(): Promise<SiteContent> {
       stage_offer:  deepMerge(DEFAULT_SITE_CONTENT.stage_offer,  (dbMap.stage_offer  ?? {}) as Partial<StageOfferContent>),
     }
   } catch (err) {
-    // Re-throw Next.js control-flow signals (e.g. DYNAMIC_SERVER_USAGE raised by
-    // cookies() during static generation). Swallowing them logs false errors and
-    // prevents Next from correctly switching the route to dynamic rendering.
     if (
       err &&
       typeof err === 'object' &&

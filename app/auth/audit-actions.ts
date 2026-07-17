@@ -1,25 +1,19 @@
 'use server'
 
 import { logAuthEvent, getRequestMeta } from '@/lib/audit-log'
-import { createClient } from '@/lib/supabase/server'
+import { auth } from '@/auth'
+import { prisma } from '@/lib/prisma'
 
-/**
- * Called from the client right after a successful staff login.
- * The session cookie is set by the time this runs, so we can read the user.
- */
 export async function recordLogin(): Promise<void> {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const session = await auth()
+    const user = session?.user as any
     if (!user) return
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('full_name, role')
-      .eq('id', user.id)
-      .single()
+    const profile = await prisma.profiles.findUnique({
+      where: { id: user.id },
+      select: { full_name: true, role: true }
+    })
 
     if (!profile) return
     const role = profile.role as string
@@ -36,27 +30,20 @@ export async function recordLogin(): Promise<void> {
       userAgent: userAgent ?? undefined,
     })
   } catch {
-    // silent — never break login flow
+    // silent
   }
 }
 
-/**
- * Called from the client before signOut().
- * We read the session now, before it is cleared.
- */
 export async function recordLogout(): Promise<void> {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const session = await auth()
+    const user = session?.user as any
     if (!user) return
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('full_name, role')
-      .eq('id', user.id)
-      .single()
+    const profile = await prisma.profiles.findUnique({
+      where: { id: user.id },
+      select: { full_name: true, role: true }
+    })
 
     if (!profile) return
     const role = profile.role as string
@@ -73,6 +60,6 @@ export async function recordLogout(): Promise<void> {
       userAgent: userAgent ?? undefined,
     })
   } catch {
-    // silent — never break logout flow
+    // silent
   }
 }

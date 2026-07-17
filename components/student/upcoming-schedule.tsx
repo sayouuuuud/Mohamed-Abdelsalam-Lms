@@ -1,4 +1,4 @@
-import { Video, ClipboardList, FileText, BookOpenCheck, CalendarDays } from 'lucide-react'
+import { Video, ClipboardList, FileText, BookOpenCheck, CalendarDays, PlayCircle } from 'lucide-react'
 import { PanelCard } from '@/components/dashboard/panel-card'
 import { cn } from '@/lib/utils'
 import type { ScheduleItem } from '@/lib/student-types'
@@ -11,6 +11,7 @@ const typeConfig: Record<
   اختبار: { icon: ClipboardList, color: 'text-rose-600', bg: 'bg-rose-50 dark:bg-rose-500/10' },
   واجب: { icon: FileText, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-500/10' },
   مراجعة: { icon: BookOpenCheck, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-500/10' },
+  مباشر: { icon: PlayCircle, color: 'text-rose-500', bg: 'bg-rose-50 dark:bg-rose-500/10' },
 }
 
 export function UpcomingSchedule({ schedule = [] }: { schedule?: ScheduleItem[] }) {

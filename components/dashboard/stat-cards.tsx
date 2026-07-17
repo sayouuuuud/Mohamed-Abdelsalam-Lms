@@ -1,4 +1,4 @@
-import { Wallet, Video, BookOpen, Users, ShoppingCart, TrendingUp, TrendingDown } from 'lucide-react'
+import { Wallet, Video, BookOpen, Users, ShoppingCart, TrendingUp, TrendingDown, Library } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
@@ -47,6 +47,17 @@ export function StatCards({ stats: inputStats }: { stats?: any }) {
       bg: 'bg-blue-50 dark:bg-blue-500/10',
     },
     {
+      label: 'عدد الكورسات (الشهور)',
+      value: (inputStats?.totalMonthlyCourses || 0).toLocaleString(),
+      change: 'إجمالي',
+      up: true,
+      neutral: true,
+      sub: 'حقيقي',
+      icon: Library,
+      color: 'text-indigo-600',
+      bg: 'bg-indigo-50 dark:bg-indigo-500/10',
+    },
+    {
       label: 'إجمالي الطلاب',
       value: (inputStats?.totalStudents || 0).toLocaleString(),
       change: pct(changes.students ?? 0),
@@ -70,7 +81,7 @@ export function StatCards({ stats: inputStats }: { stats?: any }) {
   ]
 
   return (
-    <div className="ns-stagger grid grid-cols-2 gap-4 lg:grid-cols-5">
+    <div className="ns-stagger grid grid-cols-2 gap-4 lg:grid-cols-6">
       {stats.map((stat) => (
         <Card
           key={stat.label}

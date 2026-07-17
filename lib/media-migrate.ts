@@ -14,7 +14,14 @@
  */
 
 import { UTApi } from 'uploadthing/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@supabase/supabase-js'
+
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 const utapi = new UTApi()
 
@@ -59,7 +66,7 @@ export type MigrationDryRunResult = {
 // ── dry run: count migrateable rows ──────────────────────────────────────────
 
 export async function migrateStorageDryRun(): Promise<MigrationDryRunResult> {
-  const supabase = createAdminClient()
+  const supabase = getSupabaseAdmin()
 
   const targets: { table: string; column: string }[] = [
     { table: 'stages',         column: 'image' },
@@ -89,7 +96,7 @@ export async function migrateStorageDryRun(): Promise<MigrationDryRunResult> {
 // ── real migration ────────────────────────────────────────────────────────────
 
 export async function runStorageMigration(): Promise<MigrationProgress> {
-  const supabase = createAdminClient()
+  const supabase = getSupabaseAdmin()
 
   const targets: { table: string; column: string; filePrefix: string }[] = [
     { table: 'stages',          column: 'image',     filePrefix: 'stage' },

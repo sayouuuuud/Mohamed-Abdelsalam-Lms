@@ -1,15 +1,15 @@
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '@supabase/supabase-js'
 
 const BUCKET = 'media'
 
-// Uploads a file to the public Supabase Storage `media` bucket directly from the
-// browser and returns its public URL. Used by the admin curriculum/lesson editors.
-// Unlike UploadThing, this needs no server callback, so it works in preview/sandbox.
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
 export async function uploadToStorage(
   file: File,
   folder: 'images' | 'videos' | 'attachments',
 ): Promise<string> {
-  const supabase = createClient()
+  const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
   const ext = file.name.split('.').pop() || 'bin'
   const safeName = `${folder}/${crypto.randomUUID()}.${ext}`
@@ -29,23 +29,15 @@ export async function uploadToStorage(
   return data.publicUrl
 }
 
-// Same as uploadToStorage but streams real upload progress (0-100) via a
-// callback. Uses XHR against the Supabase Storage REST endpoint because the
-// supabase-js .upload() helper does not expose upload progress events.
 export async function uploadToStorageWithProgress(
   file: File,
   folder: 'images' | 'videos' | 'attachments',
   onProgress?: (percent: number) => void,
 ): Promise<string> {
-  const supabase = createClient()
+  const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  const token = session?.access_token || anonKey
-  const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const token = supabaseAnonKey
+  const baseUrl = supabaseUrl
 
   const ext = file.name.split('.').pop() || 'bin'
   const safeName = `${folder}/${crypto.randomUUID()}.${ext}`
@@ -55,7 +47,7 @@ export async function uploadToStorageWithProgress(
     const xhr = new XMLHttpRequest()
     xhr.open('POST', endpoint)
     xhr.setRequestHeader('Authorization', `Bearer ${token}`)
-    xhr.setRequestHeader('apikey', anonKey)
+    xhr.setRequestHeader('apikey', supabaseAnonKey)
     xhr.setRequestHeader('cache-control', '3600')
     xhr.setRequestHeader('x-upsert', 'false')
     if (file.type) xhr.setRequestHeader('Content-Type', file.type)

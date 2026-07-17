@@ -1,8 +1,9 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { computeCoupon } from '@/app/coupon-actions'
+import { auth } from '@/auth'
 
 export type CartItem = {
   lectureId: string | null
@@ -15,38 +16,33 @@ export type CartItem = {
   price: number
 }
 
-// Returns the signed-in student's cart (joined with lecture/branch/stage info).
-// Returns null when the visitor is not logged in.
 export async function getCartItems(): Promise<CartItem[] | null> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return null
+  const session = await auth()
+  const user = session?.user
+  if (!user || !user.id) return null
 
-  const { data, error } = await supabase
-    .from('cart_items')
-    .select(
-      `lecture_id, monthly_course_id, term_id,
-       lectures:lecture_id (
-         title, price,
-         branches:branch_id ( title, stages:stage_id ( title ) )
-       ),
-       monthly_courses:monthly_course_id (
-         title, price,
-         branches:branch_id ( title, stages:stage_id ( title ) )
-       ),
-       terms:term_id (
-         title, price,
-         stages:stage_id ( title )
-       )`,
-    )
-    .eq('student_id', user.id)
-    .order('created_at', { ascending: true })
+  const data = await prisma.cart_items.findMany({
+    where: { student_id: user.id },
+    select: {
+      lecture_id: true,
+      monthly_course_id: true,
+      term_id: true,
+      lectures: {
+        select: { title: true, price: true, branches: { select: { title: true, stages: { select: { title: true } } } } }
+      },
+      monthly_courses: {
+        select: { title: true, price: true, branches: { select: { title: true, stages: { select: { title: true } } } } }
+      },
+      terms: {
+        select: { title: true, price: true, stages: { select: { title: true } } }
+      }
+    },
+    orderBy: { created_at: 'asc' }
+  })
 
-  if (error || !data) return []
+  if (!data) return []
 
-  return data.map((row: any) => {
+  return data.map((row) => {
     if (row.term_id) {
       const term = row.terms
       return {
@@ -56,7 +52,7 @@ export async function getCartItems(): Promise<CartItem[] | null> {
         itemType: 'term_bundle' as const,
         title: term?.title ?? '',
         branchTitle: '',
-        stageTitle: (term?.stages as any)?.title ?? '',
+        stageTitle: term?.stages?.title ?? '',
         price: Number(term?.price ?? 0),
       }
     }
@@ -74,35 +70,31 @@ export async function getCartItems(): Promise<CartItem[] | null> {
   })
 }
 
-export async function addToCart(lectureId: string) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { error: 'unauthenticated' as const }
+function generateOrderCode() {
+  const year = new Date().getFullYear()
+  const rand = Math.floor(1000 + Math.random() * 9000)
+  return `ORD-${year}-${rand}`
+}
 
-  // Check if lecture is free
-  const { data: lecture } = await supabase
-    .from('lectures')
-    .select(`
-      price, title,
-      branches:branch_id ( title, stages:stage_id ( title ) )
-    `)
-    .eq('id', lectureId)
-    .single()
+export async function addToCart(lectureId: string) {
+  const session = await auth()
+  const user = session?.user
+  if (!user || !user.id) return { error: 'unauthenticated' as const }
+
+  const lecture = await prisma.lectures.findUnique({
+    where: { id: lectureId },
+    select: { price: true, title: true, branches: { select: { title: true, stages: { select: { title: true } } } } }
+  })
 
   if (lecture && Number(lecture.price) === 0) {
-    // Auto-enroll!
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('full_name, phone, email')
-      .eq('id', user.id)
-      .single()
+    const profile = await prisma.profiles.findUnique({
+      where: { id: user.id },
+      select: { full_name: true, phone: true, email: true }
+    })
 
     const code = generateOrderCode()
-    const { data: order, error: orderErr } = await supabase
-      .from('orders')
-      .insert({
+    const order = await prisma.orders.create({
+      data: {
         code,
         student_id: user.id,
         student_name: profile?.full_name || 'طالب',
@@ -116,64 +108,63 @@ export async function addToCart(lectureId: string) {
         coupon_code: null,
         total: 0,
         status: 'approved',
-      })
-      .select('id')
-      .single()
+      },
+      select: { id: true }
+    })
 
-    if (!orderErr && order) {
-      // TypeScript safety for nested relations
-      const branchTitle = (lecture.branches as any)?.title || ''
-      const stageTitle = (lecture.branches as any)?.stages?.title || ''
+    if (order) {
+      const branchTitle = lecture.branches?.title || ''
+      const stageTitle = lecture.branches?.stages?.title || ''
 
-      await supabase.from('order_items').insert({
-        order_id: order.id,
-        lecture_id: lectureId,
-        lecture_title: lecture.title,
-        branch_title: branchTitle,
-        stage_title: stageTitle,
-        price: 0,
+      await prisma.order_items.create({
+        data: {
+          order_id: order.id,
+          lecture_id: lectureId,
+          lecture_title: lecture.title,
+          branch_title: branchTitle,
+          stage_title: stageTitle,
+          price: 0,
+        }
       })
       revalidatePath('/', 'layout')
       return { success: true, enrolledFree: true }
     }
   }
 
-  const { error } = await supabase
-    .from('cart_items')
-    .insert({ student_id: user.id, lecture_id: lectureId })
-
-  // ignore unique-violation (already in cart)
-  if (error && error.code !== '23505') return { error: error.message }
+  try {
+    await prisma.cart_items.create({
+      data: { student_id: user.id, lecture_id: lectureId }
+    })
+  } catch (error: any) {
+    // ignore unique-violation (already in cart)
+    if (error.code !== 'P2002') return { error: error.message }
+  }
   revalidatePath('/', 'layout')
   return { success: true }
 }
 
 export async function addCourseToCart(monthlyCourseId: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'unauthenticated' as const }
+  const session = await auth()
+  const user = session?.user
+  if (!user || !user.id) return { error: 'unauthenticated' as const }
 
-  // If the course is free, auto-enroll immediately without going through the cart.
-  const { data: course } = await supabase
-    .from('monthly_courses')
-    .select(`price, title, branches:branch_id ( title, stages:stage_id ( title ) )`)
-    .eq('id', monthlyCourseId)
-    .single()
+  const course = await prisma.monthly_courses.findUnique({
+    where: { id: monthlyCourseId },
+    select: { price: true, title: true, branches: { select: { title: true, stages: { select: { title: true } } } } }
+  })
 
   if (course && Number(course.price) === 0) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('full_name, phone, email')
-      .eq('id', user.id)
-      .single()
+    const profile = await prisma.profiles.findUnique({
+      where: { id: user.id },
+      select: { full_name: true, phone: true, email: true }
+    })
 
     const code = generateOrderCode()
-    const branchTitle = (course.branches as any)?.title || ''
-    const stageTitle = (course.branches as any)?.stages?.title || ''
+    const branchTitle = course.branches?.title || ''
+    const stageTitle = course.branches?.stages?.title || ''
 
-    const { data: order, error: orderErr } = await supabase
-      .from('orders')
-      .insert({
+    const order = await prisma.orders.create({
+      data: {
         code,
         student_id: user.id,
         student_name: profile?.full_name || 'طالب',
@@ -187,127 +178,124 @@ export async function addCourseToCart(monthlyCourseId: string) {
         coupon_code: null,
         total: 0,
         status: 'approved',
-      })
-      .select('id')
-      .single()
+      },
+      select: { id: true }
+    })
 
-    if (!orderErr && order) {
-      await supabase.from('order_items').insert({
-        order_id: order.id,
-        lecture_id: null,
-        monthly_course_id: monthlyCourseId,
-        item_type: 'course_bundle',
-        lecture_title: course.title,
-        branch_title: branchTitle,
-        stage_title: stageTitle,
-        price: 0,
+    if (order) {
+      await prisma.order_items.create({
+        data: {
+          order_id: order.id,
+          lecture_id: null,
+          monthly_course_id: monthlyCourseId,
+          item_type: 'course_bundle',
+          lecture_title: course.title,
+          branch_title: branchTitle,
+          stage_title: stageTitle,
+          price: 0,
+        }
       })
       revalidatePath('/', 'layout')
       return { success: true, enrolledFree: true }
     }
   }
 
-  const { error } = await supabase.from('cart_items').insert({
-    student_id: user.id,
-    monthly_course_id: monthlyCourseId,
-    lecture_id: null,
-  })
-  if (error && error.code !== '23505') return { error: error.message }
+  try {
+    await prisma.cart_items.create({
+      data: { student_id: user.id, monthly_course_id: monthlyCourseId, lecture_id: null }
+    })
+  } catch (error: any) {
+    if (error.code !== 'P2002') return { error: error.message }
+  }
   revalidatePath('/', 'layout')
   return { success: true }
 }
 
 export async function addTermToCart(termId: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'unauthenticated' as const }
+  const session = await auth()
+  const user = session?.user
+  if (!user || !user.id) return { error: 'unauthenticated' as const }
 
-  // Remove any individual courses from same term already in the cart.
-  const { data: termCourses } = await supabase
-    .from('monthly_courses')
-    .select('id')
-    .eq('term_id', termId)
-  const courseIds = (termCourses ?? []).map((c: any) => c.id)
+  const termCourses = await prisma.monthly_courses.findMany({
+    where: { term_id: termId },
+    select: { id: true }
+  })
+  const courseIds = termCourses.map((c) => c.id)
+  
   if (courseIds.length > 0) {
-    await supabase
-      .from('cart_items')
-      .delete()
-      .eq('student_id', user.id)
-      .in('monthly_course_id', courseIds)
+    await prisma.cart_items.deleteMany({
+      where: { student_id: user.id, monthly_course_id: { in: courseIds } }
+    })
   }
 
-  const { error } = await supabase.from('cart_items').insert({
-    student_id: user.id,
-    term_id: termId,
-    lecture_id: null,
-    monthly_course_id: null,
-  })
-  if (error && error.code !== '23505') return { error: error.message }
+  try {
+    await prisma.cart_items.create({
+      data: { student_id: user.id, term_id: termId, lecture_id: null, monthly_course_id: null }
+    })
+  } catch (error: any) {
+    if (error.code !== 'P2002') return { error: error.message }
+  }
   revalidatePath('/', 'layout')
   return { success: true }
 }
 
 export async function removeTermFromCart(termId: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'unauthenticated' as const }
-  await supabase.from('cart_items').delete().eq('student_id', user.id).eq('term_id', termId)
+  const session = await auth()
+  const user = session?.user
+  if (!user || !user.id) return { error: 'unauthenticated' as const }
+  await prisma.cart_items.deleteMany({
+    where: { student_id: user.id, term_id: termId }
+  })
   revalidatePath('/', 'layout')
   return { success: true }
 }
 
 export async function removeCourseFromCart(monthlyCourseId: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'unauthenticated' as const }
-  const { error } = await supabase.from('cart_items').delete().eq('student_id', user.id).eq('monthly_course_id', monthlyCourseId)
-  if (error) return { error: error.message }
+  const session = await auth()
+  const user = session?.user
+  if (!user || !user.id) return { error: 'unauthenticated' as const }
+  try {
+    await prisma.cart_items.deleteMany({
+      where: { student_id: user.id, monthly_course_id: monthlyCourseId }
+    })
+  } catch (error: any) {
+    return { error: error.message }
+  }
   revalidatePath('/', 'layout')
   return { success: true }
 }
 
 export async function removeFromCart(lectureId: string) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { error: 'unauthenticated' as const }
+  const session = await auth()
+  const user = session?.user
+  if (!user || !user.id) return { error: 'unauthenticated' as const }
 
-  const { error } = await supabase
-    .from('cart_items')
-    .delete()
-    .eq('student_id', user.id)
-    .eq('lecture_id', lectureId)
-
-  if (error) return { error: error.message }
+  try {
+    await prisma.cart_items.deleteMany({
+      where: { student_id: user.id, lecture_id: lectureId }
+    })
+  } catch (error: any) {
+    return { error: error.message }
+  }
   revalidatePath('/', 'layout')
   return { success: true }
 }
 
 export async function getCheckoutDefaults(): Promise<{ name: string; phone: string; email: string }> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { name: '', phone: '', email: '' }
+  const session = await auth()
+  const user = session?.user
+  if (!user || !user.id) return { name: '', phone: '', email: '' }
 
-  const { data } = await supabase
-    .from('profiles')
-    .select('full_name, phone, email')
-    .eq('id', user.id)
-    .single()
+  const data = await prisma.profiles.findUnique({
+      where: { id: user.id },
+    select: { full_name: true, phone: true, email: true }
+  })
 
   return {
     name: data?.full_name ?? '',
     phone: data?.phone ?? '',
     email: data?.email ?? user.email ?? '',
   }
-}
-
-function generateOrderCode() {
-  const year = new Date().getFullYear()
-  const rand = Math.floor(1000 + Math.random() * 9000)
-  return `ORD-${year}-${rand}`
 }
 
 export async function createOrder(input: {
@@ -319,22 +307,19 @@ export async function createOrder(input: {
   receiptUrl?: string
   couponCode?: string
 }) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { error: 'unauthenticated' as const }
+  const session = await auth()
+  const user = session?.user
+  if (!user || !user.id) return { error: 'unauthenticated' as const }
 
   const items = await getCartItems()
   if (!items || items.length === 0) return { error: 'السلة فارغة.' }
 
   const subtotal = items.reduce((sum, i) => sum + i.price, 0)
 
-  // Re-validate the coupon server-side (never trust a client-sent discount).
   let discount = 0
   let appliedCouponCode: string | null = null
   if (input.couponCode?.trim()) {
-    const result = await computeCoupon(supabase, input.couponCode, items)
+    const result = await computeCoupon(input.couponCode, items)
     if ('error' in result) return { error: result.error }
     discount = result.applied.discount
     appliedCouponCode = result.applied.code
@@ -343,85 +328,80 @@ export async function createOrder(input: {
   const total = Math.max(0, subtotal - discount)
   const code = generateOrderCode()
 
-  const { data: order, error: orderErr } = await supabase
-    .from('orders')
-    .insert({
-      code,
-      student_id: user.id,
-      student_name: input.name,
-      student_email: user.email ?? '',
-      student_phone: input.phone,
-      method: input.method,
-      reference: input.reference ?? '',
-      note: input.note ?? '',
-      receipt_url: input.receiptUrl ?? null,
-      subtotal,
-      discount,
-      coupon_code: appliedCouponCode,
-      total,
-      status: 'pending',
+  try {
+    const order = await prisma.orders.create({
+      data: {
+        code,
+        student_id: user.id,
+        student_name: input.name,
+        student_email: user.email ?? '',
+        student_phone: input.phone,
+        method: input.method,
+        reference: input.reference ?? '',
+        note: input.note ?? '',
+        receipt_url: input.receiptUrl ?? null,
+        subtotal,
+        discount,
+        coupon_code: appliedCouponCode,
+        total,
+        status: 'pending',
+      },
+      select: { id: true, code: true }
     })
-    .select('id, code')
-    .single()
 
-  if (orderErr || !order) return { error: orderErr?.message ?? 'تعذّر إنشاء الطلب.' }
-
-  // Increment coupon usage (best-effort; doesn't fail the order). Uses a
-  // SECURITY DEFINER RPC because coupons are admin-only for writes under RLS.
-  if (appliedCouponCode) {
-    await supabase.rpc('increment_coupon_used', { p_code: appliedCouponCode })
-  }
-
-  // Course bundles are stored as a single `course_bundle` row. Access to the
-  // bundle's lectures (current and future) is derived dynamically at read time
-  // in getPurchasedLectureIds, so we intentionally do NOT freeze a per-lecture
-  // snapshot here.
-  const orderItemRows = items.map((item) => {
-    if (item.itemType === 'term_bundle') {
-      return {
-        order_id: order.id,
-        lecture_id: null,
-        monthly_course_id: null,
-        term_id: item.termId,
-        item_type: 'term_bundle',
-        lecture_title: item.title,
-        branch_title: '',
-        stage_title: item.stageTitle,
-        price: item.price,
-      }
+    if (appliedCouponCode) {
+      await prisma.$executeRaw`SELECT increment_coupon_used(${appliedCouponCode})`
     }
-    if (item.monthlyCourseId) {
+
+    const orderItemRows = items.map((item) => {
+      if (item.itemType === 'term_bundle') {
+        return {
+          order_id: order.id,
+          lecture_id: null,
+          monthly_course_id: null,
+          term_id: item.termId,
+          item_type: 'term_bundle',
+          lecture_title: item.title,
+          branch_title: '',
+          stage_title: item.stageTitle,
+          price: item.price,
+        }
+      }
+      if (item.monthlyCourseId) {
+        return {
+          order_id: order.id,
+          lecture_id: null,
+          monthly_course_id: item.monthlyCourseId,
+          term_id: null,
+          item_type: 'course_bundle',
+          lecture_title: item.title,
+          branch_title: item.branchTitle,
+          stage_title: item.stageTitle,
+          price: item.price,
+        }
+      }
       return {
         order_id: order.id,
-        lecture_id: null,
-        monthly_course_id: item.monthlyCourseId,
+        lecture_id: item.lectureId,
+        monthly_course_id: null,
         term_id: null,
-        item_type: 'course_bundle',
+        item_type: 'lecture',
         lecture_title: item.title,
         branch_title: item.branchTitle,
         stage_title: item.stageTitle,
         price: item.price,
       }
-    }
-    return {
-      order_id: order.id,
-      lecture_id: item.lectureId,
-      monthly_course_id: null,
-      term_id: null,
-      item_type: 'lecture',
-      lecture_title: item.title,
-      branch_title: item.branchTitle,
-      stage_title: item.stageTitle,
-      price: item.price,
-    }
-  })
+    })
 
-  const { error: itemsErr } = await supabase.from('order_items').insert(orderItemRows)
-  if (itemsErr) return { error: itemsErr.message }
+    await prisma.order_items.createMany({ data: orderItemRows })
 
-  // clear the cart after a successful order
-  await supabase.from('cart_items').delete().eq('student_id', user.id)
+    await prisma.cart_items.deleteMany({
+      where: { student_id: user.id }
+    })
 
-  revalidatePath('/', 'layout')
-  return { success: true, code: order.code }
+    revalidatePath('/', 'layout')
+    return { success: true, code: order.code }
+  } catch (orderErr: any) {
+    return { error: orderErr?.message ?? 'تعذّر إنشاء الطلب.' }
+  }
 }
