@@ -30,14 +30,15 @@ const POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS ?? '10000')
 // ---------------------------------------------------------------
 export async function processOneJob(): Promise<boolean> {
   const config = await getStreamingConfig()
+  if (!config.enabled) return false
 
   const job = await claimNextJob()
   if (!job) return false   // لا يوجد شغل دلوقتي
 
   const { jobId, videoId, r2RawKey, threadsOverride } = job
-  const threads  = threadsOverride ?? config?.ffmpegThreads ?? 0
-  const renditions = config?.renditions ?? ['360p', '480p', '720p']
-  const segmentDurationSec = config?.segmentDurationSec ?? 10
+  const threads = threadsOverride ?? config.ffmpegThreads
+  const renditions = config.renditions
+  const segmentDurationSec = config.segmentDurationSec
 
   // مجلد مؤقت مخصص لهذا الـ job — يُحذف في النهاية
   const workDir    = path.join(TMP_BASE, `transcoder_${jobId}`)

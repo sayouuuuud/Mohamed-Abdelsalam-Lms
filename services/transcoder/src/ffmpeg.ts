@@ -102,7 +102,7 @@ async function runFfmpeg(args: string[], totalSeconds: number, onProgress?: (pct
     let stderr = ''
     proc.stderr.on('data', (chunk: Buffer) => {
       const line = chunk.toString()
-      stderr += line
+      stderr = `${stderr}${line}`.slice(-8_000)
 
       // parse time=HH:MM:SS.ss من تقرير FFmpeg
       if (onProgress && totalSeconds > 0) {
@@ -148,25 +148,43 @@ async function writeMasterManifest(outputDir: string): Promise<void> {
 // ---------------------------------------------------------------
 // probeDuration: يستخدم ffprobe للحصول على مدة الفيديو
 // ---------------------------------------------------------------
+export function normalizeDurationSeconds(value: unknown): number {
+  const duration = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(duration) || duration <= 0) {
+    throw new Error(`[ffprobe] مدة الفيديو غير صالحة: ${String(value)}`)
+  }
+  return Math.max(1, Math.round(duration))
+}
+
 async function probeDuration(filePath: string): Promise<number> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const proc = spawn('ffprobe', [
-      '-v', 'quiet',
+      '-v', 'error',
       '-print_format', 'json',
       '-show_format',
       filePath,
-    ], { stdio: ['ignore', 'pipe', 'ignore'] })
+    ], { stdio: ['ignore', 'pipe', 'pipe'] })
 
     let out = ''
-    proc.stdout.on('data', (d: Buffer) => { out += d.toString() })
-    proc.on('close', () => {
+    let stderr = ''
+    proc.stdout.on('data', (chunk: Buffer) => { out += chunk.toString() })
+    proc.stderr.on('data', (chunk: Buffer) => {
+      stderr = `${stderr}${chunk.toString()}`.slice(-4_000)
+    })
+    proc.on('close', (code) => {
+      if (code !== 0) {
+        reject(new Error(`[ffprobe] خرج بكود ${code}: ${stderr || 'تعذر قراءة metadata'}`))
+        return
+      }
       try {
-        const json = JSON.parse(out)
-        resolve(parseFloat(json.format?.duration ?? '0'))
-      } catch {
-        resolve(0)
+        const json = JSON.parse(out) as { format?: { duration?: unknown } }
+        resolve(normalizeDurationSeconds(json.format?.duration))
+      } catch (error) {
+        reject(error instanceof Error ? error : new Error('[ffprobe] استجابة غير صالحة'))
       }
     })
-    proc.on('error', () => resolve(0))
+    proc.on('error', (error) => {
+      reject(new Error(`[ffprobe] فشل التشغيل: ${error.message}`))
+    })
   })
 }
