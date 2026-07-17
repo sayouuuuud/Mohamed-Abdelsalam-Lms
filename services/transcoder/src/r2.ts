@@ -25,11 +25,17 @@ let _r2: S3Client | null = null
 
 function getR2Client(): S3Client {
   if (_r2) return _r2
-  const endpoint = process.env.R2_ENDPOINT
+  let endpoint = process.env.R2_ENDPOINT
+  const accountId = process.env.R2_ACCOUNT_ID
   const accessKeyId = process.env.R2_ACCESS_KEY_ID
   const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY
+  
+  if (!endpoint && accountId) {
+    endpoint = `https://${accountId}.r2.cloudflarestorage.com`
+  }
+
   if (!endpoint || !accessKeyId || !secretAccessKey) {
-    throw new Error('[transcoder/r2] متغيرات R2 غير مكتملة في .env')
+    throw new Error('[transcoder/r2] متغيرات R2 غير مكتملة في .env (تأكد من وجود R2_ENDPOINT أو R2_ACCOUNT_ID)')
   }
   _r2 = new S3Client({
     region: 'auto',
