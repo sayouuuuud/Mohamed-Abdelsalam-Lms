@@ -37,6 +37,7 @@ export async function processOneJob(): Promise<boolean> {
   const { jobId, videoId, r2RawKey, threadsOverride } = job
   const threads  = threadsOverride ?? config?.ffmpegThreads ?? 0
   const renditions = config?.renditions ?? ['360p', '480p', '720p']
+  const segmentDurationSec = config?.segmentDurationSec ?? 10
 
   // مجلد مؤقت مخصص لهذا الـ job — يُحذف في النهاية
   const workDir    = path.join(TMP_BASE, `transcoder_${jobId}`)
@@ -64,6 +65,7 @@ export async function processOneJob(): Promise<boolean> {
       outputDir:  hlsOutDir,
       renditions,
       threads,
+      segmentDurationSec,
       onProgress: async (pct) => {
         // range الـ progress هنا = 15% → 80%
         await updateJobProgress(jobId, 15 + pct * 0.65)
