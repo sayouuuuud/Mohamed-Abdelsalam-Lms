@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { hasResourceAccess } from '@/lib/auth-guard'
 import { logActivity } from '@/lib/audit-log'
 import { revalidatePath } from 'next/cache'
+import { cleanupStageMedia, cleanupBranchMedia, cleanupCourseMedia } from '@/lib/media-cleanup'
 
 // ── Admin-facing types (use the real uuid `id`) ───────────────────
 export type AdminCourseLecture = {
@@ -336,10 +337,12 @@ export async function deleteStage(id: string) {
   const supabase = await createClient()
   if (!(await hasResourceAccess(supabase, 'categories', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
+  await cleanupStageMedia(id).catch((e) => console.log('[v0] cleanupStageMedia error:', e))
+
   const { error } = await supabase.from('stages').delete().eq('id', id)
   if (error) {
     console.log('[v0] deleteStage error:', error.message)
-    return { error: 'تعذّر حذف المرحل��.' }
+    return { error: 'تعذّر حذف المرحلة.' }
   }
   logActivity({ action: 'delete', resource: 'categories', targetId: id, targetLabel: `مرحلة ID: ${id}` }).catch(() => {})
   revalidatePath('/categories')
@@ -408,6 +411,8 @@ export async function updateBranch(
 export async function deleteBranch(id: string) {
   const supabase = await createClient()
   if (!(await hasResourceAccess(supabase, 'categories', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+
+  await cleanupBranchMedia(id).catch((e) => console.log('[v0] cleanupBranchMedia error:', e))
 
   const { error } = await supabase.from('branches').delete().eq('id', id)
   if (error) {
@@ -490,6 +495,9 @@ export async function updateMonthlyCourse(
 export async function deleteMonthlyCourse(id: string) {
   const supabase = await createClient()
   if (!(await hasResourceAccess(supabase, 'categories', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+
+  // Clean up course image before DB delete (lectures keep their own media).
+  await cleanupCourseMedia(id).catch((e) => console.log('[v0] cleanupCourseMedia error:', e))
 
   // Detach lectures first (keep them, just unlink from the course)
   await supabase.from('lectures').update({ monthly_course_id: null }).eq('monthly_course_id', id)

@@ -51,16 +51,33 @@ export function getR2Client(): S3Client {
 }
 
 /**
- * isR2Configured — هل كل متغيرات R2 المطلوبة موجودة؟
- * يُستخدم لفكّ الاعتماد على R2 تلقائياً: لو غير مهيّأ يرجع النظام لـ UploadThing.
+ * isR2Configured — هل كل متغيرات R2 المطلوبة موجودة وغير فارغة؟
  */
 export function isR2Configured(): boolean {
   return Boolean(
-    (process.env.R2_ACCOUNT_ID || process.env.R2_ENDPOINT) &&
-      process.env.R2_ACCESS_KEY_ID &&
-      process.env.R2_SECRET_ACCESS_KEY &&
-      process.env.R2_BUCKET,
+    process.env.R2_ACCOUNT_ID?.trim() &&
+    process.env.R2_ACCESS_KEY_ID?.trim() &&
+    process.env.R2_SECRET_ACCESS_KEY?.trim() &&
+    process.env.R2_BUCKET?.trim(),
   )
+}
+
+/**
+ * checkR2Connection — يتحقق من الاتصال بـ R2 عبر HeadBucket.
+ * يُستخدم في زر التشخيص في صفحة الإعدادات.
+ */
+export async function checkR2Connection(): Promise<{ ok: boolean; message: string }> {
+  if (!isR2Configured()) {
+    return { ok: false, message: 'متغيرات R2 غير مكتملة (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET)' }
+  }
+  try {
+    const { HeadBucketCommand } = await import('@aws-sdk/client-s3')
+    await getR2Client().send(new HeadBucketCommand({ Bucket: R2_BUCKET() }))
+    return { ok: true, message: `الاتصال بـ R2 ناجح — bucket: ${R2_BUCKET()}` }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    return { ok: false, message: `فشل الاتصال بـ R2: ${msg}` }
+  }
 }
 
 export const R2_BUCKET = () => {

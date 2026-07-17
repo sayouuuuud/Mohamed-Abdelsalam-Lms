@@ -4,12 +4,12 @@ import Image from 'next/image'
 import { useRef, useState } from 'react'
 import { ImagePlus, X, Upload, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { uploadToStorage } from '@/lib/storage-upload'
+import { useUploadThing } from '@/lib/uploadthing'
 import { cn } from '@/lib/utils'
 
-// Reusable image picker used by the admin curriculum forms. Shows a preview of
-// the current image (URL string) and uploads new files directly to Supabase
-// Storage (no server callback needed, so it works in preview/sandbox).
+// Reusable image picker used by admin curriculum forms.
+// Uploads directly to UploadThing (curriculumImage endpoint) so all images
+// live alongside other UploadThing assets — no Supabase Storage needed.
 export function ImageUploadField({
   value,
   onChange,
@@ -24,6 +24,21 @@ export function ImageUploadField({
   const [uploading, setUploading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
+  const { startUpload } = useUploadThing('curriculumImage', {
+    onClientUploadComplete: (res) => {
+      const url = res?.[0]?.url
+      if (url) {
+        onChange(url)
+        toast.success('تم رفع الصورة')
+      }
+      setUploading(false)
+    },
+    onUploadError: (err) => {
+      toast.error(`فشل الرفع: ${err.message}`)
+      setUploading(false)
+    },
+  })
+
   async function handleFile(file: File | undefined) {
     if (!file) return
     if (!file.type.startsWith('image/')) {
@@ -31,15 +46,7 @@ export function ImageUploadField({
       return
     }
     setUploading(true)
-    try {
-      const url = await uploadToStorage(file, 'images')
-      onChange(url)
-      toast.success('تم رفع الصورة')
-    } catch (e) {
-      toast.error(`فشل الرفع: ${e instanceof Error ? e.message : 'خطأ غير معروف'}`)
-    } finally {
-      setUploading(false)
-    }
+    await startUpload([file])
   }
 
   return (
