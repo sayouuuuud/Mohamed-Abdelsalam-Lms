@@ -18,9 +18,9 @@
 import os from 'os'
 import path from 'path'
 import fs from 'fs/promises'
-import { claimNextJob, updateJobProgress, markVideoReady, markVideoFailed, getStreamingConfig } from './db'
-import { downloadRaw, uploadDirectory } from './r2'
-import { transcode } from './ffmpeg'
+import { claimNextJob, updateJobProgress, markVideoReady, markVideoFailed, getStreamingConfig } from './db.js'
+import { downloadRaw, uploadDirectory } from './r2.js'
+import { transcode } from './ffmpeg.js'
 
 const TMP_BASE = process.env.TMP_DIR ?? os.tmpdir()
 const POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS ?? '10000')

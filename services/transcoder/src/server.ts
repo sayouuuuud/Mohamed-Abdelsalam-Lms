@@ -15,7 +15,7 @@
  */
 
 import http from 'http'
-import { processOneJob, runLoop } from './worker'
+import { processOneJob, runLoop } from './worker.js'
 
 const PORT  = parseInt(process.env.PORT ?? '4000')
 const MODE  = (process.env.WORKER_MODE ?? 'http').toLowerCase()   // 'http' | 'poll'
