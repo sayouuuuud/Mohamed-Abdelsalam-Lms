@@ -250,7 +250,7 @@ export function AdminLessonDetail({
               dir="ltr"
             />
           </Field>
-          
+
           <div className="space-y-3 rounded-xl border border-border bg-secondary/30 p-4">
             <span className="block text-sm font-medium text-foreground">مصدر الفيديو</span>
             <div className="flex gap-2">
@@ -261,7 +261,7 @@ export function AdminLessonDetail({
               <VideoUploadField
                 value={video}
                 onChange={setVideo}
-                hint={streamingEnabled ? 'سيتم تحويل الفيديو تلقائياً إلى HLS بعد الرفع.' : 'ارفع ملف الفيديو. هذا ما سيشاهده الطالب.'}
+                hint={streamingEnabled ? 'يتم تشفير الفيديو تلقائيا بعد الرفع' : 'ارفع ملف الفيديو. هذا ما سيشاهده الطالب.'}
                 streamingEnabled={streamingEnabled}
                 lessonId={lesson.id}
                 onDurationDetected={setDuration}

@@ -127,7 +127,7 @@ export async function getStudentMonthlyProgress(): Promise<MonthlyStat[]> {
   const examSubs = await prisma.exam_submissions.findMany({
     where: {
       student_id: student.id,
-      score: { not: null as unknown as number },
+      grading_status: 'graded',
       submitted_at: { gte: monthStart }
     },
     select: { score: true, total: true }

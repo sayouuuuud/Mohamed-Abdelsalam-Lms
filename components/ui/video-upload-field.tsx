@@ -132,7 +132,7 @@ export function VideoUploadField({
           toast.error(`فشل التحويل: ${record.errorMessage}`)
         } else {
           setUploadPhase('processing')
-          setStatusMessage('جاري التحويل إلى صيغ HLS...')
+          setStatusMessage('جاري تشفير الفيديو')
         }
       }, 4000) // كل 4 ثواني
     },

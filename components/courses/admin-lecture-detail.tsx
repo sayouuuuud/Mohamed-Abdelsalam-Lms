@@ -201,7 +201,7 @@ export function AdminLectureDetail({
     const target = index + dir
     if (target < 0 || target >= items.length) return
     const next = [...items]
-    ;[next[index], next[target]] = [next[target], next[index]]
+      ;[next[index], next[target]] = [next[target], next[index]]
     setItems(next)
     const payload = next.map((it) => ({
       kind: it.kind,
@@ -442,7 +442,7 @@ export function AdminLectureDetail({
               <VideoUploadField
                 value={lVideo}
                 onChange={setLVideo}
-                hint={streamingEnabled ? 'سيتم تحويل الفيديو تلقائياً إلى HLS بعد الرفع.' : 'ارفع ملف الفيديو. هذا ما سيشاهده الطالب.'}
+                hint={streamingEnabled ? 'يتم تشفير الفيديو تلقائيا بعد الرفع' : 'ارفع ملف الفيديو. هذا ما سيشاهده الطالب.'}
                 streamingEnabled={streamingEnabled}
                 lessonId={editingLesson?.id}
                 onDurationDetected={setLDuration}
@@ -511,11 +511,10 @@ export function AdminLectureDetail({
         title={deleting?.kind === 'lesson' ? 'حذف الدرس' : 'حذف الواجب'}
         description={
           deleting
-            ? `هل أنت متأكد من حذف "${
-                deleting.kind === 'lesson'
-                  ? deleting.lesson.title
-                  : deleting.assignment.title
-              }"؟ لا يمكن التراجع.`
+            ? `هل أنت متأكد من حذف "${deleting.kind === 'lesson'
+              ? deleting.lesson.title
+              : deleting.assignment.title
+            }"؟ لا يمكن التراجع.`
             : ''
         }
       />

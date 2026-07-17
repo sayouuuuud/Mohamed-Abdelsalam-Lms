@@ -1457,7 +1457,7 @@ model video_jobs {
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model videos {
   id                                String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  lesson_id                         String       @db.Uuid
+  lesson_id                         String?      @db.Uuid
   r2_raw_key                        String?
   r2_hls_prefix                     String?
   status                            String       @default("pending")
@@ -1469,7 +1469,7 @@ model videos {
   updated_at                        DateTime     @default(now()) @db.Timestamptz(6)
   lessons_lessons_video_idTovideos  lessons[]    @relation("lessons_video_idTovideos")
   video_jobs                        video_jobs[]
-  lessons_videos_lesson_idTolessons lessons      @relation("videos_lesson_idTolessons", fields: [lesson_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  lessons_videos_lesson_idTolessons lessons?     @relation("videos_lesson_idTolessons", fields: [lesson_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([lesson_id])
   @@index([status])

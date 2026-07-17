@@ -12,6 +12,8 @@ import { colorPresets } from '@/lib/color-presets'
 import { neonPresets } from '@/lib/neon-presets'
 import { lightPresets } from '@/lib/light-presets'
 import { getSiteColor, getSiteNeon, getSiteLightPreset } from '@/app/admin/settings/actions'
+import { auth } from '@/auth'
+import { prisma } from '@/lib/prisma'
 import { getSiteContent } from '@/lib/site-content'
 import { getSiteUrl } from '@/lib/seo'
 import './globals.css'
@@ -97,6 +99,18 @@ export default async function RootLayout({
       getSiteLightPreset(),
       getSiteContent(),
     ])
+
+    const session = await auth()
+    const userId = session?.user?.id
+    if (userId) {
+      const userProfile = await prisma.profiles.findUnique({
+        where: { id: userId },
+        select: { color_preset: true, role: true }
+      })
+      if (userProfile && userProfile.role === 'student' && userProfile.color_preset) {
+        savedColor = userProfile.color_preset
+      }
+    }
   } catch {
     // لو فشل الجلب نكمّل بالقيم الافتراضية
   }

@@ -510,7 +510,10 @@ export async function updateLesson(id: string, input: LessonInput) {
         // لو streaming: نحط video_url=null ونربط بالـ video_id
         ...(isStreamingVideo
           ? { video_url: null, video_id: streamingVideoId }
-          : { video_url: input.videoUrl !== undefined ? input.videoUrl : undefined }
+          : { 
+              video_url: input.videoUrl !== undefined ? input.videoUrl : undefined,
+              video_id: input.videoUrl !== undefined ? null : undefined 
+            }
         ),
         description: input.description !== undefined ? input.description : undefined,
         attachments: input.attachments !== undefined ? input.attachments : undefined,
@@ -628,7 +631,7 @@ export async function getLectureDetailAdmin(id: string): Promise<{ lecture: Admi
     prisma.branches.findUnique({ where: { id: row.branch_id }, select: { id: true, title: true, stage_id: true, stages: { select: { id: true, title: true } } } }),
     prisma.lessons.findMany({
       where: { lecture_id: id },
-      select: { id: true, slug: true, title: true, duration: true, is_free: true, sort_order: true, video_url: true, description: true, content_type: true, attachments: true },
+      select: { id: true, slug: true, title: true, duration: true, is_free: true, sort_order: true, video_url: true, video_id: true, description: true, content_type: true, attachments: true },
       orderBy: { sort_order: 'asc' }
     })
   ])
@@ -663,7 +666,7 @@ export async function getLectureDetailAdmin(id: string): Promise<{ lecture: Admi
         isFree: !!l.is_free,
         contentType: (ct === 'مقال' || ct === 'تمرين' ? ct : 'فيديو') as AdminLesson['contentType'],
         sortOrder: l.sort_order,
-        videoUrl: l.video_url ?? null,
+        videoUrl: l.video_id ? `__video_id:${l.video_id}` : (l.video_url ?? null),
         description: l.description ?? null,
         attachments: Array.isArray(l.attachments) ? (l.attachments as LessonAttachment[]) : [],
       }
@@ -683,7 +686,7 @@ export async function getLectureDetailAdmin(id: string): Promise<{ lecture: Admi
 export async function getLessonDetailAdmin(lessonId: string): Promise<{ lesson: AdminLesson; lectureId: string; lectureTitle: string; lectureImage: string | null; siblings: AdminLesson[] } | null> {
   const row = await prisma.lessons.findUnique({
     where: { id: lessonId },
-    select: { id: true, slug: true, lecture_id: true, title: true, duration: true, is_free: true, sort_order: true, video_url: true, description: true, content_type: true, attachments: true }
+    select: { id: true, slug: true, lecture_id: true, title: true, duration: true, is_free: true, sort_order: true, video_url: true, video_id: true, description: true, content_type: true, attachments: true }
   })
   if (!row) return null
 
@@ -691,7 +694,7 @@ export async function getLessonDetailAdmin(lessonId: string): Promise<{ lesson: 
     prisma.lectures.findUnique({ where: { id: row.lecture_id }, select: { id: true, title: true, image: true } }),
     prisma.lessons.findMany({
       where: { lecture_id: row.lecture_id },
-      select: { id: true, slug: true, title: true, duration: true, is_free: true, sort_order: true, video_url: true, description: true, content_type: true, attachments: true },
+      select: { id: true, slug: true, title: true, duration: true, is_free: true, sort_order: true, video_url: true, video_id: true, description: true, content_type: true, attachments: true },
       orderBy: { sort_order: 'asc' }
     })
   ])
@@ -706,7 +709,7 @@ export async function getLessonDetailAdmin(lessonId: string): Promise<{ lesson: 
       isFree: !!l.is_free,
       contentType: (ct === 'مقال' || ct === 'تمرين' ? ct : 'فيديو') as AdminLesson['contentType'],
       sortOrder: l.sort_order,
-      videoUrl: l.video_url ?? null,
+      videoUrl: l.video_id ? `__video_id:${l.video_id}` : (l.video_url ?? null),
       description: l.description ?? null,
       attachments: Array.isArray(l.attachments) ? (l.attachments as LessonAttachment[]) : [],
     }
