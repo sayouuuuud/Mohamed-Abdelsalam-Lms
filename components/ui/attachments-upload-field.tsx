@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react'
 import { FileText, FileImage, File as FileIcon, X, Upload, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useUploadThing } from '@/lib/uploadthing'
+import { getAttachmentUploadUrl } from '@/app/admin/courses/actions'
 import { cn } from '@/lib/utils'
 import type { LessonAttachment } from '@/app/admin/courses/actions'
 
@@ -41,56 +41,60 @@ export function AttachmentsUploadField({
   const [isUploading, setIsUploading] = useState(false)
   const pendingRef = useRef<{ name: string; type: LessonAttachment['type'] }[]>([])
 
-  const { startUpload } = useUploadThing('lessonAttachment', {
-    onClientUploadComplete: (res) => {
-      if (res && res.length > 0) {
-        const uploaded: LessonAttachment[] = res.map((r) => ({
-          name: r.name,
-          url: r.url,
-          type: pendingRef.current.find((p) => p.name === r.name)?.type ?? 'other',
-        }))
-        onChange([...value, ...uploaded])
-        toast.success(uploaded.length === 1 ? 'تم رفع الملف' : `تم رفع ${uploaded.length} ملفات`)
-      }
-      pendingRef.current = []
-      setIsUploading(false)
-      if (inputRef.current) inputRef.current.value = ''
-    },
-    onUploadError: (e) => {
-      toast.error(`فشل الرفع: ${e.message}`)
-      pendingRef.current = []
-      setIsUploading(false)
-      if (inputRef.current) inputRef.current.value = ''
-    },
-  })
-
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return
 
     const valid: File[] = []
-    const pending: { name: string; type: LessonAttachment['type'] }[] = []
     for (const file of Array.from(files)) {
       if (file.size > MAX_FILE_SIZE) {
         toast.error(`"${file.name}" أكبر من 100 ميجابايت`)
         continue
       }
       valid.push(file)
-      pending.push({ name: file.name, type: attachmentType(file) })
     }
+
     if (valid.length === 0) {
       if (inputRef.current) inputRef.current.value = ''
       return
     }
 
-    pendingRef.current = pending
     setIsUploading(true)
+    const uploaded: LessonAttachment[] = []
+
     try {
-      await startUpload(valid)
-      // Completion handled in onClientUploadComplete.
-      // With awaitServerData: false, this resolves as soon as files reach S3.
+      for (const file of valid) {
+        const { uploadUrl, key, error } = await getAttachmentUploadUrl(file.name, file.type)
+        
+        if (error || !uploadUrl || !key) {
+          toast.error(`فشل في جلب رابط الرفع للملف: ${file.name}`)
+          continue
+        }
+
+        const res = await fetch(uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': file.type },
+          body: file,
+        })
+
+        if (!res.ok) {
+          toast.error(`فشل الرفع للملف: ${file.name}`)
+          continue
+        }
+
+        uploaded.push({
+          name: file.name,
+          url: `/api/${key}`, // Maps to /api/attachments/...
+          type: attachmentType(file),
+        })
+      }
+
+      if (uploaded.length > 0) {
+        onChange([...value, ...uploaded])
+        toast.success(uploaded.length === 1 ? 'تم رفع الملف بنجاح' : `تم رفع ${uploaded.length} ملفات بنجاح`)
+      }
     } catch (e) {
       toast.error(`فشل الرفع: ${e instanceof Error ? e.message : 'خطأ غير معروف'}`)
-      pendingRef.current = []
+    } finally {
       setIsUploading(false)
       if (inputRef.current) inputRef.current.value = ''
     }

@@ -5,6 +5,8 @@ import { prisma } from '@/lib/prisma'
 import { hasResourceAccess } from '@/lib/auth-guard'
 import { createNotification } from '@/lib/notify'
 import { logActivity } from '@/lib/audit-log'
+import { createR2UploadUrl } from '@/lib/r2'
+import crypto from 'crypto'
 
 
 export type LessonAttachment = {
@@ -818,5 +820,21 @@ export async function reorderLectureContent(
     return { success: true }
   } catch (error: any) {
     return { error: 'تعذّر إعادة الترتيب.' }
+  }
+}
+
+export async function getAttachmentUploadUrl(filename: string, contentType: string) {
+  if (!(await hasResourceAccess('courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
+
+  const ext = filename.split('.').pop() || 'bin'
+  const randomName = `${crypto.randomUUID()}.${ext}`
+  const key = `attachments/${randomName}`
+
+  try {
+    const uploadUrl = await createR2UploadUrl(key, contentType, 900) // 15 mins
+    return { uploadUrl, key }
+  } catch (error) {
+    console.error('[attachments] getAttachmentUploadUrl error:', error)
+    return { error: 'فشل في إنشاء رابط الرفع على Cloudflare R2' }
   }
 }
