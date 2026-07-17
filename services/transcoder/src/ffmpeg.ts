@@ -129,7 +129,7 @@ async function runFfmpeg(args: string[], totalSeconds: number, onProgress?: (pct
 }
 
 // ---------------------------------------------------------------
-// writeMasterManifest: يكتب master.m3u8 
+// writeMasterManifest: يكتب master.m3u8
 // ---------------------------------------------------------------
 async function writeMasterManifest(outputDir: string): Promise<void> {
   const lines: string[] = [

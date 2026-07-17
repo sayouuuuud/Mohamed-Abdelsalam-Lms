@@ -85,13 +85,24 @@ export async function processOneJob(): Promise<boolean> {
     return true
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    console.error(`[worker] job ${jobId} فشل:`, msg)
-    await markVideoFailed(jobId, videoId, msg).catch(() => {})
+    console.error(`[worker] job ${jobId} فشل:`, err)
+    try {
+      await markVideoFailed(jobId, videoId, msg)
+    } catch (persistenceError) {
+      console.error(
+        `[worker] تعذّر حفظ فشل job ${jobId}; processing error: ${msg}`,
+        persistenceError,
+      )
+    }
     return false
   } finally {
     // تنظيف الملفات المؤقتة دايماً
-    await fs.rm(workDir, { recursive: true, force: true }).catch(() => {})
-    console.log(`[worker] تنظيف ${workDir}`)
+    try {
+      await fs.rm(workDir, { recursive: true, force: true })
+      console.log(`[worker] تنظيف ${workDir}`)
+    } catch (cleanupError) {
+      console.error(`[worker] تعذّر تنظيف ${workDir}:`, cleanupError)
+    }
   }
 }
 

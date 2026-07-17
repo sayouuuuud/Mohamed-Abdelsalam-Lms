@@ -84,13 +84,27 @@ server.listen(PORT, () => {
   }
 })
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('[transcoder] SIGTERM — جاري الإغلاق ...')
-  server.close(() => process.exit(0))
+let shuttingDown = false
+
+function shutdown(reason: string, exitCode: number): void {
+  if (shuttingDown) return
+  shuttingDown = true
+  console.log(`[transcoder] ${reason} — جاري الإغلاق ...`)
+
+  const forceExit = setTimeout(() => process.exit(exitCode), 10_000)
+  forceExit.unref()
+  server.close(() => process.exit(exitCode))
+}
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[transcoder] unhandled rejection:', reason)
+  shutdown('unhandled rejection', 1)
 })
 
-process.on('SIGINT', () => {
-  console.log('[transcoder] SIGINT — جاري الإغلاق ...')
-  server.close(() => process.exit(0))
+process.on('uncaughtException', (error) => {
+  console.error('[transcoder] uncaught exception:', error)
+  shutdown('uncaught exception', 1)
 })
+
+process.on('SIGTERM', () => shutdown('SIGTERM', 0))
+process.on('SIGINT', () => shutdown('SIGINT', 0))

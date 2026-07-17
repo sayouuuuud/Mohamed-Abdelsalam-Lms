@@ -2,50 +2,36 @@
 /**
  * ffmpeg.ts
  * ينفّذ FFmpeg عبر child_process.spawn — لا wrapper خارجي.
- * المخرج: HLS ladder متعدد الجودات + master manifest.
- *
- * RENDITIONS المتاحة: 360p | 480p | 720p | 1080p
- * الـ admin panel بيحدد أيها تُنتَج (renditions[] من streaming_settings).
+ * المخرج: HLS ladder بجودة أصلية واحدة (Single Rendition) بناءً على طلب العميل.
  */
 import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs/promises';
-const ALL_RENDITIONS = {
-    '360p': { name: '360p', height: 360, videoBitrate: '800k', audioBitrate: '96k', maxRate: '856k', bufSize: '1200k' },
-    '480p': { name: '480p', height: 480, videoBitrate: '1400k', audioBitrate: '128k', maxRate: '1498k', bufSize: '2100k' },
-    '720p': { name: '720p', height: 720, videoBitrate: '2800k', audioBitrate: '128k', maxRate: '2996k', bufSize: '4200k' },
-    '1080p': { name: '1080p', height: 1080, videoBitrate: '5000k', audioBitrate: '192k', maxRate: '5350k', bufSize: '7500k' },
-};
 // ---------------------------------------------------------------
-// transcode: المدخل ← ملف فيديو محلي. المخرج ← مجلد HLS كامل.
-// يستدعي FFmpeg مرة واحدة لكل الجودات (multi-output أكثر كفاءة).
+// transcode: المدخل ← ملف فيديو محلي. المخرج ← مجلد HLS.
 // ---------------------------------------------------------------
 export async function transcode(opts) {
-    const { inputPath, outputDir, renditions, threads, onProgress } = opts;
+    const { inputPath, outputDir, threads, segmentDurationSec = 10, onProgress } = opts;
     // تأكد من وجود المجلد
     await fs.mkdir(outputDir, { recursive: true });
-    // صفّي الـ renditions المطلوبة
-    const active = renditions
-        .filter((r) => ALL_RENDITIONS[r])
-        .map((r) => ALL_RENDITIONS[r]);
-    if (active.length === 0)
-        throw new Error('[ffmpeg] لا توجد renditions صحيحة');
+    const segDir = path.join(outputDir, 'original');
+    await fs.mkdir(segDir, { recursive: true });
     // احسب مدة الفيديو الأصلي أولاً (لتتبع التقدّم)
     const totalSeconds = await probeDuration(inputPath);
     // ابنِ أوامر FFmpeg
-    const args = buildFfmpegArgs({ inputPath, outputDir, active, threads });
-    console.log('[ffmpeg] starting transcoding:', renditions.join(', '));
+    const args = buildFfmpegArgs({ inputPath, outputDir, threads, segmentDurationSec });
+    console.log('[ffmpeg] starting transcoding: Original Quality Only');
     console.log('[ffmpeg] args:', args.join(' '));
     await runFfmpeg(args, totalSeconds, onProgress);
-    // ولّد master.m3u8 يجمع كل الجودات
-    await writeMasterManifest(outputDir, active);
+    // ولّد master.m3u8
+    await writeMasterManifest(outputDir);
     return { durationSeconds: totalSeconds };
 }
 // ---------------------------------------------------------------
-// buildFfmpegArgs: يبني مصفوفة الأوامر لـ multi-output HLS
+// buildFfmpegArgs: يبني مصفوفة الأوامر
 // ---------------------------------------------------------------
 function buildFfmpegArgs(opts) {
-    const { inputPath, outputDir, active, threads } = opts;
+    const { inputPath, outputDir, threads, segmentDurationSec } = opts;
     const args = [];
     // إعدادات عامة
     args.push('-hide_banner', '-loglevel', 'warning', '-stats');
@@ -53,36 +39,18 @@ function buildFfmpegArgs(opts) {
         args.push('-threads', String(threads));
     // المدخل
     args.push('-i', inputPath);
-    // فلتر التحجيم — scale يحافظ على النسبة مع force إجبار العرض زوجي
-    const filterChain = active
-        .map((r, i) => `[0:v]scale=-2:${r.height}[v${i}]`)
-        .join(';');
-    args.push('-filter_complex', filterChain);
-    // لكل rendition: تشفير فيديو + صوت + HLS output
-    active.forEach((r, i) => {
-        const segDir = path.join(outputDir, r.name);
-        // map الـ stream
-        args.push('-map', `[v${i}]`, '-map', '0:a');
-        // إعدادات الفيديو
-        args.push(`-c:v:${i}`, 'libx264', `-preset:v:${i}`, 'veryfast', // سرعة + جودة مقبولة
-        `-crf:v:${i}`, '23', `-b:v:${i}`, r.videoBitrate, `-maxrate:v:${i}`, r.maxRate, `-bufsize:v:${i}`, r.bufSize, `-profile:v:${i}`, 'main', // توافق iOS/Android
-        `-level:v:${i}`, '4.1', `-sc_threshold:v:${i}`, '0', // يمنع keyframes عشوائية
-        `-g:v:${i}`, '48', // GOP = 2 ثانية عند 24fps
-        `-keyint_min:v:${i}`, '48');
-        // إعدادات الصوت
-        args.push(`-c:a:${i}`, 'aac', `-b:a:${i}`, r.audioBitrate, `-ar:a:${i}`, '44100', `-ac:a:${i}`, '2');
-        // HLS output
-        args.push(`-f:${i}`, 'hls', `-hls_time:${i}`, '4', // مدة كل segment: 4 ثواني
-        `-hls_playlist_type:${i}`, 'vod', `-hls_segment_type:${i}`, 'mpegts', `-hls_segment_filename:${i}`, path.join(segDir, 'seg%05d.ts'), `-hls_flags:${i}`, 'independent_segments', path.join(segDir, 'index.m3u8'));
-    });
+    const segDir = path.join(outputDir, 'original');
+    // إعدادات الفيديو والصوت وجودة واحدة فقط
+    args.push('-c:v', 'libx264', '-preset:v', 'veryfast', '-crf:v', '23', // جودة ممتازة مقاربة للأصل بضغط ذكي
+    '-profile:v', 'main', '-level:v', '4.1', '-sc_threshold:v', '0', '-g:v', '48', '-keyint_min:v', '48', '-c:a', 'aac', '-b:a', '128k', '-ar:a', '44100', '-ac:a', '2', '-f', 'hls', '-hls_time', String(segmentDurationSec), '-hls_playlist_type', 'vod', '-hls_segment_type', 'mpegts', '-hls_segment_filename', path.join(segDir, 'seg%05d.ts'), '-hls_flags', 'independent_segments', path.join(segDir, 'index.m3u8'));
     return args;
 }
 // ---------------------------------------------------------------
-// runFfmpeg: ينفّذ FFmpeg ويتابع التقدّم عبر stderr
+// runFfmpeg: ينفّذ العملية مع progress tracking
 // ---------------------------------------------------------------
-function runFfmpeg(args, totalSeconds, onProgress) {
+async function runFfmpeg(args, totalSeconds, onProgress) {
     return new Promise((resolve, reject) => {
-        const proc = spawn('ffmpeg', args, { stdio: ['ignore', 'ignore', 'pipe'] });
+        const proc = spawn('ffmpeg', args, { stdio: ['ignore', 'pipe', 'pipe'] });
         let stderr = '';
         proc.stderr.on('data', (chunk) => {
             const line = chunk.toString();
@@ -110,14 +78,17 @@ function runFfmpeg(args, totalSeconds, onProgress) {
     });
 }
 // ---------------------------------------------------------------
-// writeMasterManifest: يكتب master.m3u8 يجمع كل الجودات
+// writeMasterManifest: يكتب master.m3u8
 // ---------------------------------------------------------------
-async function writeMasterManifest(outputDir, active) {
-    const lines = ['#EXTM3U', '#EXT-X-VERSION:3', ''];
-    for (const r of active) {
-        const approxBw = parseInt(r.videoBitrate) * 1000 + parseInt(r.audioBitrate) * 1000;
-        lines.push(`#EXT-X-STREAM-INF:BANDWIDTH=${approxBw},RESOLUTION=${getResWidth(r.height)}x${r.height},NAME="${r.name}"`, `${r.name}/index.m3u8`, '');
-    }
+async function writeMasterManifest(outputDir) {
+    const lines = [
+        '#EXTM3U',
+        '#EXT-X-VERSION:3',
+        '',
+        `#EXT-X-STREAM-INF:BANDWIDTH=3000000,NAME="Original"`,
+        `original/index.m3u8`,
+        ''
+    ];
     await fs.writeFile(path.join(outputDir, 'master.m3u8'), lines.join('\n'), 'utf8');
     console.log('[ffmpeg] master.m3u8 written');
 }
@@ -145,10 +116,5 @@ async function probeDuration(filePath) {
         });
         proc.on('error', () => resolve(0));
     });
-}
-// helper: عرض الفيديو لكل ارتفاع (نسبة 16:9 تقريبية)
-function getResWidth(height) {
-    const map = { 360: 640, 480: 854, 720: 1280, 1080: 1920 };
-    return map[height] ?? Math.round(height * 16 / 9);
 }
 //# sourceMappingURL=ffmpeg.js.map

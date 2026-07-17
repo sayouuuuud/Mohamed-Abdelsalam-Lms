@@ -22,8 +22,8 @@ src/
 
 | المتغير | الوصف |
 |---|---|
-| `SUPABASE_URL` | رابط مشروع Supabase |
-| `SUPABASE_SERVICE_KEY` | service_role key (مش anon) |
+| `DATABASE_URL` | رابط PostgreSQL مباشر للـ worker |
+| `WORKER_ID` | اسم ثابت ومميز للنسخة، مثل `coolify-transcoder-1` |
 | `R2_ENDPOINT` | `https://<ACCOUNT_ID>.r2.cloudflarestorage.com` |
 | `R2_ACCESS_KEY_ID` | R2 API Token |
 | `R2_SECRET_ACCESS_KEY` | R2 API Secret |
@@ -34,9 +34,26 @@ src/
 | `POLL_INTERVAL_MS` | وقت الاستطلاع في poll mode (افتراضي 10000) |
 | `TMP_DIR` | مجلد الملفات المؤقتة (افتراضي /tmp) |
 
+## تهيئة قاعدة البيانات
+
+قبل نشر صورة الـ worker الجديدة، نفّذ migration التالي مرة واحدة على PostgreSQL:
+
+```text
+scripts/fix_transcoder_job_claim.sql
+```
+
+الدالة الجديدة `claim_next_video_job(worker_id)` تحجز الصفوف بشكل atomic، وتجدد الـ lease أثناء التحويل، ولا تستعيد job نشط إلا بعد 30 دقيقة من آخر heartbeat.
+
 ## طرق النشر
 
-### Railway (موصى به — scale-to-zero)
+### Coolify (polling — موصى به للـ always-on worker)
+
+- اجعل Build Context هو `/services/transcoder` واستخدم الـ `Dockerfile` الموجود فيه.
+- اضبط `WORKER_MODE=poll` و`PORT=4000` و`WORKER_ID` بقيمة فريدة لكل replica.
+- اضبط Health Check على `/health` والمنفذ `4000`.
+- طبّق migration أعلاه قبل إعادة النشر، ثم راقب السجل للتأكد من ظهور claim واحد فقط لكل job.
+
+### Railway (scale-to-zero)
 
 ```bash
 # من مجلد services/transcoder
@@ -44,7 +61,7 @@ railway init
 railway up
 
 # ضبط المتغيرات
-railway variables set SUPABASE_URL=... SUPABASE_SERVICE_KEY=... ...
+railway variables set DATABASE_URL=... WORKER_ID=railway-transcoder-1 ...
 
 # الـ WORKER_WAKE_URL هيكون: https://<your-app>.railway.app/wake
 ```
@@ -60,7 +77,7 @@ docker run -p 4000:4000 --env-file .env transcoder
 
 ```bash
 fly launch --name transcoder --no-deploy
-fly secrets set SUPABASE_URL=... SUPABASE_SERVICE_KEY=... ...
+fly secrets set DATABASE_URL=... WORKER_ID=fly-transcoder-1 ...
 fly deploy
 ```
 

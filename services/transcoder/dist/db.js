@@ -4,8 +4,11 @@
  * طبقة الاتصال بقاعدة بيانات PostgreSQL مباشرة من داخل الوركر.
  * بيستخدم DATABASE_URL — لا يمر عبر Prisma عشان يكون خفيف ومستقل.
  */
+import os from 'os';
 import pg from 'pg';
 const { Pool } = pg;
+const WORKER_ID = process.env.WORKER_ID?.trim() || `${os.hostname()}:${process.pid}`;
+const MAX_ERROR_LENGTH = 8_000;
 let _pool = null;
 export function getDbPool() {
     if (_pool)
@@ -26,32 +29,23 @@ export function getDbPool() {
 // ---------------------------------------------------------------
 export async function claimNextJob() {
     const pool = getDbPool();
-    try {
-        const { rows } = await pool.query('SELECT * FROM claim_next_video_job()');
-        if (!rows || rows.length === 0)
-            return null;
-        const row = rows[0];
-        return {
-            jobId: row.job_id,
-            videoId: row.video_id,
-            r2RawKey: row.r2_raw_key,
-            threadsOverride: row.threads_override ?? null,
-        };
-    }
-    catch (error) {
-        console.error('[transcoder] claimNextJob error:', error.message);
+    const { rows } = await pool.query('SELECT * FROM public.claim_next_video_job($1)', [WORKER_ID]);
+    if (!rows || rows.length === 0)
         return null;
-    }
+    const row = rows[0];
+    return {
+        jobId: row.job_id,
+        videoId: row.video_id,
+        r2RawKey: row.r2_raw_key,
+        threadsOverride: row.threads_override ?? null,
+    };
 }
-// تحديث حالة الـ job أثناء المعالجة
-export async function updateJobProgress(jobId, progress) {
+// يجدّد lease للـ job أثناء المعالجة. الجدول الحالي لا يحتوي عمود progress.
+export async function updateJobProgress(jobId, _progress) {
     const pool = getDbPool();
-    try {
-        await pool.query(`UPDATE video_jobs SET progress = $1, updated_at = NOW() WHERE id = $2`, [Math.round(progress), jobId]);
-    }
-    catch (error) {
-        console.error('[transcoder] updateJobProgress error:', error.message);
-    }
+    await pool.query(`UPDATE public.video_jobs
+     SET claimed_at = NOW(), updated_at = NOW()
+     WHERE id = $1 AND status = 'claimed' AND claimed_by = $2`, [jobId, WORKER_ID]);
 }
 // تحديث حالة الـ video و job عند الانتهاء
 export async function markVideoReady(jobId, videoId, hlsPrefix, durationSeconds) {
@@ -62,8 +56,9 @@ export async function markVideoReady(jobId, videoId, hlsPrefix, durationSeconds)
         await client.query(`UPDATE videos 
        SET status = 'ready', r2_hls_prefix = $1, duration_sec = $2, updated_at = NOW() 
        WHERE id = $3`, [hlsPrefix, durationSeconds, videoId]);
-        await client.query(`UPDATE video_jobs 
-       SET status = 'done', progress = 100, finished_at = NOW(), updated_at = NOW() 
+        await client.query(`UPDATE public.video_jobs
+       SET status = 'done', completed_at = NOW(), claimed_by = NULL,
+           claimed_at = NULL, last_error = NULL, updated_at = NOW()
        WHERE id = $1`, [jobId]);
         await client.query('COMMIT');
     }
@@ -80,17 +75,19 @@ export async function markVideoReady(jobId, videoId, hlsPrefix, durationSeconds)
 export async function markVideoFailed(jobId, videoId, errorMsg) {
     const pool = getDbPool();
     const client = await pool.connect();
+    const storedError = errorMsg.slice(0, MAX_ERROR_LENGTH);
     try {
         await client.query('BEGIN');
-        await client.query(`UPDATE videos SET status = 'error', updated_at = NOW() WHERE id = $1`, [videoId]);
-        await client.query(`UPDATE video_jobs 
-       SET status = 'error', error_message = $1, finished_at = NOW(), updated_at = NOW() 
-       WHERE id = $2`, [errorMsg, jobId]);
+        await client.query(`UPDATE public.videos SET status = 'error', error_message = $1, updated_at = NOW() WHERE id = $2`, [storedError, videoId]);
+        await client.query(`UPDATE public.video_jobs
+       SET status = 'failed', last_error = $1, completed_at = NOW(),
+           claimed_by = NULL, claimed_at = NULL, updated_at = NOW()
+       WHERE id = $2`, [storedError, jobId]);
         await client.query('COMMIT');
     }
     catch (error) {
         await client.query('ROLLBACK');
-        console.error('[transcoder] markVideoFailed error:', error.message);
+        throw error;
     }
     finally {
         client.release();
