@@ -136,6 +136,7 @@ export async function getStreamingConfig(): Promise<{
   maxConcurrentJobs: number
   ffmpegThreads: number
   renditions: string[]
+  segmentDurationSec?: number
 } | null> {
   const pool = getDbPool()
   try {
