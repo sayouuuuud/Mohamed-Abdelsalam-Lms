@@ -5,6 +5,7 @@ import { verifyVideoToken, isLatestSession } from '@/lib/video-token'
 import { userCanAccessLecture } from '@/lib/lecture-access'
 import { createR2DownloadUrl } from '@/lib/r2'
 import { auth } from '@/auth'
+import { hasResourceAccess } from '@/lib/auth-guard'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -61,8 +62,12 @@ async function resolveAuthorizedVideo(
     return { ok: false, status: 404 }
   }
 
-  if (!(await userCanAccessLecture(user.id, lesson.lecture_id))) {
-    return { ok: false, status: 403 }
+  const hasAccess = await userCanAccessLecture(user.id, lesson.lecture_id)
+  if (!hasAccess) {
+    const isStaff = await hasResourceAccess('courses', 'view')
+    if (!isStaff) {
+      return { ok: false, status: 403 }
+    }
   }
 
   const video = await prisma.videos.findUnique({

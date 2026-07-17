@@ -19,7 +19,7 @@ import os from 'os'
 import path from 'path'
 import fs from 'fs/promises'
 import { claimNextJob, updateJobProgress, markVideoReady, markVideoFailed, getStreamingConfig } from './db.js'
-import { downloadRaw, uploadDirectory } from './r2.js'
+import { downloadRaw, uploadDirectory, deleteFromR2 } from './r2.js'
 import { transcode } from './ffmpeg.js'
 
 const TMP_BASE = process.env.TMP_DIR ?? os.tmpdir()
@@ -87,6 +87,9 @@ export async function processOneJob(): Promise<boolean> {
     // المرحلة 4: تحديث DB
     await markVideoReady(jobId, videoId, r2HlsPrefix, durationSeconds)
     console.log(`[worker] job ${jobId} اكتمل بنجاح (${Math.round(durationSeconds)}s)`)
+
+    // المرحلة 5: حذف الملف الخام من R2 لتوفير المساحة
+    await deleteFromR2(r2RawKey)
 
     return true
   } catch (err) {

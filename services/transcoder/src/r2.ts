@@ -11,6 +11,7 @@ import {
   GetObjectCommand,
   PutObjectCommand,
   HeadObjectCommand,
+  DeleteObjectCommand,
 } from '@aws-sdk/client-s3'
 import { createReadStream, createWriteStream, existsSync } from 'fs'
 import { pipeline } from 'stream/promises'
@@ -121,6 +122,20 @@ export async function existsInR2(r2Key: string): Promise<boolean> {
     return true
   } catch {
     return false
+  }
+}
+
+// ---------------------------------------------------------------
+// deleteFromR2: يحذف ملف من R2
+// ---------------------------------------------------------------
+export async function deleteFromR2(r2Key: string): Promise<void> {
+  const bucket = process.env.R2_BUCKET
+  if (!bucket) return
+  try {
+    await getR2Client().send(new DeleteObjectCommand({ Bucket: bucket, Key: r2Key }))
+    console.log(`[transcoder/r2] deleted raw file → ${r2Key}`)
+  } catch (err) {
+    console.error(`[transcoder/r2] failed to delete ${r2Key}:`, err)
   }
 }
 

@@ -7,6 +7,8 @@ import { createNotification } from '@/lib/notify'
 import { logActivity } from '@/lib/audit-log'
 import { createR2UploadUrl } from '@/lib/r2'
 import crypto from 'crypto'
+import { auth } from '@/auth'
+import { createPlaybackToken } from '@/lib/video-token'
 
 
 export type LessonAttachment = {
@@ -24,6 +26,7 @@ export type AdminLesson = {
   contentType: 'فيديو' | 'مقال' | 'تمرين'
   sortOrder: number
   videoUrl: string | null
+  previewUrl?: string | null
   description: string | null
   attachments: LessonAttachment[]
 }
@@ -624,6 +627,9 @@ async function getLectureAssignments(lectureId: string): Promise<AdminAssignment
 }
 
 export async function getLectureDetailAdmin(id: string): Promise<{ lecture: AdminLecture; content: AdminContentItem[] } | null> {
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+  if (!isUuid) return null
+
   const row = await prisma.lectures.findUnique({ where: { id } })
   if (!row) return null
 
@@ -684,6 +690,9 @@ export async function getLectureDetailAdmin(id: string): Promise<{ lecture: Admi
 }
 
 export async function getLessonDetailAdmin(lessonId: string): Promise<{ lesson: AdminLesson; lectureId: string; lectureTitle: string; lectureImage: string | null; siblings: AdminLesson[] } | null> {
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lessonId)
+  if (!isUuid) return null
+
   const row = await prisma.lessons.findUnique({
     where: { id: lessonId },
     select: { id: true, slug: true, lecture_id: true, title: true, duration: true, is_free: true, sort_order: true, video_url: true, video_id: true, description: true, content_type: true, attachments: true }
@@ -710,13 +719,23 @@ export async function getLessonDetailAdmin(lessonId: string): Promise<{ lesson: 
       contentType: (ct === 'مقال' || ct === 'تمرين' ? ct : 'فيديو') as AdminLesson['contentType'],
       sortOrder: l.sort_order,
       videoUrl: l.video_id ? `__video_id:${l.video_id}` : (l.video_url ?? null),
+      previewUrl: undefined,
       description: l.description ?? null,
       attachments: Array.isArray(l.attachments) ? (l.attachments as LessonAttachment[]) : [],
     }
   }
 
+  const session = await auth()
+  const userId = session?.user?.id
+  const lessonMapped = map(row)
+  
+  if (row.video_id && userId) {
+    const token = await createPlaybackToken(userId, row.id)
+    lessonMapped.previewUrl = `/api/hls/${row.id}/master.m3u8?t=${encodeURIComponent(token)}`
+  }
+
   return {
-    lesson: map(row),
+    lesson: lessonMapped,
     lectureId: row.lecture_id,
     lectureTitle: lecture?.title ?? '',
     lectureImage: lecture?.image ?? null,

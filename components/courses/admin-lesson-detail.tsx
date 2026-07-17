@@ -118,8 +118,8 @@ export function AdminLessonDetail({
             <div className="relative aspect-video w-full bg-black">
               {lesson.videoUrl ? (
                 <VideoPlayer
-                  key={lesson.videoUrl}
-                  src={lesson.videoUrl}
+                  key={lesson.previewUrl ?? lesson.videoUrl}
+                  src={lesson.previewUrl ?? lesson.videoUrl}
                   poster={lectureImage ?? undefined}
                 />
               ) : (
