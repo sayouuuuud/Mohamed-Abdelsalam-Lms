@@ -31,8 +31,15 @@ const server = http.createServer(async (req, res) => {
     // POST /wake — تحقق من السر أولاً
     // ---------------------------------------------------------------
     if (req.method === 'POST' && req.url === '/wake') {
+        // Accept secret via either header for backward compatibility:
+        //   Authorization: Bearer <secret>   (original)
+        //   x-wake-secret: <secret>          (new — sent by video-actions.ts)
         const auth = req.headers['authorization'] ?? '';
-        if (SECRET && auth !== `Bearer ${SECRET}`) {
+        const xSecret = req.headers['x-wake-secret'] ?? '';
+        const authorized = !SECRET ||
+            auth === `Bearer ${SECRET}` ||
+            xSecret === SECRET;
+        if (!authorized) {
             res.writeHead(401, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'unauthorized' }));
             return;

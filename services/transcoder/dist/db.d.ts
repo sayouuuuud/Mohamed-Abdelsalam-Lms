@@ -1,11 +1,10 @@
 /**
  * db.ts
- * طبقة الاتصال بـ Supabase من داخل الوركر.
- * بيستخدم SUPABASE_URL + SUPABASE_SERVICE_KEY (service_role) مباشرة —
- * لا يمر عبر RLS — ده مقصود عشان الوركر يكون خارج دائرة الـ auth.
+ * طبقة الاتصال بقاعدة بيانات PostgreSQL مباشرة من داخل الوركر.
+ * بيستخدم DATABASE_URL — لا يمر عبر Prisma عشان يكون خفيف ومستقل.
  */
-import { SupabaseClient } from '@supabase/supabase-js';
-export declare function getDb(): SupabaseClient;
+import pg from 'pg';
+export declare function getDbPool(): pg.Pool;
 export declare function claimNextJob(): Promise<{
     jobId: string;
     videoId: string;
