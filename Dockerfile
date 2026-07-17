@@ -11,7 +11,7 @@ RUN corepack enable pnpm
 
 # Install dependencies based on the preferred package manager
 COPY package.json pnpm-lock.yaml* ./
-RUN pnpm i --frozen-lockfile
+RUN pnpm i --no-frozen-lockfile
 
 # Rebuild the source code only when needed
 FROM base AS builder
