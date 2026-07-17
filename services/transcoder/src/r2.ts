@@ -92,13 +92,16 @@ export async function uploadDirectory(localDir: string, r2Prefix: string): Promi
         const r2Key      = `${r2Prefix}${entry}`
         const body       = createReadStream(fullPath)
         const contentType = getContentType(entry as string)
+        const cacheControl = (entry as string).endsWith('.m3u8') 
+          ? 'no-cache, no-store, must-revalidate' 
+          : 'public, max-age=31536000'
 
         await client.send(new PutObjectCommand({
           Bucket:      bucket,
           Key:         r2Key,
           Body:        body,
           ContentType: contentType,
-          // لا CacheControl — الـ segments محمية بتوكنات مؤقتة
+          CacheControl: cacheControl,
         }))
         console.log(`[transcoder/r2] uploaded → ${r2Key}`)
       })

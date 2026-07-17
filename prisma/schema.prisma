@@ -1218,6 +1218,7 @@ model platform_settings {
   worker_ram_mb        Int?      @default(2048)
   worker_concurrency   Int?      @default(1)
   segment_duration_sec Int?      @default(4)
+  renditions           Json?     @default("[{\"name\": \"360p\", \"width\": 640, \"height\": 360, \"abitrate\": \"64k\", \"vbitrate\": \"600k\"}, {\"name\": \"480p\", \"width\": 854, \"height\": 480, \"abitrate\": \"96k\", \"vbitrate\": \"1200k\"}, {\"name\": \"720p\", \"width\": 1280, \"height\": 720, \"abitrate\": \"128k\", \"vbitrate\": \"2500k\"}, {\"name\": \"1080p\", \"width\": 1920, \"height\": 1080, \"abitrate\": \"192k\", \"vbitrate\": \"5000k\"}]")
 
   @@schema("public")
 }
@@ -1314,20 +1315,7 @@ model stages {
   @@schema("public")
 }
 
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-model streaming_settings {
-  id                   Int      @id @default(1)
-  enabled              Boolean  @default(true)
-  worker_cpu_threads   Int      @default(2)
-  worker_ram_mb        Int      @default(2048)
-  worker_concurrency   Int      @default(1)
-  renditions           Json     @default("[{\"name\": \"360p\", \"width\": 640, \"height\": 360, \"abitrate\": \"64k\", \"vbitrate\": \"600k\"}, {\"name\": \"480p\", \"width\": 854, \"height\": 480, \"abitrate\": \"96k\", \"vbitrate\": \"1200k\"}, {\"name\": \"720p\", \"width\": 1280, \"height\": 720, \"abitrate\": \"128k\", \"vbitrate\": \"2500k\"}, {\"name\": \"1080p\", \"width\": 1920, \"height\": 1080, \"abitrate\": \"192k\", \"vbitrate\": \"5000k\"}]")
-  segment_duration_sec Int      @default(4)
-  updated_at           DateTime @default(now()) @db.Timestamptz(6)
 
-  @@schema("public")
-}
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.

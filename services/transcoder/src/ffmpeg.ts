@@ -149,7 +149,7 @@ async function writeMasterManifest(outputDir: string): Promise<void> {
 // probeDuration: يستخدم ffprobe للحصول على مدة الفيديو
 // ---------------------------------------------------------------
 async function probeDuration(filePath: string): Promise<number> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const proc = spawn('ffprobe', [
       '-v', 'quiet',
       '-print_format', 'json',
@@ -162,11 +162,16 @@ async function probeDuration(filePath: string): Promise<number> {
     proc.on('close', () => {
       try {
         const json = JSON.parse(out)
-        resolve(parseFloat(json.format?.duration ?? '0'))
-      } catch {
-        resolve(0)
+        const dur = parseFloat(json.format?.duration ?? '0')
+        if (isNaN(dur) || dur <= 0) {
+          reject(new Error(`[ffmpeg] فشل في قراءة مدة الفيديو بشكل صحيح. القيمة المستلمة: ${json.format?.duration}`))
+        } else {
+          resolve(dur)
+        }
+      } catch (err) {
+        reject(new Error('[ffmpeg] فشل في تحليل مخرجات ffprobe'))
       }
     })
-    proc.on('error', () => resolve(0))
+    proc.on('error', (err) => reject(new Error(`[ffmpeg] ffprobe فشل في العمل: ${err.message}`)))
   })
 }

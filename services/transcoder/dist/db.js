@@ -55,7 +55,7 @@ export async function markVideoReady(jobId, videoId, hlsPrefix, durationSeconds)
         await client.query('BEGIN');
         await client.query(`UPDATE videos 
        SET status = 'ready', r2_hls_prefix = $1, duration_sec = $2, updated_at = NOW() 
-       WHERE id = $3`, [hlsPrefix, durationSeconds, videoId]);
+       WHERE id = $3`, [hlsPrefix, Math.round(durationSeconds), videoId]);
         await client.query(`UPDATE public.video_jobs
        SET status = 'done', completed_at = NOW(), claimed_by = NULL,
            claimed_at = NULL, last_error = NULL, updated_at = NOW()
@@ -97,14 +97,23 @@ export async function markVideoFailed(jobId, videoId, errorMsg) {
 export async function getStreamingConfig() {
     const pool = getDbPool();
     try {
-        const { rows } = await pool.query(`SELECT worker_concurrency, worker_cpu_threads FROM platform_settings WHERE id = 1 LIMIT 1`);
+        const { rows } = await pool.query(`SELECT is_streaming_enabled, worker_concurrency, worker_cpu_threads, segment_duration_sec, renditions FROM platform_settings WHERE id = 1 LIMIT 1`);
         if (!rows || rows.length === 0)
             return null;
         const data = rows[0];
+        let renditionsData = data.renditions;
+        if (typeof renditionsData === 'string') {
+            try {
+                renditionsData = JSON.parse(renditionsData);
+            }
+            catch (e) { }
+        }
         return {
+            isStreamingEnabled: data.is_streaming_enabled ?? false,
             maxConcurrentJobs: data.worker_concurrency ?? 1,
             ffmpegThreads: data.worker_cpu_threads ?? 2,
-            renditions: ['360p', '480p', '720p'], // افتراضي
+            segmentDurationSec: data.segment_duration_sec ?? 4,
+            renditions: Array.isArray(renditionsData) && renditionsData.length > 0 ? renditionsData : [],
         };
     }
     catch (error) {

@@ -79,27 +79,50 @@ export async function confirmVideoUpload(
       return { error: 'غير مصرّح' }
     }
 
-    await prisma.videos.update({
-      where: { id: videoId },
-      data: {
-        status:          'processing',
-        file_size_bytes: fileSizeBytes,
-        r2_hls_prefix:   r2Keys.hlsPrefix(videoId),
+    const video = await prisma.videos.findUnique({ where: { id: videoId } })
+    if (!video || !video.r2_raw_key) return { error: 'فيديو غير صالح' }
+    if (video.status !== 'pending') return { error: 'تم تأكيد الرفع مسبقاً' }
+
+    // التحقق من وجود الملف في R2 باستخدام HeadObject
+    const bucket = process.env.R2_BUCKET
+    if (!bucket) return { error: 'إعدادات R2 غير مكتملة' }
+    
+    try {
+      const { getR2Client } = await import('@/lib/r2')
+      const { HeadObjectCommand } = await import('@aws-sdk/client-s3')
+      const r2Client = getR2Client()
+      await r2Client.send(new HeadObjectCommand({ Bucket: bucket, Key: video.r2_raw_key }))
+    } catch (err) {
+      return { error: 'لم يتم العثور على الملف في التخزين السحابي، تأكد من اكتمال الرفع' }
+    }
+
+    const hlsPrefix = r2Keys.hlsPrefix(videoId)
+
+    await prisma.$transaction(async (tx) => {
+      await tx.videos.update({
+        where: { id: videoId },
+        data: {
+          status:          'processing',
+          file_size_bytes: fileSizeBytes,
+          r2_hls_prefix:   hlsPrefix,
+        }
+      })
+
+      // استخدام upsert لمنع تكرار الـ jobs لو تم الاستدعاء مرتين
+      const existingJob = await tx.video_jobs.findFirst({ where: { video_id: videoId } })
+      if (!existingJob) {
+        await tx.video_jobs.create({
+          data: { video_id: videoId, status: 'queued' }
+        })
+      }
+
+      if (lessonId) {
+        await tx.lessons.update({
+          where: { id: lessonId },
+          data: { video_id: videoId }
+        })
       }
     })
-
-    await prisma.video_jobs.create({
-      data: { video_id: videoId, status: 'queued' }
-    })
-
-    // ربط الدرس بالفيديو فوراً لو كان lessonId متوفر (حالة تعديل درس موجود)
-    // لو كان درسًا جديداً، الربط سيتم في createLesson
-    if (lessonId) {
-      await prisma.lessons.update({
-        where: { id: lessonId },
-        data: { video_id: videoId }
-      })
-    }
 
     const wakeUrl    = process.env.WORKER_WAKE_URL
     const wakeSecret = process.env.WORKER_WAKE_SECRET

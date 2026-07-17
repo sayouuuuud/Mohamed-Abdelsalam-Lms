@@ -19,9 +19,8 @@ import { prisma } from '@/lib/prisma'
 // student too as soon as they open the lecture again.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Reuse an existing high-entropy server-only secret as the HMAC key. This value
 // never reaches the client.
-const SECRET = process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''
+const SECRET = process.env.VIDEO_TOKEN_SECRET ?? process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''
 
 // Token lifetime. Long enough for a full lecture, short enough to limit misuse.
 const TOKEN_TTL_SECONDS = 3 * 60 * 60 // 3 hours

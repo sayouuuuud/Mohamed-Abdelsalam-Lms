@@ -48,7 +48,13 @@ export async function processOneJob(): Promise<boolean> {
   console.log(`[worker] بدأ الـ job ${jobId} | video: ${videoId}`)
   console.log(`[worker] renditions: ${renditions.join(', ')} | threads: ${threads || 'auto'}`)
 
+  let heartbeatInterval: NodeJS.Timeout | null = null
+
   try {
+    heartbeatInterval = setInterval(() => {
+      updateJobProgress(jobId, 0).catch(err => console.error(`[worker] heartbeat failed for ${jobId}`, err))
+    }, 15000)
+
     await fs.mkdir(workDir, { recursive: true })
     await fs.mkdir(hlsOutDir, { recursive: true })
 
@@ -96,6 +102,7 @@ export async function processOneJob(): Promise<boolean> {
     }
     return false
   } finally {
+    if (heartbeatInterval) clearInterval(heartbeatInterval)
     // تنظيف الملفات المؤقتة دايماً
     try {
       await fs.rm(workDir, { recursive: true, force: true })

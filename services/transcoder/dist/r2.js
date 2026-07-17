@@ -18,11 +18,15 @@ let _r2 = null;
 function getR2Client() {
     if (_r2)
         return _r2;
-    const endpoint = process.env.R2_ENDPOINT;
+    let endpoint = process.env.R2_ENDPOINT;
+    const accountId = process.env.R2_ACCOUNT_ID;
     const accessKeyId = process.env.R2_ACCESS_KEY_ID;
     const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
+    if (!endpoint && accountId) {
+        endpoint = `https://${accountId}.r2.cloudflarestorage.com`;
+    }
     if (!endpoint || !accessKeyId || !secretAccessKey) {
-        throw new Error('[transcoder/r2] متغيرات R2 غير مكتملة في .env');
+        throw new Error('[transcoder/r2] متغيرات R2 غير مكتملة في .env (تأكد من وجود R2_ENDPOINT أو R2_ACCOUNT_ID)');
     }
     _r2 = new S3Client({
         region: 'auto',
@@ -73,12 +77,15 @@ export async function uploadDirectory(localDir, r2Prefix) {
             const r2Key = `${r2Prefix}${entry}`;
             const body = createReadStream(fullPath);
             const contentType = getContentType(entry);
+            const cacheControl = entry.endsWith('.m3u8')
+                ? 'no-cache, no-store, must-revalidate'
+                : 'public, max-age=31536000';
             await client.send(new PutObjectCommand({
                 Bucket: bucket,
                 Key: r2Key,
                 Body: body,
                 ContentType: contentType,
-                // لا CacheControl — الـ segments محمية بتوكنات مؤقتة
+                CacheControl: cacheControl,
             }));
             console.log(`[transcoder/r2] uploaded → ${r2Key}`);
         }));

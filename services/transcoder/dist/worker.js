@@ -41,7 +41,11 @@ export async function processOneJob() {
     const r2HlsPrefix = `hls/${videoId}/`;
     console.log(`[worker] بدأ الـ job ${jobId} | video: ${videoId}`);
     console.log(`[worker] renditions: ${renditions.join(', ')} | threads: ${threads || 'auto'}`);
+    let heartbeatInterval = null;
     try {
+        heartbeatInterval = setInterval(() => {
+            updateJobProgress(jobId, 0).catch(err => console.error(`[worker] heartbeat failed for ${jobId}`, err));
+        }, 15000);
         await fs.mkdir(workDir, { recursive: true });
         await fs.mkdir(hlsOutDir, { recursive: true });
         // المرحلة 1: تنزيل الملف الخام
@@ -84,6 +88,8 @@ export async function processOneJob() {
         return false;
     }
     finally {
+        if (heartbeatInterval)
+            clearInterval(heartbeatInterval);
         // تنظيف الملفات المؤقتة دايماً
         try {
             await fs.rm(workDir, { recursive: true, force: true });
