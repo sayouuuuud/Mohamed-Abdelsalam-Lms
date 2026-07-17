@@ -4,8 +4,8 @@ RUN apk add --no-cache ffmpeg
 WORKDIR /app
 
 # نسخ ملفات التبعيات أولاً (Docker cache layer)
-COPY package.json package-lock.json* ./
-RUN npm ci --omit=dev
+COPY package.json ./
+RUN npm install --omit=dev
 
 # ---------------------------------------------------------------
 FROM node:20-alpine AS builder
