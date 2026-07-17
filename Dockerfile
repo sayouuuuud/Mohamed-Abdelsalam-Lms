@@ -24,6 +24,7 @@ COPY . .
 
 # Next.js telemetry is disabled
 ENV NEXT_TELEMETRY_DISABLED 1
+ENV AUTH_TRUST_HOST true
 
 # Generate Prisma Client
 RUN pnpm prisma generate
@@ -38,6 +39,7 @@ RUN apk add --no-cache openssl
 
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
+ENV AUTH_TRUST_HOST true
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs

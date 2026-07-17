@@ -2,36 +2,52 @@ import { prisma } from '@/lib/prisma'
 import type { Stage, Branch, Lecture, Lesson, MonthlyCourse, Term } from '@/lib/landing-data'
 
 export async function getCurriculum(includeUnpublished = false): Promise<Stage[]> {
-  const stagesRes = await prisma.stages.findMany({
-    orderBy: { sort_order: 'asc' },
-    include: {
-      terms: {
-        orderBy: { sort_order: 'asc' }
-      },
-      branches: {
-        orderBy: { sort_order: 'asc' },
-        include: {
-          monthly_courses: {
-            where: includeUnpublished ? undefined : { is_published: true },
-            orderBy: { sort_order: 'asc' },
-            include: {
-              monthly_course_sections: {
-                orderBy: { sort_order: 'asc' }
+  let stagesRes: any[] = []
+  try {
+    stagesRes = await prisma.stages.findMany({
+      orderBy: { sort_order: 'asc' },
+      include: {
+        terms: {
+          orderBy: { sort_order: 'asc' }
+        },
+        branches: {
+          orderBy: { sort_order: 'asc' },
+          include: {
+            monthly_courses: {
+              where: includeUnpublished ? undefined : { is_published: true },
+              orderBy: { sort_order: 'asc' },
+              include: {
+                monthly_course_sections: {
+                  orderBy: { sort_order: 'asc' }
+                }
               }
-            }
-          },
-          lectures: {
-            orderBy: { sort_order: 'asc' },
-            include: {
-              lessons: {
-                orderBy: { sort_order: 'asc' }
+            },
+            lectures: {
+              orderBy: { sort_order: 'asc' },
+              include: {
+                lessons: {
+                  orderBy: { sort_order: 'asc' }
+                }
               }
             }
           }
         }
       }
+    })
+  } catch (err) {
+    if (
+      err &&
+      typeof err === 'object' &&
+      'digest' in err &&
+      typeof (err as any).digest === 'string' &&
+      ((err as any).digest === 'DYNAMIC_SERVER_USAGE' ||
+        (err as any).digest.startsWith('NEXT_'))
+    ) {
+      throw err
     }
-  })
+    console.log('[v0] getCurriculum unexpected error:', err)
+    return []
+  }
 
   return stagesRes.map((stageRow) => {
     const terms = stageRow.terms.map((termRow) => ({
