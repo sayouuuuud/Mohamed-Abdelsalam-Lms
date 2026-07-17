@@ -121,7 +121,7 @@ export async function getLecturesAdmin(): Promise<AdminLecture[]> {
   const [stages, branches, lectures, lessons] = await Promise.all([
     prisma.stages.findMany({ select: { id: true, title: true, sort_order: true } }),
     prisma.branches.findMany({ select: { id: true, stage_id: true, title: true, sort_order: true } }),
-    prisma.lectures.findMany({ orderBy: { sort_order: 'asc' } }),
+    prisma.lectures.findMany({ orderBy: { created_at: 'desc' } }),
     prisma.lessons.findMany({
       select: { id: true, lecture_id: true, slug: true, title: true, duration: true, is_free: true, sort_order: true, video_url: true, description: true, content_type: true, attachments: true },
       orderBy: { sort_order: 'asc' }

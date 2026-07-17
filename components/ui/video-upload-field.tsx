@@ -399,7 +399,7 @@ export function VideoUploadField({
             <span className="text-xs text-muted-foreground">
               {isStreaming
                 ? 'MP4 أو MOV — سيتم تحويله تلقائياً إلى HLS'
-                : 'MP4 أو MOV أ�� WebM (أقل من 500 MB)'}
+                : 'MP4 أو MOV أو WebM (أقل من 500 MB)'}
             </span>
           </button>
         </>

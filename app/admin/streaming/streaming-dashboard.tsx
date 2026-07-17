@@ -366,7 +366,6 @@ export function StreamingDashboard({
           <p>الوركر يقرأ هذه الإعدادات تلقائياً من قاعدة البيانات عند كل وظيفة، لكنه يحتاج إلى:</p>
           <div dir="ltr" className="mt-2 grid grid-cols-1 gap-1 font-mono sm:grid-cols-2">
             {[
-              'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY',
               'R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID',
               'R2_SECRET_ACCESS_KEY', 'R2_BUCKET',
             ].map((k) => (
