@@ -19,7 +19,7 @@ import { Separator } from '@/components/ui/separator'
 import { ToggleSwitch } from '@/components/settings/toggle-switch'
 import { useStudent } from '@/components/student/student-context'
 import { useTheme } from '@/components/theme-provider'
-import { createClient } from '@supabase/supabase-js'
+import { uploadFiles } from '@/lib/uploadthing'
 import { AvatarImage } from '@/components/ui/avatar'
 import { updateStudentProfile, updateStudentPreferences, updateStudentPassword } from '@/app/student/actions'
 import { colorPresets, applyColorPreset, type PresetId } from '@/lib/color-presets'
@@ -75,17 +75,11 @@ export function StudentSettingsPanel({ profile: initProfile }: { profile?: any }
     }
     setIsUploading(true)
     try {
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      const supabase = createClient(supabaseUrl, supabaseAnonKey)
-      const ext = file.name.split('.').pop() ?? 'jpg'
-      const path = `avatars/${Date.now()}.${ext}`
-      const { error: uploadError } = await supabase.storage
-        .from('media')
-        .upload(path, file, { upsert: true })
-      if (uploadError) throw uploadError
-      const { data: urlData } = supabase.storage.from('media').getPublicUrl(path)
-      const publicUrl = urlData.publicUrl
+      const resUpload = await uploadFiles('avatarUploader', {
+        files: [file],
+      })
+      if (!resUpload || !resUpload[0]) throw new Error('Upload failed')
+      const publicUrl = resUpload[0].url
       setAvatarUrl(publicUrl)
       const res = await updateStudentProfile({
         fullName: `${firstName} ${lastName}`.trim(),

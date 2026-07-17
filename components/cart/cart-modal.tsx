@@ -18,7 +18,7 @@ import {
 import { toast } from 'sonner'
 import { useCart } from './cart-provider'
 import { createOrder, getCheckoutDefaults } from '@/app/cart-actions'
-import { uploadToStorage } from '@/lib/storage-upload'
+import { uploadFiles } from '@/lib/uploadthing'
 
 function formatEGP(value: number) {
   return new Intl.NumberFormat('ar-EG').format(value)
@@ -75,8 +75,12 @@ export function CartModal() {
     }
     setUploadingReceipt(true)
     try {
-      const url = await uploadToStorage(file, 'images')
-      setReceiptUrl(url)
+      const res = await uploadFiles('receiptUploader', {
+        files: [file],
+      })
+      if (!res || !res[0]) throw new Error('فشل الرفع')
+      
+      setReceiptUrl(res[0].url)
       toast.success('تم رفع صورة التحويل')
     } catch (e) {
       toast.error(`فشل الرفع: ${e instanceof Error ? e.message : 'خطأ غير معروف'}`)

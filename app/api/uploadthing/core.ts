@@ -12,6 +12,16 @@ export const ourFileRouter = {
     .onUploadComplete(async ({ file }) => {
       return { url: file.url };
     }),
+  // Site content images (logos, hero backgrounds, etc.)
+  siteImage: f({ image: { maxFileSize: "8MB", maxFileCount: 1 } })
+    .onUploadComplete(async ({ file }) => {
+      return { url: file.url };
+    }),
+  // User avatars
+  avatarUploader: f({ image: { maxFileSize: "4MB", maxFileCount: 1 } })
+    .onUploadComplete(async ({ file }) => {
+      return { url: file.url };
+    }),
   // Lesson video uploaded from admin lesson editor.
   lessonVideo: f({ video: { maxFileSize: "512MB", maxFileCount: 1 } })
     .onUploadComplete(async ({ file }) => {

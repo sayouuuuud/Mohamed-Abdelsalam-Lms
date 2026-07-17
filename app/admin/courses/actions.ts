@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { hasResourceAccess } from '@/lib/auth-guard'
 import { createNotification } from '@/lib/notify'
 import { logActivity } from '@/lib/audit-log'
-import { cleanupLectureMedia, cleanupLessonMedia } from '@/lib/media-cleanup'
+
 
 export type LessonAttachment = {
   name: string
@@ -428,7 +428,7 @@ export async function updateLecture(id: string, input: LectureInput) {
 export async function deleteLecture(id: string) {
   if (!(await hasResourceAccess('courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
-  await cleanupLectureMedia(id).catch((e) => console.log('[v0] cleanupLectureMedia error:', e))
+  // await cleanupLectureMedia(id).catch((e) => console.log('[v0] cleanupLectureMedia error:', e))
 
   try {
     await prisma.lectures.delete({ where: { id } })
@@ -502,7 +502,7 @@ export async function updateLesson(id: string, input: LessonInput) {
 export async function deleteLesson(id: string) {
   if (!(await hasResourceAccess('courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
-  await cleanupLessonMedia(id).catch((e) => console.log('[v0] cleanupLessonMedia error:', e))
+  // await cleanupLessonMedia(id).catch((e) => console.log('[v0] cleanupLessonMedia error:', e))
 
   try {
     await prisma.lessons.delete({ where: { id } })

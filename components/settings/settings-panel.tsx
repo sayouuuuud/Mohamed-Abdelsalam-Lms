@@ -4,8 +4,8 @@ import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { updateSettings, updateAdminProfile, updatePlatformSettings, updateAdminPassword } from '@/app/admin/settings/actions'
-import { createClient } from '@supabase/supabase-js'
-import { uploadToStorage } from '@/lib/storage-upload'
+
+import { uploadFiles } from '@/lib/uploadthing'
 import { useTheme } from '@/components/theme-provider'
 import {
   User,
@@ -195,7 +195,9 @@ export function SettingsPanel({
     }
     setUploadingAvatar(true)
     try {
-      const url = await uploadToStorage(file, 'images')
+      const res = await uploadFiles('siteImage', { files: [file] })
+      if (!res || !res[0]) throw new Error('فشل الرفع')
+      const url = res[0].url
       setAvatarUrl(url)
       toast.success('تم رفع الصورة، اضغط حفظ التغييرات لتثبيتها')
     } catch (e) {

@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
-import { uploadToStorage } from '@/lib/storage-upload'
+import { uploadFiles } from '@/lib/uploadthing'
 import {
   updateSiteContentSection,
   resetSiteContentSection,
@@ -160,7 +160,9 @@ function ImageField({
     }
     setUploading(true)
     try {
-      const url = await uploadToStorage(file, 'images')
+      const res = await uploadFiles('siteImage', { files: [file] })
+      if (!res || !res[0]) throw new Error('فشل الرفع')
+      const url = res[0].url
       onChange(url)
       toast.success('تم رفع الصورة')
     } catch (e) {
@@ -665,7 +667,9 @@ function NavbarEditor({ value, onChange }: { value: NavbarContent; onChange: (v:
     const file = e.target.files?.[0]
     if (!file) return
     startLogoUpload(async () => {
-      const url = await uploadToStorage(file, 'images')
+      const res = await uploadFiles('siteImage', { files: [file] })
+      if (!res || !res[0]) throw new Error('فشل الرفع')
+      const url = res[0].url
       if (url) set('logoUrl', url)
     })
   }
