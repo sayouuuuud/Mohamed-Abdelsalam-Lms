@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma'
 import { createR2UploadUrl, r2Keys, isR2Configured, checkR2Connection } from '@/lib/r2'
 import { auth } from '@/auth'
+import { isStaff } from '@/lib/auth-guard'
 
 export async function testR2Connection(): Promise<{ ok: boolean; message: string }> {
   return checkR2Connection()
@@ -35,12 +36,7 @@ export async function getVideoUploadUrl(
     const user = session?.user
     if (!user || !user.id) return { error: 'غير مسجّل' }
 
-    const profile = await prisma.user.findUnique({
-      where: { id: user.id },
-      select: { role: true }
-    })
-
-    if (!profile || (profile.role !== 'admin' && profile.role !== 'assistant')) {
+    if (!(await isStaff())) {
       return { error: 'غير مصرّح' }
     }
 
@@ -79,12 +75,7 @@ export async function confirmVideoUpload(
     const user = session?.user
     if (!user || !user.id) return { error: 'غير مسجّل' }
 
-    const profile = await prisma.user.findUnique({
-      where: { id: user.id },
-      select: { role: true }
-    })
-
-    if (!profile || (profile.role !== 'admin' && profile.role !== 'assistant')) {
+    if (!(await isStaff())) {
       return { error: 'غير مصرّح' }
     }
 

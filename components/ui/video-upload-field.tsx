@@ -145,10 +145,6 @@ export function VideoUploadField({
   // R2 Direct Upload
   // ---------------------------------------------------------------
   async function handleR2Upload(file: File) {
-    if (!lessonId) {
-      toast.error('lessonId مطلوب لوضع الـ streaming')
-      return
-    }
     if (!file.type.startsWith('video/')) {
       toast.error('من فضلك اختر ملف فيديو')
       return
