@@ -1,8 +1,9 @@
 export declare function transcode(opts: {
     inputPath: string;
     outputDir: string;
-    renditions: string[];
+    renditions?: string[];
     threads: number;
+    segmentDurationSec?: number;
     onProgress?: (pct: number) => void;
 }): Promise<{
     durationSeconds: number;

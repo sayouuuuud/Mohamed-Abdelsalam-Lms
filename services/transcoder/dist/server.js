@@ -14,7 +14,7 @@
  *   - لو WORKER_MODE=poll، الـ /wake لا تزال تعمل (manual trigger)
  */
 import http from 'http';
-import { processOneJob, runLoop } from './worker';
+import { processOneJob, runLoop } from './worker.js';
 const PORT = parseInt(process.env.PORT ?? '4000');
 const MODE = (process.env.WORKER_MODE ?? 'http').toLowerCase(); // 'http' | 'poll'
 const SECRET = process.env.WORKER_WAKE_SECRET ?? '';
@@ -74,13 +74,24 @@ server.listen(PORT, () => {
         });
     }
 });
-// Graceful shutdown
-process.on('SIGTERM', () => {
-    console.log('[transcoder] SIGTERM — جاري الإغلاق ...');
-    server.close(() => process.exit(0));
+let shuttingDown = false;
+function shutdown(reason, exitCode) {
+    if (shuttingDown)
+        return;
+    shuttingDown = true;
+    console.log(`[transcoder] ${reason} — جاري الإغلاق ...`);
+    const forceExit = setTimeout(() => process.exit(exitCode), 10_000);
+    forceExit.unref();
+    server.close(() => process.exit(exitCode));
+}
+process.on('unhandledRejection', (reason) => {
+    console.error('[transcoder] unhandled rejection:', reason);
+    shutdown('unhandled rejection', 1);
 });
-process.on('SIGINT', () => {
-    console.log('[transcoder] SIGINT — جاري الإغلاق ...');
-    server.close(() => process.exit(0));
+process.on('uncaughtException', (error) => {
+    console.error('[transcoder] uncaught exception:', error);
+    shutdown('uncaught exception', 1);
 });
+process.on('SIGTERM', () => shutdown('SIGTERM', 0));
+process.on('SIGINT', () => shutdown('SIGINT', 0));
 //# sourceMappingURL=server.js.map

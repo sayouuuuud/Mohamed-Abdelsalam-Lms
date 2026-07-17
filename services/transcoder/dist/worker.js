@@ -17,9 +17,9 @@
 import os from 'os';
 import path from 'path';
 import fs from 'fs/promises';
-import { claimNextJob, updateJobProgress, markVideoReady, markVideoFailed, getStreamingConfig } from './db';
-import { downloadRaw, uploadDirectory } from './r2';
-import { transcode } from './ffmpeg';
+import { claimNextJob, updateJobProgress, markVideoReady, markVideoFailed, getStreamingConfig } from './db.js';
+import { downloadRaw, uploadDirectory } from './r2.js';
+import { transcode } from './ffmpeg.js';
 const TMP_BASE = process.env.TMP_DIR ?? os.tmpdir();
 const POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS ?? '10000');
 // ---------------------------------------------------------------
@@ -33,6 +33,7 @@ export async function processOneJob() {
     const { jobId, videoId, r2RawKey, threadsOverride } = job;
     const threads = threadsOverride ?? config?.ffmpegThreads ?? 0;
     const renditions = config?.renditions ?? ['360p', '480p', '720p'];
+    const segmentDurationSec = config?.segmentDurationSec ?? 10;
     // مجلد مؤقت مخصص لهذا الـ job — يُحذف في النهاية
     const workDir = path.join(TMP_BASE, `transcoder_${jobId}`);
     const rawPath = path.join(workDir, 'raw_input');
@@ -55,6 +56,7 @@ export async function processOneJob() {
             outputDir: hlsOutDir,
             renditions,
             threads,
+            segmentDurationSec,
             onProgress: async (pct) => {
                 // range الـ progress هنا = 15% → 80%
                 await updateJobProgress(jobId, 15 + pct * 0.65);
@@ -72,14 +74,24 @@ export async function processOneJob() {
     }
     catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.error(`[worker] job ${jobId} فشل:`, msg);
-        await markVideoFailed(jobId, videoId, msg).catch(() => { });
+        console.error(`[worker] job ${jobId} فشل:`, err);
+        try {
+            await markVideoFailed(jobId, videoId, msg);
+        }
+        catch (persistenceError) {
+            console.error(`[worker] تعذّر حفظ فشل job ${jobId}; processing error: ${msg}`, persistenceError);
+        }
         return false;
     }
     finally {
         // تنظيف الملفات المؤقتة دايماً
-        await fs.rm(workDir, { recursive: true, force: true }).catch(() => { });
-        console.log(`[worker] تنظيف ${workDir}`);
+        try {
+            await fs.rm(workDir, { recursive: true, force: true });
+            console.log(`[worker] تنظيف ${workDir}`);
+        }
+        catch (cleanupError) {
+            console.error(`[worker] تعذّر تنظيف ${workDir}:`, cleanupError);
+        }
     }
 }
 // ---------------------------------------------------------------
