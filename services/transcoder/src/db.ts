@@ -111,13 +111,13 @@ export async function markVideoFailed(
     await client.query('BEGIN')
     
     await client.query(
-      `UPDATE videos SET status = 'error', updated_at = NOW() WHERE id = $1`,
-      [videoId]
+      `UPDATE videos SET status = 'error', error_message = $1, updated_at = NOW() WHERE id = $2`,
+      [errorMsg, videoId]
     )
 
     await client.query(
       `UPDATE video_jobs 
-       SET status = 'error', error_message = $1, finished_at = NOW(), updated_at = NOW() 
+       SET status = 'failed', last_error = $1, finished_at = NOW(), updated_at = NOW() 
        WHERE id = $2`,
       [errorMsg, jobId]
     )
