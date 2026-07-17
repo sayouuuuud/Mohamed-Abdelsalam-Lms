@@ -448,8 +448,12 @@ export async function createLesson(lectureId: string, input: LessonInput) {
 
   const sortOrder = await nextContentOrder(lectureId)
 
+  // لو الفيديو عن طريق الـ R2 streaming (بيبدأ بـ __video_id:)
+  const isStreamingVideo = input.videoUrl?.startsWith('__video_id:')
+  const streamingVideoId = isStreamingVideo ? input.videoUrl!.replace('__video_id:', '') : null
+
   try {
-    await prisma.lessons.create({
+    const lesson = await prisma.lessons.create({
       data: {
         lecture_id: lectureId,
         slug: slugify(input.title),
@@ -458,11 +462,25 @@ export async function createLesson(lectureId: string, input: LessonInput) {
         is_free: input.isFree,
         content_type: input.contentType ?? 'فيديو',
         sort_order: sortOrder,
-        video_url: input.videoUrl ?? null,
+        // لو streaming: video_url=null وvideo_id=معرّف. لو عادي: video_urlكما هي.
+        video_url: isStreamingVideo ? null : (input.videoUrl ?? null),
         description: input.description ?? null,
         attachments: input.attachments ?? [],
-      }
+      },
+      select: { id: true },
     })
+
+    // ربط سجل الفيديو بالدرس لو كان streaming
+    if (streamingVideoId) {
+      await prisma.lessons.update({
+        where: { id: lesson.id },
+        data: { video_id: streamingVideoId },
+      })
+      await prisma.videos.update({
+        where: { id: streamingVideoId },
+        data: { lesson_id: lesson.id },
+      })
+    }
 
     logActivity({ action: 'create', resource: 'courses', targetLabel: `درس: ${input.title}` }).catch(() => {})
     revalidatePath('/courses', 'layout')
@@ -477,6 +495,10 @@ export async function createLesson(lectureId: string, input: LessonInput) {
 export async function updateLesson(id: string, input: LessonInput) {
   if (!(await hasResourceAccess('courses', 'manage'))) return { error: 'غير مسموح. لازم تكون أدمن.' }
 
+  // لو الفيديو عن طريق الـ R2 streaming
+  const isStreamingVideo = input.videoUrl?.startsWith('__video_id:')
+  const streamingVideoId = isStreamingVideo ? input.videoUrl!.replace('__video_id:', '') : null
+
   try {
     await prisma.lessons.update({
       where: { id },
@@ -485,11 +507,23 @@ export async function updateLesson(id: string, input: LessonInput) {
         duration: input.duration,
         is_free: input.isFree,
         content_type: input.contentType ?? 'فيديو',
-        video_url: input.videoUrl !== undefined ? input.videoUrl : undefined,
+        // لو streaming: نحط video_url=null ونربط بالـ video_id
+        ...(isStreamingVideo
+          ? { video_url: null, video_id: streamingVideoId }
+          : { video_url: input.videoUrl !== undefined ? input.videoUrl : undefined }
+        ),
         description: input.description !== undefined ? input.description : undefined,
         attachments: input.attachments !== undefined ? input.attachments : undefined,
       }
     })
+
+    // ربط سجل الفيديو بالدرس لو كان streaming
+    if (streamingVideoId) {
+      await prisma.videos.update({
+        where: { id: streamingVideoId },
+        data: { lesson_id: id },
+      })
+    }
 
     logActivity({ action: 'update', resource: 'courses', targetId: id, targetLabel: `درس: ${input.title}` }).catch(() => {})
     revalidatePath('/courses', 'layout')

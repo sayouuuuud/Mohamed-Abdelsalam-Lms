@@ -58,9 +58,11 @@ const QUESTION_KIND_BADGE = {
 export function AdminLectureDetail({
   lecture,
   content,
+  streamingEnabled = false,
 }: {
   lecture: AdminLecture
   content: AdminContentItem[]
+  streamingEnabled?: boolean
 }) {
   const router = useRouter()
 
@@ -440,7 +442,9 @@ export function AdminLectureDetail({
               <VideoUploadField
                 value={lVideo}
                 onChange={setLVideo}
-                hint="ارفع ملف الفيديو. هذا ما سيشاهده الطالب."
+                hint={streamingEnabled ? 'سيتم تحويل الفيديو تلقائياً إلى HLS بعد الرفع.' : 'ارفع ملف الفيديو. هذا ما سيشاهده الطالب.'}
+                streamingEnabled={streamingEnabled}
+                lessonId={editingLesson?.id}
                 onDurationDetected={setLDuration}
               />
             ) : (

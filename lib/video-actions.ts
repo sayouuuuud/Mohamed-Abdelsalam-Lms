@@ -22,7 +22,7 @@ export type VideoRecord = {
 }
 
 export async function getVideoUploadUrl(
-  lessonId:    string,
+  lessonId:    string | undefined,
   fileName:    string,
   contentType: string,
 ): Promise<{ uploadUrl: string; videoId: string; r2Key: string } | { error: string }> {
@@ -45,8 +45,9 @@ export async function getVideoUploadUrl(
     }
 
     const ext = fileName.split('.').pop()?.toLowerCase() ?? 'mp4'
+    // لو lessonId متوفر، نربط الفيديو بالدرس فوراً. لو لأ، سيتم الربط لما يتحفظ الدرس.
     const vid = await prisma.videos.create({
-      data: { lesson_id: lessonId, status: 'pending' },
+      data: { lesson_id: lessonId ?? null, status: 'pending' },
       select: { id: true }
     })
 
@@ -69,8 +70,8 @@ export async function getVideoUploadUrl(
 }
 
 export async function confirmVideoUpload(
-  videoId:      string,
-  lessonId:     string,
+  videoId:       string,
+  lessonId:      string | undefined,
   fileSizeBytes: number,
 ): Promise<{ ok: true } | { error: string }> {
   try {
@@ -100,10 +101,14 @@ export async function confirmVideoUpload(
       data: { video_id: videoId, status: 'queued' }
     })
 
-    await prisma.lessons.update({
-      where: { id: lessonId },
-      data: { video_id: videoId }
-    })
+    // ربط الدرس بالفيديو فوراً لو كان lessonId متوفر (حالة تعديل درس موجود)
+    // لو كان درسًا جديداً، الربط سيتم في createLesson
+    if (lessonId) {
+      await prisma.lessons.update({
+        where: { id: lessonId },
+        data: { video_id: videoId }
+      })
+    }
 
     const wakeUrl    = process.env.WORKER_WAKE_URL
     const wakeSecret = process.env.WORKER_WAKE_SECRET
