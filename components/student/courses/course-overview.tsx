@@ -183,10 +183,16 @@ function CurriculumSection({
 
 export function CourseOverview({ course }: { course: CourseDetail }) {
   const percent = course.totalLessons > 0 ? Math.round((course.completedLessons / course.totalLessons) * 100) : 0
-  const allLessons = getCourseLessons(course)
-  const nextLesson =
-    allLessons.find((l) => !l.completed && !l.locked) ?? allLessons[0]
-  const courseAssignments = getCourseItems(course)
+  const allItems = getCourseItems(course)
+  const nextItem = allItems.find((it) => {
+    if (it.kind === 'lesson') return !it.lesson.completed && !it.lesson.locked
+    if (it.kind === 'assignment') {
+      return (it.assignment.status !== 'تم التسليم' && it.assignment.status !== 'مصحّح') && !it.assignment.locked
+    }
+    return false
+  }) ?? allItems[0]
+
+  const courseAssignments = allItems
     .filter((it) => it.kind === 'assignment')
     .map((it) => (it as Extract<typeof it, { kind: 'assignment' }>).assignment)
 
@@ -196,6 +202,16 @@ export function CourseOverview({ course }: { course: CourseDetail }) {
     { icon: Clock, label: course.durationHours },
     { icon: BookOpen, label: `${course.totalLessons} درس` },
   ]
+
+  const nextHref = nextItem?.kind === 'assignment' 
+    ? `/student/assignments/${nextItem.assignment.id}`
+    : nextItem?.kind === 'lesson' 
+      ? `/student/courses/${course.id}/lessons/${nextItem.lesson.id}`
+      : '#'
+
+  const nextLabel = nextItem?.kind === 'assignment'
+    ? 'حل الواجب'
+    : percent === 0 ? 'ابدأ الكورس' : 'متابعة الدرس'
 
   return (
     <div className="flex flex-col gap-6">
@@ -261,13 +277,13 @@ export function CourseOverview({ course }: { course: CourseDetail }) {
                 style={{ width: `${percent}%` }}
               />
             </div>
-            {nextLesson ? (
+            {nextItem ? (
               <Link
-                href={`/student/courses/${course.id}/lessons/${nextLesson.id}`}
+                href={nextHref}
                 className={cn(buttonVariants(), "mt-4 w-fit")}
               >
-                <Play className="size-4" />
-                {percent === 0 ? 'ابدأ الكورس' : 'متابعة الدرس'}
+                {nextItem.kind === 'assignment' ? <ClipboardList className="size-4" /> : <Play className="size-4" />}
+                {nextLabel}
               </Link>
             ) : (
               <Button disabled className="mt-4 w-fit opacity-50">

@@ -8,7 +8,8 @@ export default async function StudentProfilePage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const profile = await getStudentProfileData(id)
+  const decodedId = decodeURIComponent(id)
+  const profile = await getStudentProfileData(decodedId)
 
   if (!profile) {
     notFound()

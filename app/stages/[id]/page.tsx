@@ -39,7 +39,8 @@ export default async function StagePage({
 }: {
   params: Promise<{ id: string }>
 }) {
-  const { id } = await params
+  const paramsObj = await params
+  const id = decodeURIComponent(paramsObj.id)
   const stage = await getStageBySlug(id)
   if (!stage) notFound()
 

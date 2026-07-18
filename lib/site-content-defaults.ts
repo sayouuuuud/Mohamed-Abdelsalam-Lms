@@ -339,6 +339,8 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
     { platform: 'youtube' as SocialPlatform,   href: '#', enabled: false },
     { platform: 'facebook' as SocialPlatform,  href: '#', enabled: false },
     { platform: 'instagram' as SocialPlatform, href: '#', enabled: false },
+    { platform: 'tiktok' as SocialPlatform,    href: '#', enabled: false },
+    { platform: 'twitter' as SocialPlatform,   href: '#', enabled: false },
   ],
   },
 

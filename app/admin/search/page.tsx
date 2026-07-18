@@ -10,9 +10,11 @@ export const metadata: Metadata = {
 export default async function AdminSearchPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
-  const { q = '' } = await searchParams
+  const params = await searchParams
+  const rawQ = params.q
+  const q = typeof rawQ === 'string' ? rawQ : Array.isArray(rawQ) ? rawQ[0] : ''
   const results = await globalAdminSearch(q)
 
   return <SearchResults q={q} results={results} />

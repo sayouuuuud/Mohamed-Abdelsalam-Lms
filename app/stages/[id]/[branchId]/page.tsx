@@ -42,7 +42,9 @@ export default async function BranchPage({
 }: {
   params: Promise<{ id: string; branchId: string }>
 }) {
-  const { id, branchId } = await params
+  const paramsObj = await params
+  const id = decodeURIComponent(paramsObj.id)
+  const branchId = decodeURIComponent(paramsObj.branchId)
   const result = await getBranchBySlug(id, branchId)
   if (!result) notFound()
 

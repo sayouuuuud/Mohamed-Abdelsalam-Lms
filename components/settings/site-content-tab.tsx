@@ -436,14 +436,14 @@ function StatsEditor({ value, onChange }: { value: StatsContent; onChange: (v: S
             <Field label="اللاحقة" hint="+ أو % أو k">
               <Input value={item.suffix} onChange={(e) => updateItem(i, { suffix: e.target.value })} dir="ltr" />
             </Field>
-            <Field label="التسمي��">
+            <Field label="التسمية">
               <Input value={item.label} onChange={(e) => updateItem(i, { label: e.target.value })} className="text-right" />
             </Field>
           </div>
         </div>
       ))}
       <Button type="button" variant="outline" size="sm" onClick={() => set('items', [...value.items, { value: 0, suffix: '+', label: '' }])} className="gap-2">
-        <Plus className="size-3.5" />إ��افة رقم
+        <Plus className="size-3.5" />إضافة رقم
       </Button>
     </div>
   )
@@ -947,7 +947,7 @@ export function SiteContentTab({ initialContent }: { initialContent: SiteContent
     },
     {
       id: 'footer',
-      title: 'ا��فوتر (ذيل الصفحة)',
+      title: 'الفوتر (ذيل الصفحة)',
       description: 'الاسم، الوصف، الروابط السريعة، بيانات التواصل',
       editor: <FooterEditor value={footer} onChange={setFooter} />,
       onSave: () => save('footer', footer),
