@@ -152,15 +152,15 @@ function StagePreview({ stage }: { stage: Stage }) {
               الصفوف داخل المرحلة
             </span>
             <ul className="mt-3 space-y-2">
-              {stage.rows.map((row, idx) => (
+              {stage.branches.map((branch, idx) => (
                 <li
-                  key={row}
+                  key={branch.id}
                   className="flex items-center gap-3 rounded-xl border border-white/10 bg-navy-deep/40 px-4 py-3 text-cream/90"
                 >
                   <span className="font-thmanyah text-sm text-gold dark:text-teal-glow">
                     {(idx + 1).toLocaleString('ar-EG', { minimumIntegerDigits: 2 })}
                   </span>
-                  {row}
+                  {branch.title}
                 </li>
               ))}
             </ul>
@@ -225,15 +225,15 @@ function MobileStage({
         <div className="overflow-hidden">
           <p className="text-pretty leading-relaxed text-cream/65">{stage.subtitle}</p>
           <ul className="mt-4 space-y-2">
-            {stage.rows.map((row, idx) => (
+            {stage.branches.map((branch, idx) => (
               <li
-                key={row}
+                key={branch.id}
                 className="flex items-center gap-3 rounded-xl border border-white/10 bg-navy-deep/40 px-4 py-3 text-sm text-cream/90"
               >
                 <span className="font-thmanyah text-gold dark:text-teal-glow">
                   {(idx + 1).toLocaleString('ar-EG', { minimumIntegerDigits: 2 })}
                 </span>
-                {row}
+                {branch.title}
               </li>
             ))}
           </ul>
