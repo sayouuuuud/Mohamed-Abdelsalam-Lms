@@ -13,9 +13,12 @@ export default async function Image({
 }: {
   params: Promise<{ id: string; branchId: string; courseId: string }>
 }) {
-  const { id, branchId, courseId } = await params
+  const paramsObj = await params
+  const id = decodeURIComponent(paramsObj.id)
+  const branchId = decodeURIComponent(paramsObj.branchId)
+  const courseId = decodeURIComponent(paramsObj.courseId)
   const [result, { seo }, fonts] = await Promise.all([
-    getCourseBySlug(id, branchId, decodeURIComponent(courseId)),
+    getCourseBySlug(id, branchId, courseId),
     getSiteContent(),
     loadCairoFonts(),
   ])
