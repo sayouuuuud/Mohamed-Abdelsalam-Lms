@@ -232,7 +232,7 @@ function LectureCard({
 
   return (
     <Card className="group relative flex flex-col overflow-hidden border-border/50 p-0 transition-all hover:-translate-y-1 hover:border-primary/20 hover:shadow-xl">
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
       <div className="relative z-10 flex flex-col gap-4 p-5 sm:flex-row">
         {/* Cover */}
         <div className="relative aspect-[16/10] w-full shrink-0 overflow-hidden rounded-2xl border border-border/10 bg-muted shadow-inner sm:w-64">
@@ -309,7 +309,7 @@ function CourseCard({
 
   return (
     <Card className="group relative flex flex-col overflow-hidden border-border/50 p-0 transition-all hover:-translate-y-1 hover:border-primary/20 hover:shadow-xl">
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
       <div className="relative z-10 flex flex-col gap-4 p-5 sm:flex-row">
         {/* Cover */}
         <div className="relative aspect-[16/10] w-full shrink-0 overflow-hidden rounded-2xl border border-border/10 bg-muted shadow-inner sm:w-64">
@@ -390,7 +390,7 @@ function CourseCard({
 
       {/* Lectures list — grouped by section when the course has sections */}
       {open && (
-        <div className="flex flex-col gap-5 border-t border-border/50 bg-secondary/10 p-5 shadow-inner">
+        <div className="relative z-10 flex flex-col gap-5 border-t border-border/50 bg-secondary/10 p-5 shadow-inner">
           {course.lectures.length === 0 ? (
             <p className="py-8 text-center font-medium text-muted-foreground">
               المدرّس لسه ما نزّلش محاضرات في الكورس ده. تابعنا قريبًا.
