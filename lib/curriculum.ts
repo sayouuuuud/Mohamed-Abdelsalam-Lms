@@ -177,6 +177,7 @@ export async function getFreeLectureBySlug(
   const result = await getCourseBySlug(stageSlug, branchSlug, courseSlug)
   if (!result) return undefined
   const lecture = result.course.lectures.find((l) => l.id === lectureSlug)
-  if (!lecture || (!lecture.isFree && result.course.price !== 0)) return undefined
+  // Allow watch if: lecture is explicitly free (isFree=true), OR the whole course is free (price 0)
+  if (!lecture || (!lecture.isFree && Number(result.course.price) !== 0)) return undefined
   return { ...result, lecture }
 }
