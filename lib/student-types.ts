@@ -111,6 +111,8 @@ export type EnrolledCourseLecture = {
   image: string
   totalLessons: number
   completedLessons: number
+  /** slug لأول درس غير مكتمل، أو أول درس عند اكتمال المحاضرة */
+  nextLessonId: string | null
   /** أُضيفت للكورس بعد اشتراك الطالب */
   isNew: boolean
   /** تاريخ إضافة المحاضرة للكورس (ISO) */

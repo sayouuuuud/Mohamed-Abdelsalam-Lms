@@ -451,12 +451,18 @@ function EnrolledLectureRow({
   index: number
 }) {
   const done = lecture.totalLessons > 0 && lecture.completedLessons === lecture.totalLessons
+  const lectureHref = `/student/courses/${lecture.id}`
+  const actionHref = lecture.nextLessonId
+    ? `${lectureHref}/lessons/${lecture.nextLessonId}`
+    : lectureHref
+
   return (
-    <Link
-      href={`/student/courses/${lecture.id}`}
-      className="group/row flex items-center justify-between gap-3 rounded-2xl border border-border/50 bg-card p-4 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-secondary/50 hover:shadow-md"
-    >
-      <div className="flex min-w-0 items-center gap-4">
+    <div className="group/row flex items-center justify-between gap-3 rounded-2xl border border-border/50 bg-card p-4 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-secondary/50 hover:shadow-md">
+      <Link
+        href={lectureHref}
+        className="flex min-w-0 flex-1 items-center gap-4 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        aria-label={`عرض تفاصيل محاضرة ${lecture.title}`}
+      >
         <span
           className={cn(
             'grid size-11 shrink-0 place-items-center rounded-xl text-sm font-black transition-colors',
@@ -481,11 +487,15 @@ function EnrolledLectureRow({
             {lecture.completedLessons}/{lecture.totalLessons} درس مكتمل
           </p>
         </div>
-      </div>
-      <span className="flex shrink-0 items-center gap-1.5 rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary opacity-0 transition-all group-hover/row:opacity-100 md:opacity-100">
+      </Link>
+      <Link
+        href={actionHref}
+        className="flex shrink-0 items-center gap-1.5 rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-primary hover:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        aria-label={`${lecture.completedLessons > 0 ? 'متابعة' : 'ابدأ'} محاضرة ${lecture.title}`}
+      >
         <PlayCircle className="size-4" />
         {lecture.completedLessons > 0 ? 'متابعة' : 'ابدأ'}
-      </span>
-    </Link>
+      </Link>
+    </div>
   )
 }
