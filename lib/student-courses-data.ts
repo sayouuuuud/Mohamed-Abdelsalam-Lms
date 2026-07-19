@@ -13,6 +13,7 @@ export type {
   EnrolledCourseLecture,
   EnrolledCourseSection,
   EnrolledMonthlyCourse,
+  CourseProgress,
 } from './student-types'
 
 export {

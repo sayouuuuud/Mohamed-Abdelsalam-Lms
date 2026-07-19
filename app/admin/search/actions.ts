@@ -31,12 +31,18 @@ export async function globalAdminSearch(q: string): Promise<GlobalSearchResults>
   const term = `%${q.trim()}%`
 
   const [studentsRes, lecturesRes, coursesRes, examsRes, stagesRes, branchesRes] = await Promise.all([
-    prisma.$queryRaw`
-      SELECT id, name as full_name, email, phone 
-      FROM users 
-      WHERE role = 'student' AND (name ILIKE ${term} OR email ILIKE ${term} OR phone ILIKE ${term})
-      LIMIT 8
-    `,
+    prisma.students.findMany({
+      where: {
+        OR: [
+          { name: { contains: q.trim(), mode: 'insensitive' } },
+          { email: { contains: q.trim(), mode: 'insensitive' } },
+          { phone: { contains: q.trim(), mode: 'insensitive' } },
+          { code: { contains: q.trim(), mode: 'insensitive' } },
+        ]
+      },
+      select: { code: true, name: true, email: true, phone: true },
+      take: 8
+    }),
     prisma.lectures.findMany({
       where: { title: { contains: q.trim(), mode: 'insensitive' } },
       select: { id: true, title: true, branches: { select: { title: true, stages: { select: { title: true } } } } },
@@ -65,10 +71,10 @@ export async function globalAdminSearch(q: string): Promise<GlobalSearchResults>
   ])
 
   const students: SearchResultItem[] = (studentsRes as any[]).map((r: any) => ({
-    id: r.id,
-    label: r.full_name || r.email,
-    sublabel: r.email,
-    href: `/admin/students?q=${encodeURIComponent(r.email || r.full_name)}`,
+    id: r.code,
+    label: r.name || r.email,
+    sublabel: r.email || r.phone,
+    href: `/admin/students/${r.code}`,
     type: 'student',
   }))
 

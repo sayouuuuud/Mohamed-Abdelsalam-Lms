@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { hasResourceAccess } from '@/lib/auth-guard'
 import { logActivity } from '@/lib/audit-log'
 import type { StudentProfile, DeviceInfo, EnrolledCourse, PaymentRecord, ExamGrade, AssignmentRecord, StudentStatus } from '@/lib/student-profile-data'
+import type { StudentGender } from '@/lib/students-data'
 
 export async function updateStudentStatus(
   studentId: string,
@@ -256,7 +257,7 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
         seenLectureIds.add(lectureId)
 
         const lecObj = item.lectures
-        const lessonIds = (lecObj?.lessons ?? []).map((l) => l.id).filter(Boolean)
+        const lessonIds = (lecObj?.lessons ?? []).map((l: any) => l.id).filter(Boolean)
 
         lectureRows.push({
           lectureId,
@@ -274,7 +275,7 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
     })
 
     legacyProgress = await prisma.lesson_progress.findMany({
-      where: { student_id: studentUserId, completed: true },
+      where: { enrollments: { student_id: studentId }, completed: true },
       select: { lesson_id: true, completed_at: true }
     })
 

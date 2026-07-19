@@ -60,7 +60,7 @@ export function StudentProfileView({ profile, studentDbId }: StudentProfileViewP
   const avgGrade =
     profile.exams.length > 0
       ? Math.round(
-          profile.exams.reduce((sum, e) => sum + (e.score / e.total) * 100, 0) /
+          profile.exams.reduce((sum, e) => sum + (e.total > 0 ? (e.score / e.total) * 100 : 0), 0) /
             profile.exams.length,
         )
       : 0

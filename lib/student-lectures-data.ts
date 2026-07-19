@@ -119,7 +119,7 @@ function toCourseDetail(row: any, progress: Progress = EMPTY_PROGRESS): CourseDe
         ? progress.completedLessonIds.has(it.lesson.lessonId)
         : false
       it.lesson.completed = done
-      it.lesson.locked = !prevDone
+      it.lesson.locked = false
       prevDone = prevDone && done
     } else {
       const saved = progress.assignmentStatus.get(it.assignment.id)

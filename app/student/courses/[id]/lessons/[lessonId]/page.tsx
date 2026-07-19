@@ -17,9 +17,8 @@ export default async function Page({
   console.log('Lesson ID:', data.lesson.lessonId);
   console.log('Attachments:', JSON.stringify(data.lesson.attachments, null, 2));
 
-  // Sequential gating: a locked lesson can't be opened until the student
-  // completes everything before it. Send them back to the course outline.
-  if (data.lesson.locked) redirect(`/student/courses/${id}`)
+  // Sequential gating: disabled for lessons to prevent stuck loops.
+  // if (data.lesson.locked) redirect(`/student/courses/${id}`)
 
   return (
     <LessonPlayer
