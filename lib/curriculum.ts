@@ -140,6 +140,7 @@ export async function getCurriculum(includeUnpublished = false): Promise<Stage[]
 
 export async function getStageBySlug(slug: string): Promise<Stage | undefined> {
   const all = await getCurriculum()
+  console.log('[v0] getStageBySlug: looking for slug="%s" in stages=[%s]', slug, all.map((s) => s.id).join(', '))
   return all.find((s) => s.id === slug)
 }
 
@@ -175,8 +176,15 @@ export async function getFreeLectureBySlug(
   { stage: Stage; branch: Branch; course: MonthlyCourse; lecture: Lecture } | undefined
 > {
   const result = await getCourseBySlug(stageSlug, branchSlug, courseSlug)
+  console.log('[v0] getFreeLectureBySlug:', { stageSlug, branchSlug, courseSlug, lectureSlug })
+  console.log('[v0] getCourseBySlug result:', result
+    ? `OK - course.id="${result.course.id}" lectures=[${result.course.lectures.map((l) => l.id).join(', ')}]`
+    : 'NOT FOUND')
   if (!result) return undefined
   const lecture = result.course.lectures.find((l) => l.id === lectureSlug)
+  console.log('[v0] lecture find result:', lecture
+    ? `FOUND id="${lecture.id}" isFree=${lecture.isFree} price=${lecture.price}`
+    : `NOT FOUND - lectureSlug="${lectureSlug}" available ids: [${result.course.lectures.map((l) => `"${l.id}"`).join(', ')}]`)
   // Allow watch if: lecture is explicitly free (isFree=true), OR the whole course is free (price 0)
   if (!lecture || (!lecture.isFree && Number(result.course.price) !== 0)) return undefined
   return { ...result, lecture }
