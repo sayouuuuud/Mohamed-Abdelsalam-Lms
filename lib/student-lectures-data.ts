@@ -346,7 +346,21 @@ export async function getEnrolledMonthlyCourses(): Promise<EnrolledMonthlyCourse
 
   const lectureRows = await prisma.lectures.findMany({
     where: { monthly_course_id: { in: courseIds } },
-    select: { id: true, slug: true, title: true, image: true, monthly_course_id: true, monthly_course_section_id: true, course_sort_order: true, sort_order: true, created_at: true, lessons: { select: { id: true } } }
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      image: true,
+      monthly_course_id: true,
+      monthly_course_section_id: true,
+      course_sort_order: true,
+      sort_order: true,
+      created_at: true,
+      lessons: {
+        select: { id: true, slug: true, sort_order: true },
+        orderBy: { sort_order: 'asc' },
+      },
+    }
   })
 
   const sectionRows = await prisma.monthly_course_sections.findMany({
@@ -383,8 +397,16 @@ export async function getEnrolledMonthlyCourses(): Promise<EnrolledMonthlyCourse
     let completedLessons = 0
     let newLecturesCount = 0
     const lectures: EnrolledCourseLecture[] = rawLectures.map((lecture) => {
-      const lessonIds: string[] = (lecture.lessons ?? []).map((l: any) => l.id)
+      const lectureLessons = (lecture.lessons ?? []) as Array<{
+        id: string
+        slug: string
+        sort_order: number | null
+      }>
+      const lessonIds = lectureLessons.map((lesson) => lesson.id)
       const done = lessonIds.filter((id) => progress.completedLessonIds.has(id)).length
+      const nextLesson =
+        lectureLessons.find((lesson) => !progress.completedLessonIds.has(lesson.id)) ??
+        lectureLessons[0]
       totalLessons += lessonIds.length
       completedLessons += done
 
@@ -399,6 +421,7 @@ export async function getEnrolledMonthlyCourses(): Promise<EnrolledMonthlyCourse
         image: lecture.image || lectureImage(lecture.slug),
         totalLessons: lessonIds.length,
         completedLessons: done,
+        nextLessonId: nextLesson?.slug ?? null,
         isNew,
         addedAt,
         sectionId: lecture.monthly_course_section_id ?? null,
