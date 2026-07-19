@@ -13,7 +13,9 @@ export async function generateMetadata({
 }: {
   params: Promise<{ id: string; branchId: string }>
 }): Promise<Metadata> {
-  const { id, branchId } = await params
+  const paramsObj = await params
+  const id = decodeURIComponent(paramsObj.id)
+  const branchId = decodeURIComponent(paramsObj.branchId)
   const [result, { seo }] = await Promise.all([getBranchBySlug(id, branchId), getSiteContent()])
   if (!result) return { title: 'الفرع غير موجود' }
   const description = buildBranchDescription({

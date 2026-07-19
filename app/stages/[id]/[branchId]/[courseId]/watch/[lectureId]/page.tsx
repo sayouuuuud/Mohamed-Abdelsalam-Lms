@@ -10,8 +10,12 @@ type PageProps = {
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { id, branchId, courseId, lectureId } = await params
-  const data = await getFreeLectureWatch(id, branchId, decodeURIComponent(courseId), decodeURIComponent(lectureId))
+  const paramsObj = await params
+  const id = decodeURIComponent(paramsObj.id)
+  const branchId = decodeURIComponent(paramsObj.branchId)
+  const courseId = decodeURIComponent(paramsObj.courseId)
+  const lectureId = decodeURIComponent(paramsObj.lectureId)
+  const data = await getFreeLectureWatch(id, branchId, courseId, lectureId)
   if (!data) return { title: 'المحاضرة غير متاحة', robots: { index: false, follow: false } }
   return {
     title: `${data.lecture.title} (مجانية)`,
@@ -20,8 +24,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function FreeLectureWatchPage({ params }: PageProps) {
-  const { id, branchId, courseId, lectureId } = await params
-  const data = await getFreeLectureWatch(id, branchId, decodeURIComponent(courseId), decodeURIComponent(lectureId))
+  const paramsObj = await params
+  const id = decodeURIComponent(paramsObj.id)
+  const branchId = decodeURIComponent(paramsObj.branchId)
+  const courseId = decodeURIComponent(paramsObj.courseId)
+  const lectureId = decodeURIComponent(paramsObj.lectureId)
+  const data = await getFreeLectureWatch(id, branchId, courseId, lectureId)
   if (!data) notFound()
 
   return (
