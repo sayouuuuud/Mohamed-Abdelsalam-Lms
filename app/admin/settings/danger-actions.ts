@@ -29,7 +29,7 @@ export async function wipeAllData(password: string) {
   }).catch(() => {})
 
   try {
-    await prisma.$executeRaw`SELECT admin_wipe_all_data(${user.id})`
+    await prisma.$executeRaw`SELECT admin_wipe_all_data(${user.id}::uuid)`
     return { success: true }
   } catch (error: any) {
     console.log('[v0] wipeAllData error:', error.message)
