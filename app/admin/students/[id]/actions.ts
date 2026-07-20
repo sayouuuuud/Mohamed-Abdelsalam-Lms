@@ -351,7 +351,8 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
 
   const examsData = await prisma.exam_submissions.findMany({
     where: { student_id: studentId },
-    select: { id: true, score: true, total: true, status: true, submitted_at: true, exams: { select: { title: true, course: true } } }
+    select: { id: true, score: true, total: true, status: true, submitted_at: true, exams: { select: { title: true, course: true } } },
+    orderBy: { submitted_at: 'desc' }
   })
 
   const exams: ExamGrade[] = examsData.map((e) => ({
@@ -366,7 +367,8 @@ export async function getStudentProfileData(code: string): Promise<StudentProfil
 
   const assignmentsData = await prisma.assignment_submissions.findMany({
     where: { student_id: studentId },
-    select: { id: true, status: true, score: true, submitted_at: true, assignments: { select: { title: true, due_date: true, courses: { select: { title: true } } } } }
+    select: { id: true, status: true, score: true, submitted_at: true, assignments: { select: { title: true, due_date: true, courses: { select: { title: true } } } } },
+    orderBy: { submitted_at: 'desc' }
   })
 
   const assignments: AssignmentRecord[] = assignmentsData.map((a) => {

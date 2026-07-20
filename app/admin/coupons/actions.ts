@@ -13,7 +13,7 @@ import {
 
 export async function getCoupons(): Promise<CouponRecord[]> {
   const data = await prisma.coupons.findMany({
-    orderBy: { display_code: 'asc' }
+    orderBy: { created_at: 'desc' }
   })
 
   return data.map((row) => ({

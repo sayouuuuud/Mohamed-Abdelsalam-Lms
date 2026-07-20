@@ -10,8 +10,8 @@ import type { CalendarEvent, CalendarEventType } from '@/lib/calendar-data'
 export async function getEvents(): Promise<CalendarEvent[]> {
   const data = await prisma.calendar_events.findMany({
     orderBy: [
-      { event_date: 'asc' },
-      { event_time: 'asc' }
+      { event_date: 'desc' },
+      { event_time: 'desc' }
     ]
   })
 
