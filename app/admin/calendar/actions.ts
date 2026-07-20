@@ -72,7 +72,7 @@ export async function createEvent(values: {
       data: {
         code,
         title: values.title,
-        event_date: values.date,
+        event_date: new Date(values.date).toISOString(),
         event_time: values.time,
         type: values.type,
         course: values.course || '',
@@ -122,7 +122,7 @@ export async function updateEvent(
       where: { code: id },
       data: {
         title: values.title,
-        event_date: values.date,
+        event_date: new Date(values.date).toISOString(),
         event_time: values.time,
         type: values.type,
         course: values.course || '',
