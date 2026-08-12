@@ -216,6 +216,58 @@ export async function updatePlatformSettings(input: { is_streaming_enabled: bool
 
 import bcrypt from 'bcryptjs'
 
+export async function updateAdminEmail(newEmail: string, currentPassword: string) {
+  if (!(await hasResourceAccess('settings', 'manage'))) {
+    return { error: 'غير مسموح. لازم تكون أدمن.' }
+  }
+  const session = await auth()
+  const sessionUser = session?.user
+  if (!sessionUser) return { error: 'لازم تسجّل دخول.' }
+
+  const email = newEmail.trim().toLowerCase()
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+  if (!email || !emailRegex.test(email)) {
+    return { error: 'البريد الإلكتروني غير صالح.' }
+  }
+
+  if (!currentPassword) {
+    return { error: 'أدخل كلمة المرور الحالية للتأكيد.' }
+  }
+
+  try {
+    const user = await prisma.user.findUnique({ where: { id: sessionUser.id } })
+    if (!user || !user.encrypted_password) {
+      return { error: 'تعذّر التحقق من الحساب.' }
+    }
+
+    const isValid = await bcrypt.compare(currentPassword, user.encrypted_password)
+    if (!isValid) {
+      return { error: 'كلمة المرور الحالية غير صحيحة.' }
+    }
+
+    if (email === (user.email || '').toLowerCase()) {
+      return { error: 'هذا هو بريدك الإلكتروني الحالي.' }
+    }
+
+    const existing = await prisma.user.findFirst({ where: { email } })
+    if (existing && existing.id !== sessionUser.id) {
+      return { error: 'هذا البريد الإلكتروني مستخدم بالفعل.' }
+    }
+
+    await prisma.$transaction([
+      prisma.user.update({ where: { id: sessionUser.id }, data: { email } }),
+      prisma.profiles.update({ where: { id: sessionUser.id }, data: { email } }),
+    ])
+
+    logActivity({ action: 'update', resource: 'settings', targetLabel: `تغيير البريد الإلكتروني إلى: ${email}` }).catch(() => {})
+    revalidatePath('/admin', 'layout')
+    return { success: true }
+  } catch (error: any) {
+    return { error: 'تعذّر تحديث البريد الإلكتروني. حاول تاني.' }
+  }
+}
+
 export async function updateAdminPassword(newPassword: string) {
   if (!(await hasResourceAccess('settings', 'manage'))) {
     return { error: 'غير مسموح. لازم تكون أدمن.' }

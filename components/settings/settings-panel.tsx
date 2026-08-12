@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { updateSettings, updateAdminProfile, updatePlatformSettings, updateAdminPassword } from '@/app/admin/settings/actions'
+import { updateSettings, updateAdminProfile, updatePlatformSettings, updateAdminPassword, updateAdminEmail } from '@/app/admin/settings/actions'
 
 import { uploadFiles } from '@/lib/uploadthing'
 import { useTheme } from '@/components/theme-provider'
@@ -175,7 +175,9 @@ export function SettingsPanel({
   const [lastName, setLastName] = useState(
     nameParts.length > 1 ? nameParts.slice(1).join(' ') : settings.profile.lastName,
   )
-  const [email] = useState(adminProfile?.email || settings.profile.email)
+  const [email, setEmail] = useState(adminProfile?.email || settings.profile.email)
+  const [newEmail, setNewEmail] = useState(adminProfile?.email || settings.profile.email)
+  const [emailPassword, setEmailPassword] = useState('')
   const [phone, setPhone] = useState(adminProfile?.phone || settings.profile.phone)
   const [bio, setBio] = useState(settings.profile.bio)
 
@@ -258,6 +260,29 @@ export function SettingsPanel({
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+
+  async function handleEmailUpdate() {
+    const trimmedEmail = newEmail.trim()
+    if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      toast.error('من فضلك أدخل بريد إلكتروني صالح.')
+      return
+    }
+    if (!emailPassword) {
+      toast.error('أدخل كلمة المرور الحالية للتأكيد.')
+      return
+    }
+    startTransition(async () => {
+      const res = await updateAdminEmail(trimmedEmail, emailPassword)
+      if (res?.error) {
+        toast.error(res.error)
+      } else {
+        toast.success('تم تحديث البريد الإلكتروني بنجاح')
+        setEmail(trimmedEmail)
+        setEmailPassword('')
+        router.refresh()
+      }
+    })
+  }
 
   async function handlePasswordUpdate() {
     if (newPassword.length < 6) {
@@ -447,6 +472,33 @@ export function SettingsPanel({
               <p className="mt-1 text-sm text-muted-foreground">
                 إدارة كلمة المرور وحماية حسابك
               </p>
+            </div>
+            <Separator />
+            <div className="grid gap-4 sm:max-w-md">
+              <div>
+                <FieldLabel>البريد الإلكتروني</FieldLabel>
+                <Input
+                  type="email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  className="text-right"
+                  dir="ltr"
+                />
+              </div>
+              <div>
+                <FieldLabel>كلمة المرور الحالية (للتأكيد)</FieldLabel>
+                <Input
+                  type="password"
+                  value={emailPassword}
+                  onChange={(e) => setEmailPassword(e.target.value)}
+                  dir="ltr"
+                />
+              </div>
+            </div>
+            <div className="flex justify-start gap-3">
+              <Button onClick={handleEmailUpdate} disabled={isPending}>
+                تحديث البريد الإلكتروني
+              </Button>
             </div>
             <Separator />
             <div className="grid gap-4 sm:max-w-md">
