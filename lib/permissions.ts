@@ -51,6 +51,9 @@ export function mapPathToResource(pathname: string): ResourceKey | null {
   // /admin/courses/123/lessons/... -> segment after /admin
   const rest = pathname.slice('/admin'.length).replace(/^\/+/, '')
   const seg = rest.split('/')[0] || 'dashboard'
+  // Assignments are managed as part of the courses/lectures domain and share
+  // its permission, even though they live at their own top-level route.
+  if (seg === 'assignments') return 'courses'
   const match = RESOURCE_KEYS.find((k) => k === seg)
   return match ?? null
 }
