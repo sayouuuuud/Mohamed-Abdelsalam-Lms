@@ -181,10 +181,20 @@ export async function submitExam(code: string, answers: SubmitAnswer[]) {
   const student = await getCurrentStudent()
   if (!student) return { success: false, error: 'لازم تسجّل دخول.' }
 
-  const exam = await prisma.exams.findFirst({
-    where: { code },
-    select: { id: true, code: true, pass_mark: true, status: true, stage_id: true, branch_id: true }
-  })
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(code)
+
+  let exam
+  if (isUuid) {
+    exam = await prisma.exams.findUnique({
+      where: { id: code },
+      select: { id: true, code: true, pass_mark: true, status: true, stage_id: true, branch_id: true }
+    })
+  } else {
+    exam = await prisma.exams.findFirst({
+      where: { code },
+      select: { id: true, code: true, pass_mark: true, status: true, stage_id: true, branch_id: true }
+    })
+  }
 
   if (!exam || exam.status !== 'منشور') {
     return { success: false, error: 'الاختبار غير متاح.' }
