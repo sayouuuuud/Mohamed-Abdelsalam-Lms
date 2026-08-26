@@ -114,7 +114,7 @@ export async function getStudentsStats() {
 async function generateStudentCode(): Promise<string> {
   const data = await prisma.students.findFirst({
     select: { code: true },
-    orderBy: { code: 'desc' }
+    orderBy: { created_at: 'desc' }
   })
 
   let next = 1043

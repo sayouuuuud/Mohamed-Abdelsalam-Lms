@@ -18,7 +18,7 @@ type Body = {
 
 async function generateStudentCode(): Promise<string> {
   const lastStudent = await prisma.students.findFirst({
-    orderBy: { code: 'desc' },
+    orderBy: { created_at: 'desc' },
     select: { code: true }
   });
 
@@ -103,11 +103,42 @@ export async function POST(request: NextRequest) {
     where: { email }
   })
 
+  let userId: string;
+  const verificationRequired = await isEmailVerificationRequired()
+  const hashedPassword = await bcrypt.hash(password, 10)
+
   if (existingUser) {
-    return NextResponse.json(
-      { error: 'البريد الإلكتروني مستخدم بالفعل.' },
-      { status: 409 },
-    )
+    const existingStudent = await prisma.students.findFirst({
+      where: { user_id: existingUser.id }
+    })
+
+    if (existingStudent) {
+      return NextResponse.json(
+        { error: 'البريد الإلكتروني مستخدم بالفعل.' },
+        { status: 409 },
+      )
+    }
+    
+    userId = existingUser.id;
+    // Update password for orphaned user in case they changed it
+    await prisma.user.update({
+      where: { id: userId },
+      data: { encrypted_password: hashedPassword }
+    })
+  } else {
+    userId = crypto.randomUUID()
+    await prisma.user.create({
+      data: {
+        id: userId,
+        email,
+        encrypted_password: hashedPassword,
+        aud: 'authenticated',
+        role: 'authenticated',
+        emailVerified: verificationRequired ? null : new Date(),
+        created_at: new Date(),
+        updated_at: new Date()
+      }
+    })
   }
 
   const userMetadata = {
@@ -116,25 +147,6 @@ export async function POST(request: NextRequest) {
     grade: body.grade ?? '',
     role: 'student',
   }
-
-  const verificationRequired = await isEmailVerificationRequired()
-  
-  // Create User
-  const userId = crypto.randomUUID()
-  const hashedPassword = await bcrypt.hash(password, 10)
-
-  await prisma.user.create({
-    data: {
-      id: userId,
-      email,
-      encrypted_password: hashedPassword,
-      aud: 'authenticated',
-      role: 'authenticated',
-      emailVerified: verificationRequired ? null : new Date(),
-      created_at: new Date(),
-      updated_at: new Date()
-    }
-  })
 
   await ensureStudentRow(userId, email, userMetadata)
 

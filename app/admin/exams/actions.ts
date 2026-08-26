@@ -105,6 +105,8 @@ export async function saveExam(payload: SaveExamPayload) {
 
     logActivity({ action: 'create', resource: 'exams', targetId: exam.code, targetLabel: `اختبار: ${meta.title.trim()}` }).catch(() => {})
     revalidatePath('/admin/exams')
+    revalidatePath('/student/exams')
+    revalidatePath('/student/dashboard')
     return { success: true, code: exam.code }
   } catch (error: any) {
     return { success: false, error: 'تعذر حفظ الاختبار أو الأسئلة' }

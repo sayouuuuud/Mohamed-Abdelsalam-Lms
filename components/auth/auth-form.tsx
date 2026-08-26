@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 import { recordLogin } from '@/app/auth/audit-actions'
 import { signIn, getSession } from 'next-auth/react'
 
-type Tab = 'login' | 'register'
+type Tab = 'login' | 'register' | 'forgot_password' | 'reset_password'
 
 const grades = [
   { value: 'sec-1', label: 'الصف الأول الثانوي' },
@@ -129,6 +129,39 @@ export function AuthForm({ initialTab = 'login' }: { initialTab?: Tab }) {
           'بعتنالك كود تفعيل على بريدك الإلكتروني. اكتبه تحت عشان تفعّل حسابك.',
         )
         setAwaitingCode(true)
+      } else if (tab === 'forgot_password') {
+        const res = await fetch('/auth/forgot-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: loginEmail.trim() }),
+        })
+        const result = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          setError(result.error ?? 'حصلت مشكلة. حاول تاني.')
+          return
+        }
+        setDoneMessage('بعتنالك كود استعادة كلمة المرور على الإيميل. اكتبه تحت مع كلمة المرور الجديدة.')
+        setTab('reset_password')
+        setDone(true)
+      } else if (tab === 'reset_password') {
+        const res = await fetch('/auth/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: loginEmail.trim(),
+            code: code.trim(),
+            password: loginPassword,
+          }),
+        })
+        const result = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          setError(result.error ?? 'حصلت مشكلة. حاول تاني.')
+          return
+        }
+        
+        switchTab('login')
+        setDone(true)
+        setDoneMessage('تم تغيير كلمة المرور بنجاح. تقدر تسجل دخولك دلوقتي.')
       }
     } catch {
       setError('حصل خطأ غير متوقّع. حاول تاني.')
@@ -374,11 +407,24 @@ export function AuthForm({ initialTab = 'login' }: { initialTab?: Tab }) {
           icon={<Mail className="size-4" />}
           type="email"
           placeholder="you@example.com"
-          value={tab === 'login' ? loginEmail : email}
-          onChange={tab === 'login' ? setLoginEmail : setEmail}
+          value={tab === 'register' ? email : loginEmail}
+          onChange={tab === 'register' ? setEmail : setLoginEmail}
           autoComplete="email"
           dir="ltr"
         />
+
+        {tab === 'reset_password' && (
+          <Field
+            id="code"
+            label="كود الاستعادة"
+            icon={<ShieldCheck className="size-4" />}
+            type="text"
+            placeholder="000000"
+            value={code}
+            onChange={setCode}
+            dir="ltr"
+          />
+        )}
 
         {tab === 'register' && (
           <>
@@ -428,46 +474,51 @@ export function AuthForm({ initialTab = 'login' }: { initialTab?: Tab }) {
         )}
 
         {/* Password */}
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <label htmlFor="password" className="block text-sm font-semibold text-navy dark:text-ink-fg">
-              كلمة السر
-            </label>
-            {tab === 'login' && (
-              <button type="button" className="text-xs font-semibold text-gold-deep hover:underline dark:text-teal-glow">
-                نسيت كلمة السر؟
-              </button>
-            )}
-          </div>
-          <div className="relative">
-            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-navy-soft dark:text-ink-dim">
-              <Lock className="size-4" />
-            </span>
-            <input
-              id="password"
-              type={showPassword ? 'text' : 'password'}
-              required
-              placeholder="••••••••"
-              value={tab === 'login' ? loginPassword : password}
-              onChange={(e) =>
-                tab === 'login' ? setLoginPassword(e.target.value) : setPassword(e.target.value)
-              }
-              autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
-              className={cn(
-                'h-12 w-full rounded-xl border border-navy/15 bg-cream/60 pr-10 pl-11 text-sm font-medium text-navy outline-none transition-colors dark:border-ink-line dark:bg-ink-base/60 dark:text-ink-fg',
-                'placeholder:text-navy-soft/60 focus:border-gold focus:ring-4 focus:ring-gold/15 dark:placeholder:text-ink-dim/60 dark:focus:border-teal-glow dark:focus:ring-teal-glow/15',
+        {tab !== 'forgot_password' && (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label htmlFor="password" className="block text-sm font-semibold text-navy dark:text-ink-fg">
+                {tab === 'reset_password' ? 'كلمة السر الجديدة' : 'كلمة السر'}
+              </label>
+              {tab === 'login' && (
+                <button 
+                  type="button" 
+                  onClick={() => switchTab('forgot_password')}
+                  className="text-xs font-semibold text-gold-deep hover:underline dark:text-teal-glow">
+                  نسيت كلمة السر؟
+                </button>
               )}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((s) => !s)}
-              className="absolute inset-y-0 left-3 flex items-center text-navy-soft transition-colors hover:text-navy dark:text-ink-dim dark:hover:text-ink-fg"
-              aria-label={showPassword ? 'إخفاء كلمة السر' : 'إظهار كلمة السر'}
-            >
-              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-            </button>
+            </div>
+            <div className="relative">
+              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-navy-soft dark:text-ink-dim">
+                <Lock className="size-4" />
+              </span>
+              <input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                required
+                placeholder="••••••••"
+                value={tab === 'register' ? password : loginPassword}
+                onChange={(e) =>
+                  tab === 'register' ? setPassword(e.target.value) : setLoginPassword(e.target.value)
+                }
+                autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
+                className={cn(
+                  'h-12 w-full rounded-xl border border-navy/15 bg-cream/60 pr-10 pl-11 text-sm font-medium text-navy outline-none transition-colors dark:border-ink-line dark:bg-ink-base/60 dark:text-ink-fg',
+                  'placeholder:text-navy-soft/60 focus:border-gold focus:ring-4 focus:ring-gold/15 dark:placeholder:text-ink-dim/60 dark:focus:border-teal-glow dark:focus:ring-teal-glow/15',
+                )}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((s) => !s)}
+                className="absolute inset-y-0 left-3 flex items-center text-navy-soft transition-colors hover:text-navy dark:text-ink-dim dark:hover:text-ink-fg"
+                aria-label={showPassword ? 'إخفاء كلمة السر' : 'إظهار كلمة السر'}
+              >
+                {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         <button
           type="submit"
@@ -478,13 +529,23 @@ export function AuthForm({ initialTab = 'login' }: { initialTab?: Tab }) {
           )}
         >
           {submitting && <Loader2 className="size-4 animate-spin" />}
-          {tab === 'login' ? 'تسجيل الدخول' : 'إنشاء الحساب'}
+          {tab === 'login' ? 'تسجيل الدخول' : 
+           tab === 'register' ? 'إنشاء الحساب' :
+           tab === 'forgot_password' ? 'إرسال كود الاستعادة' : 'تغيير كلمة السر'}
         </button>
       </form>
 
       {/* Footer switch */}
       <p className="mt-6 text-center text-sm text-navy-soft dark:text-ink-dim">
-        {tab === 'login' ? (
+        {tab === 'forgot_password' || tab === 'reset_password' ? (
+          <button
+            type="button"
+            onClick={() => switchTab('login')}
+            className="font-bold text-gold-deep hover:underline dark:text-teal-glow"
+          >
+            الرجوع لتسجيل الدخول
+          </button>
+        ) : tab === 'login' ? (
           <>
             لسه ماعندكش حساب؟{' '}
             <button
