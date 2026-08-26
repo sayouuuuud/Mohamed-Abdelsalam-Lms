@@ -7,6 +7,8 @@ import {
   getStudentLearningActivity
 } from './actions'
 
+export const dynamic = 'force-dynamic'
+
 export default async function StudentPage() {
   const enrolledCourses = await getStudentEnrolledCourses()
   const schedule = await getStudentUpcomingSchedule()
