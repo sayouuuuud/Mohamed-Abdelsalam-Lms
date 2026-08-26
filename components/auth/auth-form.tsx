@@ -91,7 +91,7 @@ export function AuthForm({ initialTab = 'login' }: { initialTab?: Tab }) {
 
         window.location.assign(destination)
         return
-      } else {
+      } else if (tab === 'register') {
         const res = await fetch('/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
